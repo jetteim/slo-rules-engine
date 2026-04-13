@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'optparse'
+require 'fileutils'
 require_relative '../lib/sre'
 
 module RulesCtl
@@ -41,8 +42,10 @@ module RulesCtl
 
   def generate(argv)
     provider_key = nil
+    output_dir = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--output-dir=DIR', 'Write generated manifests under DIR') { |value| output_dir = value }
     end
     parser.parse!(argv)
     abort_usage('missing --provider') unless provider_key
@@ -56,6 +59,7 @@ module RulesCtl
       exit 1
     end
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    write_provider_manifests(output_dir, manifests) if output_dir
     puts JSON.pretty_generate(manifests)
   end
 
@@ -145,12 +149,20 @@ module RulesCtl
     }
   end
 
+  def write_provider_manifests(output_dir, manifests)
+    manifests.each do |manifest|
+      path = File.join(output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, JSON.pretty_generate(manifest))
+    end
+  end
+
   def abort_usage(message = nil)
     warn "Error: #{message}" if message
     warn <<~USAGE
       Usage:
         bin/rules-ctl validate <definitionfile...>
-        bin/rules-ctl generate --provider=<provider> <definitionfile...>
+        bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
