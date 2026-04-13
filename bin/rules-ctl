@@ -1,0 +1,79 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'optparse'
+require_relative '../lib/sre'
+
+module RulesCtl
+  module_function
+
+  def run(argv)
+    command = argv.shift
+    abort_usage unless command
+
+    case command
+    when 'validate'
+      validate(argv)
+    when 'generate'
+      generate(argv)
+    when 'providers'
+      providers(argv)
+    else
+      abort_usage("unknown command: #{command}")
+    end
+  end
+
+  def validate(argv)
+    definitions = load_definitions(argv)
+    validator = SloRulesEngine::CoreValidator.new
+    results = definitions.map { |definition| validator.validate(definition).to_h.merge(service: definition.service) }
+    puts JSON.pretty_generate(results)
+    exit(results.all? { |result| result[:valid] } ? 0 : 1)
+  end
+
+  def generate(argv)
+    provider_key = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    registry = SloRulesEngine.default_provider_registry
+    provider = registry.fetch(provider_key)
+    definitions = load_definitions(argv)
+    manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    puts JSON.pretty_generate(manifests)
+  end
+
+  def providers(argv)
+    subcommand = argv.shift
+    abort_usage('usage: providers list') unless subcommand == 'list'
+
+    providers = SloRulesEngine.default_provider_registry.list.map do |provider|
+      { key: provider.key, capabilities: provider.capabilities }
+    end
+    puts JSON.pretty_generate(providers)
+  end
+
+  def load_definitions(paths)
+    abort_usage('missing definition file') if paths.empty?
+
+    SloRulesEngine.clear_definitions
+    paths.each { |path| load File.expand_path(path) }
+    SloRulesEngine.definitions
+  end
+
+  def abort_usage(message = nil)
+    warn "Error: #{message}" if message
+    warn <<~USAGE
+      Usage:
+        bin/rules-ctl validate <definitionfile...>
+        bin/rules-ctl generate --provider=<provider> <definitionfile...>
+        bin/rules-ctl providers list
+    USAGE
+    exit 2
+  end
+end
+
+RulesCtl.run(ARGV)
