@@ -7,13 +7,13 @@ This is the running plan for the long refactor.
 - [x] Create public-safe repository scaffold.
 - [x] Document feature inventory and provider contract.
 - [x] Document migration map.
-- [ ] Add minimal executable Ruby DSL.
-- [ ] Add neutral model objects.
-- [ ] Add validation result model.
-- [ ] Add provider registry.
-- [ ] Add `datadog`, `prometheus_stack`, and `notification_router` smoke providers.
-- [ ] Add sample service definitions.
-- [ ] Add tests and forbidden-term scan.
+- [x] Add minimal executable Ruby DSL.
+- [x] Add neutral model objects.
+- [x] Add validation result model.
+- [x] Add provider registry.
+- [x] Add `datadog`, `prometheus_stack`, and `notification_router` smoke providers.
+- [x] Add sample service definitions.
+- [x] Add tests and forbidden-term scan.
 - [ ] Push public repository.
 
 ## Phase 2: DSL Compatibility
