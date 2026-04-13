@@ -25,6 +25,8 @@ class ProvidersTest < Minitest::Test
     assert_equal 1, manifest[:artifacts][:slos].length
     assert_equal 1, manifest[:artifacts][:monitors].length
     assert_equal [14.4, 6.0], manifest[:artifacts][:monitors].fetch(0)[:burn_rate_windows].map { |window| window[:threshold] }
+    assert_equal 1, manifest[:artifacts][:telemetry_gap_monitors].length
+    assert_equal 'notification', manifest[:artifacts][:telemetry_gap_monitors].fetch(0)[:classification]
     assert_equal 1, manifest[:artifacts][:dashboards].length
   end
 
@@ -35,6 +37,8 @@ class ProvidersTest < Minitest::Test
     assert_equal 1, manifest[:artifacts][:recording_rules].length
     assert_equal 2, manifest[:artifacts][:burn_rate_rules].length
     assert_equal [14.4, 6.0], manifest[:artifacts][:burn_rate_rules].map { |rule| rule[:threshold] }
+    assert_equal 1, manifest[:artifacts][:missing_telemetry_rules].length
+    assert_equal 'notification', manifest[:artifacts][:missing_telemetry_rules].fetch(0)[:classification]
     assert_equal 1, manifest[:artifacts][:alert_rules].length
     assert_equal 1, manifest[:artifacts][:alertmanager_routes].length
     assert_equal 1, manifest[:artifacts][:grafana_dashboards].length
