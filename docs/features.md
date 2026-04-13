@@ -11,6 +11,7 @@ This file tracks the long-running migration scope.
 - Reality checks against historical telemetry and measured metric inventories.
 - SLI/SLO candidate generation from measured telemetry with findings for rejected or incomplete signals.
 - Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and notification routing.
+- Compatibility reports for legacy DSL and implementation-coupled definitions.
 - Golden-style tests for generated artifacts.
 
 ## Change

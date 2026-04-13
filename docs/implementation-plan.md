@@ -47,7 +47,7 @@ This is the running plan for the long refactor.
 
 ## Phase 4: Migration Tooling
 
-- [ ] Add old-DSL compatibility report.
+- [x] Add old-DSL compatibility report.
 - [ ] Add anonymization helper for examples.
 - [ ] Add generated artifact diff harness.
 - [ ] Add import guidance for existing service files.

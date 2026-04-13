@@ -109,4 +109,18 @@ class CLITest < Minitest::Test
       assert_equal 'missing_provider_metric', payload.fetch('findings').fetch(0).fetch('code')
     end
   end
+
+  def test_migration_report_exits_nonzero_for_findings
+    Tempfile.create(['legacy-sld', '.rb']) do |file|
+      file.write("datadog_trace_slo\n")
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'migration-report', file.path)
+      payload = JSON.parse(stdout)
+
+      refute status.success?
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'provider_specific_dsl', payload.fetch('findings').fetch(0).fetch('code')
+    end
+  end
 end
