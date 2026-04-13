@@ -4,6 +4,7 @@ require 'json'
 require 'minitest/autorun'
 require 'open3'
 require 'tempfile'
+require 'tmpdir'
 
 class CLITest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
@@ -46,6 +47,28 @@ class CLITest < Minitest::Test
       refute status.success?
       assert_equal false, payload.fetch('valid')
       assert payload.fetch('errors').any? { |error| error.fetch('message').include?('missing datadog query binding') }
+    end
+  end
+
+  def test_generate_writes_manifest_to_output_dir
+    Dir.mktmpdir do |dir|
+      stdout, _stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'generate',
+        '--provider=datadog',
+        "--output-dir=#{dir}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+
+      assert status.success?, stdout
+
+      manifest_path = File.join(dir, 'checkout-api', 'datadog', 'manifest.json')
+      assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
+
+      payload = JSON.parse(File.read(manifest_path))
+      assert_equal 'checkout-api', payload.fetch('service')
+      assert_equal 'datadog', payload.fetch('provider')
     end
   end
 end
