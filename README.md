@@ -64,6 +64,7 @@ bin/rules-ctl integrations list
 ```bash
 ruby -Ilib test/all_test.rb
 bin/rules-ctl validate examples/services/checkout.rb
+scripts/verify.sh
 ```
 
 No external Ruby dependencies are required for the initial skeleton.
