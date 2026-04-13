@@ -47,6 +47,10 @@ module SloRulesEngine
         %w[prometheus openmetrics]
       end
 
+      def required_route_sources
+        %w[alertmanager]
+      end
+
       def each_slo(definition)
         definition.slis.each do |sli|
           sli.instances.each do |instance|

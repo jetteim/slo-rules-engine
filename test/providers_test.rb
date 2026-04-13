@@ -55,4 +55,13 @@ class ProvidersTest < Minitest::Test
     assert_equal '/api/datadog/checkout-api/checkout-api', manifest[:artifacts][:route_availability_checks].fetch(0)[:path]
     assert_equal '/api/alertmanager/checkout-api', manifest[:artifacts][:route_availability_checks].fetch(1)[:path]
   end
+
+  def test_provider_validation_requires_matching_route_source
+    @definition.notification_routes.delete_if { |route| route.source == 'datadog' }
+
+    result = SloRulesEngine.default_provider_registry.fetch('datadog').validate(@definition)
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path == 'notification_routes' && error.message.include?('datadog') }
+  end
 end
