@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require_relative '../lib/slo_rules_engine'
+require_relative '../lib/sre'
 
 class RealityCheckTest < Minitest::Test
   def test_recommends_observations_for_high_volume
@@ -22,5 +22,33 @@ class RealityCheckTest < Minitest::Test
 
     assert_equal 'time_slice', result.basis
     assert_equal 'high', result.confidence
+  end
+
+  def test_checks_provider_bindings_against_measured_telemetry
+    SloRulesEngine.clear_definitions
+    load File.expand_path('../examples/services/checkout.rb', __dir__)
+    definition = SloRulesEngine.definitions.fetch(0)
+
+    report = SloRulesEngine::RealityCheck::TelemetryBindingChecker.new(provider: 'datadog').check(
+      definition,
+      [{ metric: 'http.server.request.duration' }]
+    )
+
+    assert report.valid?, report.to_h.inspect
+  end
+
+  def test_reports_missing_provider_telemetry
+    SloRulesEngine.clear_definitions
+    load File.expand_path('../examples/services/checkout.rb', __dir__)
+    definition = SloRulesEngine.definitions.fetch(0)
+
+    report = SloRulesEngine::RealityCheck::TelemetryBindingChecker.new(provider: 'datadog').check(
+      definition,
+      [{ metric: 'other.metric' }]
+    )
+
+    refute report.valid?
+    assert_equal 'missing_provider_metric', report.findings.fetch(0)[:code]
+    assert_equal 'http.server.request.duration', report.findings.fetch(0)[:metric]
   end
 end
