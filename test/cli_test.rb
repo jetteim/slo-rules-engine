@@ -71,4 +71,21 @@ class CLITest < Minitest::Test
       assert_equal 'datadog', payload.fetch('provider')
     end
   end
+
+  def test_candidates_outputs_review_with_findings
+    Tempfile.create(['signals', '.json']) do |file|
+      file.write(JSON.generate([
+        { kind: 'latency', metric: 'http_duration_seconds', user_visible: true },
+        { kind: 'saturation', metric: 'heap_used', user_visible: false }
+      ]))
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'candidates', file.path)
+      payload = JSON.parse(stdout)
+
+      assert status.success?, stdout
+      assert_equal 1, payload.fetch('candidates').length
+      assert_equal ['non_user_visible'], payload.fetch('findings').map { |finding| finding.fetch('code') }
+    end
+  end
 end
