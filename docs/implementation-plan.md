@@ -26,16 +26,22 @@ This is the running plan for the long refactor.
 - [x] Add provider-specific query bindings while preserving neutral metric intent.
 - [x] Add provider capability validation before generation.
 - [x] Add line references for validation messages.
-- [ ] Add calculation-basis rules.
+- [x] Add calculation-basis recommendation rules.
+- [x] Add alert route reference validation.
 - [ ] Add SLO reality-check hooks.
 
 ## Phase 3: Provider Depth
 
-- [ ] Implement Datadog SLO and monitor artifact generation.
-- [ ] Implement Prometheus-compatible recording and alert rule generation.
-- [ ] Implement Grafana dashboard generation.
-- [ ] Implement notification-router route catalog generation.
-- [ ] Add provider capability validation.
+- [x] Implement Datadog SLO, burn-rate monitor, telemetry-gap notification, and dashboard manifest generation.
+- [x] Implement Prometheus-compatible recording, burn-rate, missing-telemetry, and alert rule manifest generation.
+- [x] Implement Grafana dashboard manifest generation.
+- [x] Implement notification-router route catalog generation.
+- [x] Add notification-router route availability check manifests.
+- [x] Add provider capability validation.
+- [x] Add provider route-source validation.
+- [x] Add generated provider manifest output directory.
+- [ ] Add provider artifact schemas for apply-ready outputs.
+- [ ] Add provider query/reality-check adapters.
 
 ## Phase 4: Migration Tooling
 

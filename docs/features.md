@@ -7,9 +7,10 @@ This file tracks the long-running migration scope.
 - Ruby service level definition DSL.
 - SLI, SLI instance, SLO, objective, success condition, and calculation-basis concepts.
 - Validation of naming, required fields, uniqueness, SLO objective ranges, and metric binding completeness.
+- Validation that SLO alert route keys and provider-specific route sources exist.
 - Reality checks against historical telemetry.
-- SLI/SLO candidate generation from measured telemetry.
-- Generation of SLO rules, alerts, dashboards, and notification routing.
+- SLI/SLO candidate generation from measured telemetry with findings for rejected or incomplete signals.
+- Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and notification routing.
 - Golden-style tests for generated artifacts.
 
 ## Change
@@ -32,7 +33,7 @@ This file tracks the long-running migration scope.
 
 - Error-budget burn-rate thresholds.
 - Observation-based and time-slice-based SLO calculation.
-- Missing metric detection.
+- Missing metric and missing telemetry detection.
 - Provider-specific capability validation.
 - Dashboard links from alerts.
 - Route availability checks before alert delivery.
