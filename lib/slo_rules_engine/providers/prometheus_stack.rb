@@ -22,6 +22,7 @@ module SloRulesEngine
       def generate(definition)
         artifacts = {
           recording_rules: [],
+          burn_rate_rules: [],
           alert_rules: [],
           alertmanager_routes: [],
           grafana_dashboards: []
@@ -29,6 +30,7 @@ module SloRulesEngine
 
         each_slo(definition) do |sli, instance, slo|
           artifacts[:recording_rules] << recording_rule(definition, sli, instance, slo)
+          artifacts[:burn_rate_rules].concat(burn_rate_rules(definition, sli, instance, slo))
           artifacts[:alert_rules] << burn_rate_alert(definition, sli, instance, slo)
           artifacts[:alertmanager_routes] << alertmanager_route(definition, slo)
           artifacts[:grafana_dashboards] << grafana_dashboard(definition, sli, instance, slo)
@@ -60,11 +62,25 @@ module SloRulesEngine
         }
       end
 
+      def burn_rate_rules(definition, sli, instance, slo)
+        BurnRatePolicy.new.windows.map do |window|
+          {
+            record: "slo:#{definition.service}:#{sli.uid}:#{instance.uid}:#{slo.uid}:burn_rate:#{window[:range]}",
+            labels: prometheus_labels(definition, sli, instance, slo),
+            range: window[:range],
+            percent: window[:percent],
+            threshold: window[:threshold],
+            expr: "(1 - slo:#{definition.service}:#{sli.uid}:#{instance.uid}:#{slo.uid}:success_ratio) / #{error_budget(slo)}"
+          }
+        end
+      end
+
       def burn_rate_alert(definition, sli, instance, slo)
         labels = prometheus_labels(definition, sli, instance, slo).merge(
           severity: 'page',
           route_key: slo.alert_route_key || definition.service
         )
+        fast_window = BurnRatePolicy.new.windows.fetch(0)
         {
           alert: 'SLOErrorBudgetBurning',
           labels: labels,
@@ -77,7 +93,7 @@ module SloRulesEngine
             dashboard: slo.dashboard_path || grafana_dashboard_path(definition, sli, instance, slo),
             playbook: instance.playbook_url
           },
-          expr: "slo_burn_rate{service=\"#{definition.service}\",sli=\"#{sli.uid}\",slo=\"#{slo.uid}\"} > 14.4",
+          expr: "slo:#{definition.service}:#{sli.uid}:#{instance.uid}:#{slo.uid}:burn_rate:#{fast_window[:range]} > #{fast_window[:threshold]}",
           for: '5m'
         }
       end
@@ -131,6 +147,10 @@ module SloRulesEngine
 
       def grafana_dashboard_path(definition, sli, instance, slo)
         "/d/slo/#{definition.service}?var-sli=#{sli.uid}&var-instance=#{instance.uid}&var-slo=#{slo.uid}"
+      end
+
+      def error_budget(slo)
+        1.0 - slo.objective.to_f
       end
     end
   end
