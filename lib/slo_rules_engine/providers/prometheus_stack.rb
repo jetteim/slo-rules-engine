@@ -52,7 +52,7 @@ module SloRulesEngine
         {
           record: "slo:#{definition.service}:#{sli.uid}:#{instance.uid}:#{slo.uid}:success_ratio",
           labels: labels,
-          expr: success_ratio_expression(sli.metric, instance, slo)
+          expr: success_ratio_expression(sli.metric.binding_for(key), instance, slo)
         }
       end
 
@@ -107,9 +107,9 @@ module SloRulesEngine
         labels = selector.map { |key, value| "#{key}=#{value.inspect}" }.join(',')
         if slo.success_selector
           success = selector.merge(slo.success_selector).map { |key, value| "#{key}=#{value.inspect}" }.join(',')
-          "sum(rate(#{metric.name}{#{success}}[#{metric.range || '5m'}])) / sum(rate(#{metric.name}{#{labels}}[#{metric.range || '5m'}]))"
+          "sum(rate(#{metric.metric}{#{success}}[#{metric.range || '5m'}])) / sum(rate(#{metric.metric}{#{labels}}[#{metric.range || '5m'}]))"
         else
-          "#{metric.name}{#{labels}}"
+          "#{metric.metric}{#{labels}}"
         end
       end
 

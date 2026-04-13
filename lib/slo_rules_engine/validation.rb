@@ -106,6 +106,13 @@ module SloRulesEngine
       validate_presence(result, "#{path}.data_source", metric.data_source)
       validate_presence(result, "#{path}.type", metric.type)
       validate_hash(result, "#{path}.selector", metric.selector)
+      validate_hash(result, "#{path}.provider_bindings", metric.provider_bindings)
+      metric.provider_bindings.each do |provider, binding|
+        validate_presence(result, "#{path}.provider_bindings.#{provider}.metric", binding.metric)
+        validate_presence(result, "#{path}.provider_bindings.#{provider}.data_source", binding.data_source)
+        validate_presence(result, "#{path}.provider_bindings.#{provider}.type", binding.type)
+        validate_hash(result, "#{path}.provider_bindings.#{provider}.selector", binding.selector)
+      end
     end
 
     def validate_routes(result, routes)

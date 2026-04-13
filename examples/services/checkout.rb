@@ -26,11 +26,25 @@ SRE.define do
     uid 'http-requests'
     title 'HTTP requests'
 
-    metric 'http_server_request_duration_seconds_count' do
-      data_source 'prometheus'
+    metric 'http.server.request.duration' do
+      data_source 'otel'
       type 'counter'
       range '5m'
       selector service: 'checkout-api'
+
+      provider_binding 'datadog' do
+        metric 'http.server.request.duration'
+        data_source 'datadog'
+        type 'distribution'
+        query 'p95:http.server.request.duration{service:checkout-api}'
+      end
+
+      provider_binding 'prometheus_stack' do
+        metric 'http_server_request_duration_seconds_count'
+        data_source 'prometheus'
+        type 'counter'
+        selector service: 'checkout-api'
+      end
     end
 
     instance do
