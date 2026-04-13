@@ -46,13 +46,13 @@ module SloRulesEngine
       validate_presence(result, 'owner', definition.owner)
       validate_environments(result, definition.environments)
       validate_routes(result, definition.notification_routes)
-      validate_slis(result, definition.slis)
+      validate_slis(result, definition.slis, route_keys(definition.notification_routes))
       result
     end
 
     private
 
-    def validate_slis(result, slis)
+    def validate_slis(result, slis, route_keys)
       result.error('slis', 'at least one SLI is required') if slis.empty?
       seen = {}
       slis.each_with_index do |sli, index|
@@ -62,11 +62,11 @@ module SloRulesEngine
         seen[sli.uid] = true
         validate_presence(result, "#{path}.title", sli.title, line_reference: line_reference(sli, :title))
         validate_metric(result, "#{path}.metric", sli.metric)
-        validate_instances(result, path, sli.instances)
+        validate_instances(result, path, sli.instances, route_keys)
       end
     end
 
-    def validate_instances(result, path, instances)
+    def validate_instances(result, path, instances, route_keys)
       result.error("#{path}.instances", 'at least one SLI instance is required') if instances.empty?
       seen = {}
       instances.each_with_index do |instance, index|
@@ -75,11 +75,11 @@ module SloRulesEngine
         result.error("#{instance_path}.uid", 'SLI instance uid must be unique', line_reference: line_reference(instance, :uid)) if instance.uid && seen[instance.uid]
         seen[instance.uid] = true
         validate_hash(result, "#{instance_path}.selector", instance.selector, line_reference: line_reference(instance, :selector))
-        validate_slos(result, instance_path, instance.slos)
+        validate_slos(result, instance_path, instance.slos, route_keys)
       end
     end
 
-    def validate_slos(result, path, slos)
+    def validate_slos(result, path, slos, route_keys)
       result.error("#{path}.slos", 'at least one SLO is required') if slos.empty?
       seen = {}
       slos.each_with_index do |slo, index|
@@ -94,6 +94,7 @@ module SloRulesEngine
         if empty?(slo.success_selector) && empty?(slo.success_threshold)
           result.error("#{slo_path}.success", 'success_selector or success_threshold is required')
         end
+        validate_alert_route_key(result, "#{slo_path}.alert_route_key", slo, route_keys)
       end
     end
 
@@ -125,6 +126,13 @@ module SloRulesEngine
       end
     end
 
+    def validate_alert_route_key(result, path, slo, route_keys)
+      return if empty?(slo.alert_route_key)
+      return if route_keys.include?(slo.alert_route_key)
+
+      result.error(path, "unknown notification route key #{slo.alert_route_key.inspect}", line_reference: line_reference(slo, :alert_route_key))
+    end
+
     def validate_environments(result, environments)
       result.error('environments', 'at least one environment is required') if environments.empty?
       environments.each do |environment|
@@ -138,6 +146,10 @@ module SloRulesEngine
       elsif objective <= 0 || objective >= 1
         result.error(path, 'objective must be a ratio greater than 0 and less than 1', line_reference: line_reference)
       end
+    end
+
+    def route_keys(routes)
+      routes.map(&:key).compact.uniq
     end
 
     def validate_name(result, path, value, line_reference: nil)
