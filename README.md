@@ -28,7 +28,9 @@ Initial providers:
 
 - `datadog`: Datadog SLOs, monitors, dashboards, webhooks, and query validation.
 - `prometheus_stack`: Prometheus-compatible recording/alert rules, Alertmanager routing, Grafana dashboards, and PromQL reality checks.
-- `notification_router`: generated route catalog entries for a platform-agnostic notification router used by backend providers.
+Initial integration:
+
+- `notification_router`: generated route catalog entries for contextual alert delivery used by backend providers.
 
 Future provider candidates:
 
@@ -50,8 +52,11 @@ Future provider candidates:
 bin/rules-ctl validate examples/services/checkout.rb
 bin/rules-ctl generate --provider datadog examples/services/checkout.rb
 bin/rules-ctl generate --provider prometheus_stack examples/services/checkout.rb
-bin/rules-ctl generate --provider notification_router examples/services/checkout.rb
+bin/rules-ctl generate-routes --integration notification_router examples/services/checkout.rb
+bin/rules-ctl candidates examples/telemetry/checkout-signals.json
+bin/rules-ctl recommend-calculation-basis --observations-per-second=25 --failed-observations-to-alert=120
 bin/rules-ctl providers list
+bin/rules-ctl integrations list
 ```
 
 ## Development

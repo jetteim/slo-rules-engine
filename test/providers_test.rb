@@ -13,7 +13,7 @@ class ProvidersTest < Minitest::Test
   def test_lists_complete_backend_providers
     registry = SloRulesEngine.default_provider_registry
 
-    assert_equal %w[datadog prometheus_stack notification_router], registry.list.map(&:key)
+    assert_equal %w[datadog prometheus_stack], registry.list.map(&:key)
     assert_includes registry.fetch('prometheus_stack').capabilities, 'parameterized_dashboards'
     assert_includes registry.fetch('datadog').capabilities, 'slo_evaluation'
   end
@@ -37,9 +37,11 @@ class ProvidersTest < Minitest::Test
     assert_equal 1, manifest[:artifacts][:grafana_dashboards].length
   end
 
-  def test_notification_router_provider_generates_route_catalog
-    manifest = SloRulesEngine.default_provider_registry.fetch('notification_router').generate(@definition).to_h
+  def test_notification_router_integration_generates_route_catalog
+    registry = SloRulesEngine.default_integration_registry
+    manifest = registry.fetch('notification_router').generate(@definition).to_h
 
+    assert_equal 'notification_router', manifest[:integration]
     assert_equal 'msteams', manifest[:artifacts][:route_map][:datadog]['checkout-api'][:provider]
     assert_equal 'msteams', manifest[:artifacts][:route_map][:alertmanager]['checkout-api'][:provider]
   end

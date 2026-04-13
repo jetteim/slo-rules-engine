@@ -11,9 +11,12 @@ This is the running plan for the long refactor.
 - [x] Add neutral model objects.
 - [x] Add validation result model.
 - [x] Add provider registry.
-- [x] Add `datadog`, `prometheus_stack`, and `notification_router` smoke providers.
+- [x] Add `datadog` and `prometheus_stack` smoke providers.
+- [x] Add `notification_router` as delivery integration, not provider.
 - [x] Add sample service definitions.
 - [x] Add tests and forbidden-term scan.
+- [x] Add CLI entrypoint for telemetry-derived SLI/SLO candidates.
+- [x] Add calculation-basis reality-check advisor.
 - [ ] Push public repository.
 
 ## Phase 2: DSL Compatibility

@@ -18,6 +18,14 @@ module RulesCtl
       generate(argv)
     when 'providers'
       providers(argv)
+    when 'integrations'
+      integrations(argv)
+    when 'generate-routes'
+      generate_routes(argv)
+    when 'candidates'
+      candidates(argv)
+    when 'recommend-calculation-basis'
+      recommend_calculation_basis(argv)
     else
       abort_usage("unknown command: #{command}")
     end
@@ -56,6 +64,55 @@ module RulesCtl
     puts JSON.pretty_generate(providers)
   end
 
+  def integrations(argv)
+    subcommand = argv.shift
+    abort_usage('usage: integrations list') unless subcommand == 'list'
+
+    integrations = SloRulesEngine.default_integration_registry.list.map do |integration|
+      { key: integration.key, capabilities: integration.capabilities }
+    end
+    puts JSON.pretty_generate(integrations)
+  end
+
+  def generate_routes(argv)
+    integration_key = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--integration=INTEGRATION', 'Integration key') { |value| integration_key = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --integration') unless integration_key
+
+    integration = SloRulesEngine.default_integration_registry.fetch(integration_key)
+    definitions = load_definitions(argv)
+    manifests = definitions.map { |definition| integration.generate(definition).to_h.merge(service: definition.service) }
+    puts JSON.pretty_generate(manifests)
+  end
+
+  def candidates(argv)
+    abort_usage('missing telemetry JSON file') if argv.empty?
+
+    signals = JSON.parse(File.read(argv.fetch(0)), symbolize_names: true)
+    puts JSON.pretty_generate(SloRulesEngine::Onboarding::CandidateGenerator.new.generate(signals))
+  end
+
+  def recommend_calculation_basis(argv)
+    observations_per_second = nil
+    failed_observations_to_alert = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--observations-per-second=VALUE', Float) { |value| observations_per_second = value }
+      opts.on('--failed-observations-to-alert=VALUE', Float) { |value| failed_observations_to_alert = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --observations-per-second') unless observations_per_second
+    abort_usage('missing --failed-observations-to-alert') unless failed_observations_to_alert
+
+    recommendation = SloRulesEngine::RealityCheck::CalculationBasisAdvisor.new.recommend(
+      observations_per_second: observations_per_second,
+      failed_observations_to_alert: failed_observations_to_alert
+    )
+    puts JSON.pretty_generate(recommendation.to_h)
+  end
+
   def load_definitions(paths)
     abort_usage('missing definition file') if paths.empty?
 
@@ -71,6 +128,10 @@ module RulesCtl
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl generate --provider=<provider> <definitionfile...>
         bin/rules-ctl providers list
+        bin/rules-ctl integrations list
+        bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
+        bin/rules-ctl candidates <telemetry.json>
+        bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
     USAGE
     exit 2
   end

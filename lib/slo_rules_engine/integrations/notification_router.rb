@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
 module SloRulesEngine
-  module Providers
-    class NotificationRouter < Provider
+  module Integrations
+    class NotificationRouter < Integration
       def initialize
         super(
           key: 'notification_router',
           capabilities: %w[
-            contextual_alerts
-            notification_router_integration
+            contextual_alert_delivery
+            route_catalog_generation
+            route_availability_checks
           ]
         )
       end
