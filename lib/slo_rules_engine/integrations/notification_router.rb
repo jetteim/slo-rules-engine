@@ -19,6 +19,7 @@ module SloRulesEngine
           datadog: {},
           alertmanager: {}
         }
+        route_availability_checks = []
 
         definition.notification_routes.each do |route|
           source = route.source.to_sym
@@ -27,9 +28,32 @@ module SloRulesEngine
             provider: route.provider,
             target: route.target
           }
+          route_availability_checks << availability_check(definition, route)
         end
 
-        manifest(route_map: route_map)
+        manifest(
+          route_map: route_map,
+          route_availability_checks: route_availability_checks
+        )
+      end
+
+      private
+
+      def availability_check(definition, route)
+        {
+          source: route.source,
+          route_key: route.key,
+          method: 'GET',
+          path: availability_path(definition, route)
+        }
+      end
+
+      def availability_path(definition, route)
+        case route.source.to_s
+        when 'datadog' then "/api/datadog/#{definition.service}/#{route.key}"
+        when 'alertmanager' then "/api/alertmanager/#{route.key}"
+        else "/api/routes/#{route.source}/#{route.key}"
+        end
       end
     end
   end

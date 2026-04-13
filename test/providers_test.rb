@@ -47,5 +47,8 @@ class ProvidersTest < Minitest::Test
     assert_equal 'notification_router', manifest[:integration]
     assert_equal 'msteams', manifest[:artifacts][:route_map][:datadog]['checkout-api'][:provider]
     assert_equal 'msteams', manifest[:artifacts][:route_map][:alertmanager]['checkout-api'][:provider]
+    assert_equal 2, manifest[:artifacts][:route_availability_checks].length
+    assert_equal '/api/datadog/checkout-api/checkout-api', manifest[:artifacts][:route_availability_checks].fetch(0)[:path]
+    assert_equal '/api/alertmanager/checkout-api', manifest[:artifacts][:route_availability_checks].fetch(1)[:path]
   end
 end
