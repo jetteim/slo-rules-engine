@@ -54,6 +54,13 @@ module SloRulesEngine
       result.error("#{path}.metric", 'is required') if binding.metric.to_s.empty?
       result.error("#{path}.data_source", 'is required') if binding.data_source.to_s.empty?
       result.error("#{path}.type", 'is required') if binding.type.to_s.empty?
+      if !supported_data_sources.empty? && !supported_data_sources.include?(binding.data_source)
+        result.error("#{path}.data_source", "unsupported data source #{binding.data_source.inspect} for provider #{key}")
+      end
+    end
+
+    def supported_data_sources
+      []
     end
   end
 end

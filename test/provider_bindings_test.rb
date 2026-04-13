@@ -41,4 +41,14 @@ class ProviderBindingsTest < Minitest::Test
     refute result.valid?
     assert result.errors.any? { |error| error.message.include?('missing datadog query binding') }
   end
+
+  def test_provider_validation_reports_unsupported_data_source
+    binding = @definition.slis.fetch(0).metric.binding_for('datadog')
+    binding.data_source = 'prometheus'
+
+    result = SloRulesEngine.default_provider_registry.fetch('datadog').validate(@definition)
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.message.include?('unsupported data source') }
+  end
 end

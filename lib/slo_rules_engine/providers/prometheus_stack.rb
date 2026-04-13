@@ -39,6 +39,10 @@ module SloRulesEngine
 
       private
 
+      def supported_data_sources
+        %w[prometheus openmetrics]
+      end
+
       def each_slo(definition)
         definition.slis.each do |sli|
           sli.instances.each do |instance|
