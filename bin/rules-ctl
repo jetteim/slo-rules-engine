@@ -101,7 +101,7 @@ module RulesCtl
     abort_usage('missing telemetry JSON file') if argv.empty?
 
     signals = JSON.parse(File.read(argv.fetch(0)), symbolize_names: true)
-    puts JSON.pretty_generate(SloRulesEngine::Onboarding::CandidateGenerator.new.generate(signals))
+    puts JSON.pretty_generate(SloRulesEngine::Onboarding::CandidateGenerator.new.review(signals))
   end
 
   def recommend_calculation_basis(argv)

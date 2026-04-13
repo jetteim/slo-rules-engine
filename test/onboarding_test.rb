@@ -24,4 +24,28 @@ class OnboardingTest < Minitest::Test
     assert_equal 0.95, candidates.fetch(0)[:proposed_slo][:objective]
     assert_equal 'observations', candidates.fetch(0)[:proposed_slo][:calculation_basis]
   end
+
+  def test_review_records_candidate_evidence_and_findings
+    generator = SloRulesEngine::Onboarding::CandidateGenerator.new
+
+    review = generator.review([
+      {
+        kind: 'availability',
+        metric: 'http_requests_total',
+        user_visible: true,
+        observations_per_second: 0.01,
+        failed_observations_to_alert: 1
+      },
+      { kind: 'saturation', metric: 'runtime_heap_used', user_visible: false },
+      { kind: 'cache_hit_rate', metric: 'cache_hits_total', user_visible: true },
+      { kind: 'errors', user_visible: true }
+    ])
+
+    assert_equal 1, review[:candidates].length
+    assert_equal 'time_slice', review[:candidates].fetch(0)[:proposed_slo][:calculation_basis]
+    assert_equal 0.01, review[:candidates].fetch(0)[:evidence][:observations_per_second]
+    assert_equal 'high', review[:candidates].fetch(0)[:calculation_basis_recommendation][:confidence]
+
+    assert_equal %w[non_user_visible unsupported_signal missing_metric], review[:findings].map { |finding| finding[:code] }
+  end
 end
