@@ -29,6 +29,8 @@ module RulesCtl
       recommend_calculation_basis(argv)
     when 'reality-check'
       reality_check(argv)
+    when 'migration-report'
+      migration_report(argv)
     else
       abort_usage("unknown command: #{command}")
     end
@@ -150,6 +152,14 @@ module RulesCtl
     exit(payload[:valid] ? 0 : 1)
   end
 
+  def migration_report(argv)
+    abort_usage('missing file') if argv.empty?
+
+    report = SloRulesEngine::MigrationReport.scan_files(argv)
+    puts JSON.pretty_generate(report.to_h)
+    exit(report.valid? ? 0 : 1)
+  end
+
   def load_definitions(paths)
     abort_usage('missing definition file') if paths.empty?
 
@@ -197,6 +207,7 @@ module RulesCtl
         bin/rules-ctl candidates <telemetry.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
+        bin/rules-ctl migration-report <legacyfile...>
     USAGE
     exit 2
   end
