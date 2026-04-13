@@ -1,0 +1,16 @@
+[
+  {
+    "kind": "latency",
+    "metric": "http.server.request.duration",
+    "user_visible": true,
+    "objective": 0.95,
+    "success_condition": "Request duration is below a user-reviewed threshold.",
+    "observations_per_second": 25,
+    "failed_observations_to_alert": 120
+  },
+  {
+    "kind": "saturation",
+    "metric": "runtime.heap.used",
+    "user_visible": false
+  }
+]

@@ -56,9 +56,15 @@ Expected artifacts:
 - Grafana dashboards
 - PromQL reality-check queries
 
+## Delivery Integrations
+
+Delivery integrations are not providers. They do not evaluate SLIs/SLOs or own dashboards.
+
+They receive contextual alert route intent from providers.
+
 ### `notification_router`
 
-Integration provider for route catalog generation.
+Route catalog integration for contextual alert delivery.
 
 Expected artifacts:
 

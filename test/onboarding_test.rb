@@ -8,12 +8,20 @@ class OnboardingTest < Minitest::Test
     generator = SloRulesEngine::Onboarding::CandidateGenerator.new
 
     candidates = generator.generate([
-      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true, objective: 0.95 },
+      {
+        kind: 'latency',
+        metric: 'http_request_duration_seconds',
+        user_visible: true,
+        objective: 0.95,
+        observations_per_second: 10,
+        failed_observations_to_alert: 100
+      },
       { kind: 'saturation', metric: 'ruby_heap_slots', user_visible: false }
     ])
 
     assert_equal 1, candidates.length
     assert_equal 'request-latency', candidates.fetch(0)[:sli_uid]
     assert_equal 0.95, candidates.fetch(0)[:proposed_slo][:objective]
+    assert_equal 'observations', candidates.fetch(0)[:proposed_slo][:calculation_basis]
   end
 end

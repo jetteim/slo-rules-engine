@@ -6,7 +6,8 @@ The engine has three layers:
 
 1. DSL compatibility layer for service level definitions.
 2. Neutral model and validation layer.
-3. Provider layer for generated artifacts and telemetry reality checks.
+3. Provider layer for generated SLO backend artifacts and telemetry reality checks.
+4. Delivery integration layer for notification route catalogs.
 
 The core model is provider-neutral. Provider modules own backend syntax and capability gaps.
 
@@ -19,6 +20,7 @@ Ruby DSL file
   -> core validation
   -> provider validation
   -> provider artifact manifests
+  -> delivery integration route catalogs
 ```
 
 ## SLI/SLO Generation From Telemetry

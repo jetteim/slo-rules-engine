@@ -28,7 +28,7 @@ module SloRulesEngine
               uid: signal[:slo_uid] || default_slo_uid(kind),
               objective: signal[:objective] || 0.99,
               success_condition: signal[:success_condition] || default_success_condition(kind),
-              calculation_basis: signal[:calculation_basis] || 'observations'
+              calculation_basis: signal[:calculation_basis] || calculation_basis(signal)
             }
           }
         end
@@ -52,6 +52,15 @@ module SloRulesEngine
         when 'freshness' then 'Data age remains within a user-reviewed threshold.'
         else 'Observation meets the reviewed service quality threshold.'
         end
+      end
+
+      def calculation_basis(signal)
+        return 'observations' unless signal.key?(:observations_per_second) && signal.key?(:failed_observations_to_alert)
+
+        RealityCheck::CalculationBasisAdvisor.new.recommend(
+          observations_per_second: signal[:observations_per_second],
+          failed_observations_to_alert: signal[:failed_observations_to_alert]
+        ).basis
       end
     end
   end
