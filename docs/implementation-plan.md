@@ -17,7 +17,8 @@ This is the running plan for the long refactor.
 - [x] Add tests and forbidden-term scan.
 - [x] Add CLI entrypoint for telemetry-derived SLI/SLO candidates.
 - [x] Add calculation-basis reality-check advisor.
-- [ ] Push public repository.
+- [x] Push public repository.
+- [x] Add CI verification workflow.
 
 ## Phase 2: DSL Compatibility
 
