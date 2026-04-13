@@ -5,6 +5,7 @@ require 'yaml'
 
 require_relative 'slo_rules_engine/model'
 require_relative 'slo_rules_engine/validation'
+require_relative 'slo_rules_engine/burn_rate_policy'
 require_relative 'slo_rules_engine/dsl'
 require_relative 'slo_rules_engine/provider'
 require_relative 'slo_rules_engine/integration'

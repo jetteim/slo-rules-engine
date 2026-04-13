@@ -78,6 +78,7 @@ module SloRulesEngine
           name: "SLO burn rate: #{definition.service}/#{sli.uid}/#{instance.uid}/#{slo.uid}",
           type: 'burn_rate',
           route_key: slo.alert_route_key || definition.service,
+          burn_rate_windows: BurnRatePolicy.new.windows,
           message_context: alert_context(definition, sli, instance, slo)
         }
       end
