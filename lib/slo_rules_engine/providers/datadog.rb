@@ -23,6 +23,7 @@ module SloRulesEngine
         artifacts = {
           slos: [],
           monitors: [],
+          telemetry_gap_monitors: [],
           dashboards: []
         }
 
@@ -39,6 +40,7 @@ module SloRulesEngine
             query: datadog_query(sli.metric, instance, slo)
           }
           artifacts[:monitors] << contextual_monitor(definition, sli, instance, slo)
+          artifacts[:telemetry_gap_monitors] << telemetry_gap_monitor(definition, sli, instance, slo)
           artifacts[:dashboards] << dashboard(definition, sli, instance, slo)
         end
 
@@ -80,6 +82,19 @@ module SloRulesEngine
           route_key: slo.alert_route_key || definition.service,
           burn_rate_windows: BurnRatePolicy.new.windows,
           message_context: alert_context(definition, sli, instance, slo)
+        }
+      end
+
+      def telemetry_gap_monitor(definition, sli, instance, slo)
+        {
+          name: "SLO telemetry gap: #{definition.service}/#{sli.uid}/#{instance.uid}",
+          type: 'missing_telemetry',
+          classification: 'notification',
+          route_key: slo.alert_route_key || definition.service,
+          query: datadog_query(sli.metric, instance, slo),
+          message_context: alert_context(definition, sli, instance, slo).merge(
+            impact: 'SLO decision support is incomplete until telemetry resumes.'
+          )
         }
       end
 
