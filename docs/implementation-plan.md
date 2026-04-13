@@ -28,7 +28,8 @@ This is the running plan for the long refactor.
 - [x] Add line references for validation messages.
 - [x] Add calculation-basis recommendation rules.
 - [x] Add alert route reference validation.
-- [ ] Add SLO reality-check hooks.
+- [x] Add offline telemetry binding reality-check hooks.
+- [ ] Add backend API reality-check adapters.
 
 ## Phase 3: Provider Depth
 
@@ -41,6 +42,7 @@ This is the running plan for the long refactor.
 - [x] Add provider route-source validation.
 - [x] Add generated provider manifest output directory.
 - [ ] Add provider artifact schemas for apply-ready outputs.
+- [x] Add provider query binding reality-check report.
 - [ ] Add provider query/reality-check adapters.
 
 ## Phase 4: Migration Tooling
