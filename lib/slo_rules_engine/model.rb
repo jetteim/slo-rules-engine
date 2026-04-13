@@ -8,6 +8,7 @@ module SloRulesEngine
     :environments,
     :slis,
     :notification_routes,
+    :line_references,
     keyword_init: true
   ) do
     def initialize(**kwargs)
@@ -15,6 +16,7 @@ module SloRulesEngine
       self.environments ||= ['production']
       self.slis ||= []
       self.notification_routes ||= []
+      self.line_references ||= {}
     end
   end
 
@@ -23,11 +25,13 @@ module SloRulesEngine
     :title,
     :metric,
     :instances,
+    :line_references,
     keyword_init: true
   ) do
     def initialize(**kwargs)
       super
       self.instances ||= []
+      self.line_references ||= {}
     end
   end
 
@@ -39,12 +43,14 @@ module SloRulesEngine
     :selector,
     :query,
     :provider_bindings,
+    :line_references,
     keyword_init: true
   ) do
     def initialize(**kwargs)
       super
       self.selector ||= {}
       self.provider_bindings ||= {}
+      self.line_references ||= {}
     end
 
     def binding_for(provider)
@@ -60,11 +66,13 @@ module SloRulesEngine
     :range,
     :selector,
     :query,
+    :line_references,
     keyword_init: true
   ) do
     def initialize(**kwargs)
       super
       self.selector ||= {}
+      self.line_references ||= {}
     end
   end
 
@@ -74,6 +82,7 @@ module SloRulesEngine
     :slos,
     :playbook_url,
     :dashboard_variables,
+    :line_references,
     keyword_init: true
   ) do
     def initialize(**kwargs)
@@ -81,6 +90,7 @@ module SloRulesEngine
       self.selector ||= {}
       self.slos ||= []
       self.dashboard_variables ||= {}
+      self.line_references ||= {}
     end
   end
 
@@ -93,11 +103,13 @@ module SloRulesEngine
     :documentation,
     :alert_route_key,
     :dashboard_path,
+    :line_references,
     keyword_init: true
   ) do
     def initialize(**kwargs)
       super
       self.calculation_basis ||= 'observations'
+      self.line_references ||= {}
     end
   end
 
@@ -106,6 +118,7 @@ module SloRulesEngine
     :source,
     :provider,
     :target,
+    :line_references,
     keyword_init: true
   )
 
