@@ -47,6 +47,10 @@ module SloRulesEngine
 
       private
 
+      def supported_data_sources
+        %w[datadog]
+      end
+
       def each_slo(definition)
         definition.slis.each do |sli|
           sli.instances.each do |instance|

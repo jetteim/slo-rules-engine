@@ -50,6 +50,11 @@ module RulesCtl
     registry = SloRulesEngine.default_provider_registry
     provider = registry.fetch(provider_key)
     definitions = load_definitions(argv)
+    validation = validate_for_provider(definitions, provider)
+    unless validation[:valid]
+      puts JSON.pretty_generate(validation)
+      exit 1
+    end
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
     puts JSON.pretty_generate(manifests)
   end
@@ -119,6 +124,25 @@ module RulesCtl
     SloRulesEngine.clear_definitions
     paths.each { |path| load File.expand_path(path) }
     SloRulesEngine.definitions
+  end
+
+  def validate_for_provider(definitions, provider)
+    core_validator = SloRulesEngine::CoreValidator.new
+    errors = []
+    warnings = []
+    definitions.each do |definition|
+      core_result = core_validator.validate(definition)
+      provider_result = provider.validate(definition)
+      errors.concat(core_result.errors.map(&:to_h))
+      errors.concat(provider_result.errors.map(&:to_h))
+      warnings.concat(core_result.warnings.map(&:to_h))
+      warnings.concat(provider_result.warnings.map(&:to_h))
+    end
+    {
+      valid: errors.empty?,
+      errors: errors,
+      warnings: warnings
+    }
   end
 
   def abort_usage(message = nil)
