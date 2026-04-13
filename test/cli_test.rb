@@ -88,4 +88,25 @@ class CLITest < Minitest::Test
       assert_equal ['non_user_visible'], payload.fetch('findings').map { |finding| finding.fetch('code') }
     end
   end
+
+  def test_reality_check_reports_missing_telemetry
+    Tempfile.create(['signals', '.json']) do |file|
+      file.write(JSON.generate([{ metric: 'other.metric' }]))
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'reality-check',
+        '--provider=datadog',
+        "--telemetry=#{file.path}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+      payload = JSON.parse(stdout)
+
+      refute status.success?
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'missing_provider_metric', payload.fetch('findings').fetch(0).fetch('code')
+    end
+  end
 end

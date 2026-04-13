@@ -27,6 +27,8 @@ module RulesCtl
       candidates(argv)
     when 'recommend-calculation-basis'
       recommend_calculation_basis(argv)
+    when 'reality-check'
+      reality_check(argv)
     else
       abort_usage("unknown command: #{command}")
     end
@@ -122,6 +124,32 @@ module RulesCtl
     puts JSON.pretty_generate(recommendation.to_h)
   end
 
+  def reality_check(argv)
+    provider_key = nil
+    telemetry_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--telemetry=FILE', 'Telemetry inventory JSON file') { |value| telemetry_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+    abort_usage('missing --telemetry') unless telemetry_path
+
+    telemetry_signals = JSON.parse(File.read(telemetry_path), symbolize_names: true)
+    definitions = load_definitions(argv)
+    checker = SloRulesEngine::RealityCheck::TelemetryBindingChecker.new(provider: provider_key)
+    reports = definitions.map { |definition| checker.check(definition, telemetry_signals).to_h.merge(service: definition.service) }
+    findings = reports.flat_map { |report| report.fetch(:findings) }
+    payload = {
+      valid: findings.empty?,
+      provider: provider_key,
+      findings: findings,
+      reports: reports
+    }
+    puts JSON.pretty_generate(payload)
+    exit(payload[:valid] ? 0 : 1)
+  end
+
   def load_definitions(paths)
     abort_usage('missing definition file') if paths.empty?
 
@@ -168,6 +196,7 @@ module RulesCtl
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
         bin/rules-ctl candidates <telemetry.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
+        bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
     USAGE
     exit 2
   end
