@@ -36,4 +36,14 @@ class ValidationTest < Minitest::Test
     assert_includes objective_error.line_reference[:file], 'examples/services/checkout.rb'
     assert_kind_of Integer, objective_error.line_reference[:line]
   end
+
+  def test_rejects_unknown_alert_route_key
+    definition = SloRulesEngine.definitions.fetch(0)
+    definition.slis.fetch(0).instances.fetch(0).slos.fetch(0).alert_route_key = 'missing-route'
+
+    result = SloRulesEngine::CoreValidator.new.validate(definition)
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path.end_with?('.alert_route_key') && error.message.include?('unknown') }
+  end
 end
