@@ -25,7 +25,7 @@ This is the running plan for the long refactor.
 - [ ] Expand DSL methods to match existing service definition shape.
 - [x] Add provider-specific query bindings while preserving neutral metric intent.
 - [x] Add provider capability validation before generation.
-- [ ] Add line references for validation messages.
+- [x] Add line references for validation messages.
 - [ ] Add calculation-basis rules.
 - [ ] Add SLO reality-check hooks.
 

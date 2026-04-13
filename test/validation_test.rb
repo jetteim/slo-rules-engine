@@ -24,4 +24,16 @@ class ValidationTest < Minitest::Test
     refute result.valid?
     assert result.errors.any? { |error| error.path.end_with?('.objective') }
   end
+
+  def test_validation_errors_include_line_reference
+    definition = SloRulesEngine.definitions.fetch(0)
+    definition.slis.fetch(0).instances.fetch(0).slos.fetch(0).objective = 1.0
+
+    result = SloRulesEngine::CoreValidator.new.validate(definition)
+    objective_error = result.errors.find { |error| error.path.end_with?('.objective') }
+
+    refute_nil objective_error.line_reference
+    assert_includes objective_error.line_reference[:file], 'examples/services/checkout.rb'
+    assert_kind_of Integer, objective_error.line_reference[:line]
+  end
 end
