@@ -8,7 +8,7 @@ This file tracks the long-running migration scope.
 - SLI, SLI instance, SLO, objective, success condition, and calculation-basis concepts.
 - Validation of naming, required fields, uniqueness, SLO objective ranges, and metric binding completeness.
 - Validation that SLO alert route keys and provider-specific route sources exist.
-- Reality checks against historical telemetry.
+- Reality checks against historical telemetry and measured metric inventories.
 - SLI/SLO candidate generation from measured telemetry with findings for rejected or incomplete signals.
 - Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and notification routing.
 - Golden-style tests for generated artifacts.
