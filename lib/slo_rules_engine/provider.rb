@@ -41,6 +41,7 @@ module SloRulesEngine
           result.error("slis[#{sli_index}].metric.provider_bindings.#{key}", "missing #{key} query binding")
         end
       end
+      validate_required_routes(result, definition)
       result
     end
 
@@ -59,7 +60,36 @@ module SloRulesEngine
       end
     end
 
+    def validate_required_routes(result, definition)
+      required_route_sources.each do |source|
+        route_keys = definition.notification_routes.select { |route| route.source == source }.map(&:key)
+        if route_keys.empty?
+          result.error('notification_routes', "missing #{source} notification route source for provider #{key}")
+          next
+        end
+
+        each_slo(definition) do |_sli, _instance, slo|
+          effective_key = slo.alert_route_key || definition.service
+          unless route_keys.include?(effective_key)
+            result.error('notification_routes', "missing #{source} notification route #{effective_key.inspect} for provider #{key}")
+          end
+        end
+      end
+    end
+
+    def each_slo(definition)
+      definition.slis.each do |sli|
+        sli.instances.each do |instance|
+          instance.slos.each { |slo| yield sli, instance, slo }
+        end
+      end
+    end
+
     def supported_data_sources
+      []
+    end
+
+    def required_route_sources
       []
     end
   end

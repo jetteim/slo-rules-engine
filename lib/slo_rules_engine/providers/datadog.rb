@@ -53,6 +53,10 @@ module SloRulesEngine
         %w[datadog]
       end
 
+      def required_route_sources
+        %w[datadog]
+      end
+
       def each_slo(definition)
         definition.slis.each do |sli|
           sli.instances.each do |instance|
