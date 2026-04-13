@@ -56,12 +56,14 @@ module SloRulesEngine
       end
 
       def datadog_query(metric, instance, slo)
-        selector = metric.selector.merge(instance.selector)
+        binding = metric.binding_for(key)
+        selector = binding.selector.merge(instance.selector)
         {
-          data_source: metric.data_source,
-          metric: metric.name,
-          type: metric.type,
+          data_source: binding.data_source,
+          metric: binding.metric,
+          type: binding.type,
           selector: selector,
+          query: binding.query,
           success_selector: slo.success_selector,
           success_threshold: slo.success_threshold
         }

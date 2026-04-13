@@ -116,6 +116,76 @@ module SloRulesEngine
       def initialize(name)
         @name = name.to_s
         @selector = {}
+        @provider_bindings = {}
+      end
+
+      def data_source(value = nil)
+        return @data_source if value.nil?
+
+        @data_source = value.to_s
+      end
+
+      def type(value = nil)
+        return @type if value.nil?
+
+        @type = value.to_s
+      end
+
+      def range(value = nil)
+        return @range if value.nil?
+
+        @range = value.to_s
+      end
+
+      def selector(value = nil)
+        return @selector if value.nil?
+
+        @selector = stringify_hash(value)
+      end
+
+      def query(value = nil)
+        return @query if value.nil?
+
+        @query = value.to_s
+      end
+
+      def provider_binding(provider, &block)
+        @provider_bindings[provider.to_s] = ProviderQueryBindingBuilder.evaluate(provider.to_s, &block)
+      end
+
+      def to_model
+        MetricBinding.new(
+          name: @name,
+          data_source: @data_source,
+          type: @type,
+          range: @range,
+          selector: @selector,
+          query: @query,
+          provider_bindings: @provider_bindings
+        )
+      end
+
+      private
+
+      def stringify_hash(value)
+        value.each_with_object({}) { |(key, val), hash| hash[key.to_s] = val.to_s }
+      end
+    end
+
+    class ProviderQueryBindingBuilder
+      def self.evaluate(provider, &block)
+        new(provider).tap { |builder| builder.instance_eval(&block) }.to_model
+      end
+
+      def initialize(provider)
+        @provider = provider
+        @selector = {}
+      end
+
+      def metric(value = nil)
+        return @metric if value.nil?
+
+        @metric = value.to_s
       end
 
       def data_source(value = nil)
@@ -149,8 +219,9 @@ module SloRulesEngine
       end
 
       def to_model
-        MetricBinding.new(
-          name: @name,
+        ProviderQueryBinding.new(
+          provider: @provider,
+          metric: @metric,
           data_source: @data_source,
           type: @type,
           range: @range,

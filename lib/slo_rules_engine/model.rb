@@ -38,6 +38,28 @@ module SloRulesEngine
     :range,
     :selector,
     :query,
+    :provider_bindings,
+    keyword_init: true
+  ) do
+    def initialize(**kwargs)
+      super
+      self.selector ||= {}
+      self.provider_bindings ||= {}
+    end
+
+    def binding_for(provider)
+      provider_bindings.fetch(provider.to_s)
+    end
+  end
+
+  ProviderQueryBinding = Struct.new(
+    :provider,
+    :metric,
+    :data_source,
+    :type,
+    :range,
+    :selector,
+    :query,
     keyword_init: true
   ) do
     def initialize(**kwargs)

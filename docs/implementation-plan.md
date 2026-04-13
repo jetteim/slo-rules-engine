@@ -23,6 +23,7 @@ This is the running plan for the long refactor.
 ## Phase 2: DSL Compatibility
 
 - [ ] Expand DSL methods to match existing service definition shape.
+- [x] Add provider-specific query bindings while preserving neutral metric intent.
 - [ ] Add line references for validation messages.
 - [ ] Add calculation-basis rules.
 - [ ] Add SLO reality-check hooks.
