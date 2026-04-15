@@ -116,6 +116,9 @@ class CLITest < Minitest::Test
       assert status.success?, stderr
       assert_includes stdout, "SRE.define"
       assert_includes stdout, "uid 'request-latency'"
+      assert_includes stdout, 'measurement_details do'
+      assert_includes stdout, 'miss_policy do'
+      assert_includes stdout, "observability_handoff 'bind provider queries', 'generate decision dashboard'"
       refute_includes stdout, "uid 'resource-saturation'"
 
       Tempfile.create(['draft-definition', '.rb']) do |draft_file|

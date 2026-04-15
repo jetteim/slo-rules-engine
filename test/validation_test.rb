@@ -46,4 +46,23 @@ class ValidationTest < Minitest::Test
     refute result.valid?
     assert result.errors.any? { |error| error.path.end_with?('.alert_route_key') && error.message.include?('unknown') }
   end
+
+  def test_warns_when_sli_lacks_user_visible_rationale
+    definition = SloRulesEngine.definitions.fetch(0)
+    definition.slis.fetch(0).user_visible_rationale = nil
+
+    result = SloRulesEngine::CoreValidator.new.validate(definition)
+
+    assert result.warnings.any? { |warning| warning.path.end_with?('.user_visible_rationale') }
+  end
+
+  def test_errors_when_slo_lacks_miss_policy
+    definition = SloRulesEngine.definitions.fetch(0)
+    definition.slis.fetch(0).instances.fetch(0).slos.fetch(0).miss_policy = nil
+
+    result = SloRulesEngine::CoreValidator.new.validate(definition)
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path.end_with?('.miss_policy') }
+  end
 end

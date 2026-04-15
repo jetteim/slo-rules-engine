@@ -61,6 +61,12 @@ module SloRulesEngine
         result.error("#{path}.uid", 'SLI uid must be unique', line_reference: line_reference(sli, :uid)) if sli.uid && seen[sli.uid]
         seen[sli.uid] = true
         validate_presence(result, "#{path}.title", sli.title, line_reference: line_reference(sli, :title))
+        if empty?(sli.user_visible_rationale)
+          result.warning("#{path}.user_visible_rationale", 'user-visible rationale should explain why this SLI represents service quality')
+        end
+        if sli.measurement_details.nil? || empty?(sli.measurement_details.measurement_point)
+          result.warning("#{path}.measurement_details", 'measurement details should include measurement point')
+        end
         validate_metric(result, "#{path}.metric", sli.metric)
         validate_instances(result, path, sli.instances, route_keys)
       end
@@ -93,6 +99,14 @@ module SloRulesEngine
         end
         if empty?(slo.success_selector) && empty?(slo.success_threshold)
           result.error("#{slo_path}.success", 'success_selector or success_threshold is required')
+        end
+        if slo.miss_policy.nil?
+          result.error("#{slo_path}.miss_policy", 'miss-policy is required for SLO review')
+        elsif empty?(slo.miss_policy.trigger) || empty?(slo.miss_policy.response) || empty?(slo.miss_policy.authority) || empty?(slo.miss_policy.exit_condition)
+          result.error("#{slo_path}.miss_policy", 'miss-policy requires trigger, response, authority, and exit condition')
+        end
+        if slo.observability_handoff.nil? || slo.observability_handoff.requests.empty?
+          result.warning("#{slo_path}.observability_handoff", 'observability handoff should list backend binding, alert, or dashboard work')
         end
         validate_alert_route_key(result, "#{slo_path}.alert_route_key", slo, route_keys)
       end

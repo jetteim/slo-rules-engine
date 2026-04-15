@@ -72,6 +72,10 @@ class OnboardingTest < Minitest::Test
     assert_includes draft, "service 'checkout-api'"
     assert_includes draft, "uid 'request-latency'"
     assert_includes draft, "metric 'http.server.request.duration'"
+    assert_includes draft, "user_visible_rationale 'Measured telemetry is close to user-visible service quality.'"
+    assert_includes draft, 'measurement_details do'
+    assert_includes draft, 'miss_policy do'
+    assert_includes draft, "observability_handoff 'bind provider queries', 'generate decision dashboard'"
     refute_includes draft, "uid 'resource-saturation'"
     assert_includes draft, '# finding: non_user_visible'
 

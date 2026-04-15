@@ -607,11 +607,16 @@ git commit -m "feat: capture reliability intent in DSL"
 
 ## Task 4: Validation Gates For Modeling
 
+Status: completed on branch `sre-rules-validation-gates`.
+
 **Files:**
 - Modify: `lib/slo_rules_engine/validation.rb`
+- Modify: `lib/slo_rules_engine/onboarding/definition_draft_generator.rb`
+- Modify: `test/onboarding_test.rb`
+- Modify: `test/cli_test.rb`
 - Modify: `test/validation_test.rb`
 
-- [ ] **Step 1: Write failing validation tests**
+- [x] **Step 1: Write failing validation tests**
 
 Add to `test/validation_test.rb`:
 
@@ -636,13 +641,13 @@ def test_errors_when_slo_lacks_miss_policy
 end
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run: `ruby -Ilib test/validation_test.rb`
 
 Expected: FAIL because validation does not inspect these fields.
 
-- [ ] **Step 3: Add validation**
+- [x] **Step 3: Add validation**
 
 In `validate_slis`, after title validation:
 
@@ -668,7 +673,9 @@ if slo.observability_handoff.nil? || slo.observability_handoff.requests.empty?
 end
 ```
 
-- [ ] **Step 4: Run tests and commit**
+Also keep telemetry-derived drafts valid under the new gates by emitting draft user-visible rationale, measurement details, miss-policy, reality-check notes, and observability handoff.
+
+- [x] **Step 4: Run tests and commit**
 
 Run: `ruby -Ilib test/validation_test.rb`
 
