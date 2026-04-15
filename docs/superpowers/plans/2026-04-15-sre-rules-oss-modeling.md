@@ -236,13 +236,15 @@ git commit -m "test: guard against private modeling artifacts"
 
 ## Task 2: Reliability Model Enrichment
 
+Status: completed on branch `sre-rules-reliability-model`.
+
 **Files:**
 - Modify: `lib/slo_rules_engine/model.rb`
 - Modify: `lib/slo_rules_engine.rb`
 - Create: `test/reliability_model_test.rb`
 - Modify: `test/all_test.rb`
 
-- [ ] **Step 1: Write failing tests for new neutral objects**
+- [x] **Step 1: Write failing tests for new neutral objects**
 
 Create `test/reliability_model_test.rb`:
 
@@ -295,13 +297,13 @@ Modify `test/all_test.rb`:
 require_relative 'reliability_model_test'
 ```
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run: `ruby -Ilib test/reliability_model_test.rb`
 
 Expected: FAIL with missing constants.
 
-- [ ] **Step 3: Add minimal model structs**
+- [x] **Step 3: Add minimal model structs**
 
 Append to `lib/slo_rules_engine/model.rb`:
 
@@ -356,13 +358,13 @@ MissPolicy = Struct.new(
 end
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `ruby -Ilib test/reliability_model_test.rb`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/slo_rules_engine/model.rb test/reliability_model_test.rb test/all_test.rb
