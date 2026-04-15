@@ -13,9 +13,10 @@ class ProvidersTest < Minitest::Test
   def test_lists_complete_backend_providers
     registry = SloRulesEngine.default_provider_registry
 
-    assert_equal %w[datadog prometheus_stack], registry.list.map(&:key)
+    assert_equal %w[datadog prometheus_stack sloth], registry.list.map(&:key)
     assert_includes registry.fetch('prometheus_stack').capabilities, 'parameterized_dashboards'
     assert_includes registry.fetch('datadog').capabilities, 'slo_evaluation'
+    assert_includes registry.fetch('sloth').capabilities, 'slo_evaluation'
   end
 
   def test_datadog_provider_generates_slo_monitor_and_dashboard
@@ -42,6 +43,23 @@ class ProvidersTest < Minitest::Test
     assert_equal 1, manifest[:artifacts][:alert_rules].length
     assert_equal 1, manifest[:artifacts][:alertmanager_routes].length
     assert_equal 1, manifest[:artifacts][:grafana_dashboards].length
+  end
+
+  def test_sloth_provider_generates_prometheus_v1_slo_spec
+    manifest = SloRulesEngine.default_provider_registry.fetch('sloth').generate(@definition).to_h
+    spec = manifest[:artifacts][:sloth_specs].fetch(0)
+    slo = spec[:slos].fetch(0)
+
+    assert_equal 'sloth', manifest[:provider]
+    assert_equal 'prometheus/v1', spec[:version]
+    assert_equal 'checkout-api', spec[:service]
+    assert_equal({ owner: 'payments-platform' }, spec[:labels])
+    assert_equal 'http-requests-public-api-successful-requests', slo[:name]
+    assert_equal 99.9, slo[:objective]
+    assert_equal 'Requests complete without service-side failure.', slo[:description]
+    assert_includes slo[:sli][:events][:total_query], 'http_server_request_duration_seconds_count'
+    assert_includes slo[:sli][:events][:error_query], 'status!="success"'
+    assert_equal 'checkout-api', slo[:alerting][:page_alert][:labels][:routing_key]
   end
 
   def test_notification_router_integration_generates_route_catalog

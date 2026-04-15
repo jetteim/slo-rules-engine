@@ -12,6 +12,7 @@ require_relative 'slo_rules_engine/integration'
 require_relative 'slo_rules_engine/migration_report'
 require_relative 'slo_rules_engine/providers/datadog'
 require_relative 'slo_rules_engine/providers/prometheus_stack'
+require_relative 'slo_rules_engine/providers/sloth'
 require_relative 'slo_rules_engine/integrations/notification_router'
 require_relative 'slo_rules_engine/reality_check'
 require_relative 'slo_rules_engine/onboarding/candidate_generator'
@@ -37,6 +38,7 @@ module SloRulesEngine
       ProviderRegistry.new.tap do |registry|
         registry.register(Providers::Datadog.new)
         registry.register(Providers::PrometheusStack.new)
+        registry.register(Providers::Sloth.new)
       end
     end
 
