@@ -25,6 +25,8 @@ module RulesCtl
       generate_routes(argv)
     when 'candidates'
       candidates(argv)
+    when 'draft-definition'
+      draft_definition(argv)
     when 'recommend-calculation-basis'
       recommend_calculation_basis(argv)
     when 'reality-check'
@@ -106,6 +108,29 @@ module RulesCtl
 
     signals = JSON.parse(File.read(argv.fetch(0)), symbolize_names: true)
     puts JSON.pretty_generate(SloRulesEngine::Onboarding::CandidateGenerator.new.review(signals))
+  end
+
+  def draft_definition(argv)
+    service = nil
+    owner = nil
+    environment = 'production'
+    parser = OptionParser.new do |opts|
+      opts.on('--service=SERVICE', 'Service name for the draft definition') { |value| service = value }
+      opts.on('--owner=OWNER', 'Service owner for the draft definition') { |value| owner = value }
+      opts.on('--environment=ENVIRONMENT', 'Environment for the draft definition') { |value| environment = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --service') unless service
+    abort_usage('missing --owner') unless owner
+    abort_usage('missing telemetry JSON file') if argv.empty?
+
+    signals = JSON.parse(File.read(argv.fetch(0)), symbolize_names: true)
+    puts SloRulesEngine::Onboarding::DefinitionDraftGenerator.new.generate(
+      service: service,
+      owner: owner,
+      environment: environment,
+      signals: signals
+    )
   end
 
   def recommend_calculation_basis(argv)
@@ -205,6 +230,7 @@ module RulesCtl
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
         bin/rules-ctl candidates <telemetry.json>
+        bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
         bin/rules-ctl migration-report <legacyfile...>
