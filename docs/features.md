@@ -14,6 +14,20 @@ This file tracks the long-running migration scope.
 - Compatibility reports for legacy DSL and implementation-coupled definitions.
 - Golden-style tests for generated artifacts.
 
+## Primary Capability: Generate SLIs And SLOs From Telemetry
+
+The most important onboarding path is telemetry lookup first, then generated candidate review. The engine should let maintainers start with existing measured telemetry and produce a reviewable service definition draft before any provider artifact generation.
+
+Explicit features:
+
+- **Telemetry inventory ingestion:** accept measured telemetry inventory JSON as the starting input.
+- **Signal eligibility review:** reject unsupported, non-user-visible, or metric-less signals with machine-readable findings.
+- **SLI/SLO candidate inference:** map eligible signals to SLI identifiers, SLO identifiers, objectives, success conditions, and calculation-basis recommendations.
+- **Draft definition generation:** emit a public-safe Ruby DSL draft with candidate SLIs, metric bindings, instances, and proposed SLOs.
+- **Generated draft validation:** ensure emitted drafts can be loaded by the DSL and validated before provider generation.
+- **Review handoff:** preserve findings and conservative review wording so generated SLOs remain proposals until a maintainer accepts them.
+- **Provider handoff:** keep backend-specific generation downstream of accepted definitions; providers translate accepted intent and do not invent SLO policy.
+
 ## Change
 
 - Provider abstraction means complete observability backend bundle.
