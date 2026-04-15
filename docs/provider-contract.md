@@ -16,6 +16,7 @@ Every production-grade provider should declare support for:
 - `notification_router_integration`
 - `parameterized_dashboards`
 - `reality_check`
+- `apply_plan`
 
 Optional capabilities:
 
@@ -23,6 +24,25 @@ Optional capabilities:
 - `prune`
 - `import_existing`
 - `cost_estimation`
+
+## Automation Modes
+
+Every provider must declare one automation mode:
+
+- `live_api`: the provider can reconcile generated artifacts with a backend API.
+- `manifest_bundle`: the provider manages deterministic files for a deployment system.
+- `external_generator`: the provider emits input for another tool that expands or applies backend resources.
+- `manifest_only`: the provider can generate artifacts but cannot participate in apply planning yet.
+
+Every provider must also declare supported state actions:
+
+- `plan`
+- `apply`
+- `diff`
+- `import_existing`
+- `prune`
+
+Unsupported actions must fail with explicit provider validation output.
 
 ## Provider Responsibilities
 
@@ -36,11 +56,15 @@ Do not use provider code to invent reliability policy. A provider may express re
 
 Providers receive reliability intent as input. They may render miss-policy, measurement caveats, playbook links, and dashboard variables into backend-specific artifacts, but objective selection and calculation-basis policy remain model decisions.
 
+Generation must not mutate live systems. Backend state changes must use explicit apply commands. Dry-run plans must be available before live mutation. Live mutation must require confirmation and must not store credentials.
+
 ## Initial Providers
 
 ### `datadog`
 
 Single-tool provider.
+
+Automation mode: `live_api`.
 
 Expected artifacts:
 
@@ -50,9 +74,18 @@ Expected artifacts:
 - webhook integration payloads or route references
 - query validation requests
 
+Expected state behavior:
+
+- dry-run apply plan
+- live API apply when confirmed
+- credential validation through environment or explicit runtime configuration
+- retry handling for rate limiting and transient server errors
+
 ### `prometheus_stack`
 
 Multi-tool provider treated as one backend bundle.
+
+Automation mode: `manifest_bundle`.
 
 Expected artifacts:
 
@@ -62,9 +95,17 @@ Expected artifacts:
 - Grafana dashboards
 - PromQL reality-check queries
 
+Expected state behavior:
+
+- dry-run manifest write plan
+- confirmed file write into an output directory
+- direct backend mutation only through a future dedicated adapter
+
 ### `sloth`
 
 Prometheus-oriented provider that emits Sloth `prometheus/v1` SLO specs for Sloth rule generation.
+
+Automation mode: `external_generator`.
 
 Expected artifacts:
 
@@ -73,7 +114,7 @@ Expected artifacts:
 - page and ticket alert context labels
 - annotations carrying reviewed reliability intent
 
-The Sloth provider does not execute the Sloth CLI or apply generated rules. It produces reviewable spec artifacts that can be handed to Sloth in a separate workflow.
+The Sloth provider does not execute the Sloth CLI or apply generated rules. It produces reviewable spec artifacts and an external-generator handoff plan.
 
 ## Delivery Integrations
 
