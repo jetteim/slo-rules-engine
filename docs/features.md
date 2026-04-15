@@ -2,6 +2,8 @@
 
 This file tracks the long-running migration scope.
 
+See [Evolution Plan](evolution-plan.md) for value streams, capability mapping, contribution streams, and delivery order.
+
 ## Keep
 
 - Ruby service level definition DSL.

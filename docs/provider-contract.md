@@ -30,6 +30,8 @@ Providers receive neutral intent and return generated artifacts.
 
 They must not mutate DSL objects. They should report unsupported intent through validation errors instead of silently dropping behavior.
 
+Providers are downstream translators, not reliability policy owners. Objective selection, calculation-basis choice, miss-policy, and alert intent belong to the neutral model and review workflow. Provider contributions should follow the provider contribution stream in [Evolution Plan](evolution-plan.md).
+
 ## Initial Providers
 
 ### `datadog`
