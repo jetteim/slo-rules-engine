@@ -113,6 +113,55 @@ module SloRulesEngine
     end
   end
 
+  MeasurementDetails = Struct.new(
+    :source,
+    :measurement_point,
+    :probe_interval,
+    :probe_timeout,
+    :threshold_requirements,
+    :excluded_traffic,
+    :caveats,
+    keyword_init: true
+  ) do
+    def initialize(**kwargs)
+      super
+      self.threshold_requirements ||= []
+      self.excluded_traffic ||= []
+      self.caveats ||= []
+    end
+
+    def to_h
+      {
+        source: source,
+        measurement_point: measurement_point,
+        probe_interval: probe_interval,
+        probe_timeout: probe_timeout,
+        threshold_requirements: threshold_requirements,
+        excluded_traffic: excluded_traffic,
+        caveats: caveats
+      }
+    end
+  end
+
+  MissPolicy = Struct.new(
+    :trigger,
+    :response,
+    :authority,
+    :exit_condition,
+    :review_cadence,
+    keyword_init: true
+  ) do
+    def to_h
+      {
+        trigger: trigger,
+        response: response,
+        authority: authority,
+        exit_condition: exit_condition,
+        review_cadence: review_cadence
+      }
+    end
+  end
+
   NotificationRoute = Struct.new(
     :key,
     :source,
