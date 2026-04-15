@@ -117,6 +117,18 @@ module SloRulesEngine
         @title = value.to_s
       end
 
+      def user_visible_rationale(value = nil)
+        return @user_visible_rationale if value.nil?
+
+        record_line(:user_visible_rationale)
+        @user_visible_rationale = value.to_s
+      end
+
+      def measurement_details(&block)
+        record_line(:measurement_details)
+        @measurement_details = MeasurementDetailsBuilder.evaluate(&block)
+      end
+
       def metric(value = nil, &block)
         if block
           @metric = MetricBuilder.evaluate(value, &block)
@@ -132,7 +144,15 @@ module SloRulesEngine
       end
 
       def to_model
-        SLI.new(uid: @uid, title: @title, metric: @metric, instances: @instances, line_references: @line_references)
+        SLI.new(
+          uid: @uid,
+          title: @title,
+          metric: @metric,
+          instances: @instances,
+          user_visible_rationale: @user_visible_rationale,
+          measurement_details: @measurement_details,
+          line_references: @line_references
+        )
       end
 
       private
@@ -445,6 +465,21 @@ module SloRulesEngine
         @dashboard_path = value.to_s
       end
 
+      def miss_policy(&block)
+        record_line(:miss_policy)
+        @miss_policy = MissPolicyBuilder.evaluate(&block)
+      end
+
+      def reality_check_notes(*values)
+        record_line(:reality_check_notes)
+        @reality_check_notes = values.flatten.map(&:to_s)
+      end
+
+      def observability_handoff(*requests)
+        record_line(:observability_handoff)
+        @observability_handoff = ObservabilityHandoff.new(requests: requests.flatten.map(&:to_s))
+      end
+
       def to_model
         SLO.new(
           uid: @uid,
@@ -455,6 +490,9 @@ module SloRulesEngine
           documentation: @documentation,
           alert_route_key: @alert_route_key,
           dashboard_path: @dashboard_path,
+          miss_policy: @miss_policy,
+          reality_check_notes: @reality_check_notes,
+          observability_handoff: @observability_handoff,
           line_references: @line_references
         )
       end
@@ -472,6 +510,106 @@ module SloRulesEngine
 
       def stringify_hash(value)
         value.each_with_object({}) { |(key, val), hash| hash[key.to_s] = val.to_s }
+      end
+    end
+
+    class MeasurementDetailsBuilder
+      def self.evaluate(&block)
+        new.tap { |builder| builder.instance_eval(&block) }.to_model
+      end
+
+      def source(value = nil)
+        return @source if value.nil?
+
+        @source = value.to_s
+      end
+
+      def measurement_point(value = nil)
+        return @measurement_point if value.nil?
+
+        @measurement_point = value.to_s
+      end
+
+      def probe_interval(value = nil)
+        return @probe_interval if value.nil?
+
+        @probe_interval = value.to_s
+      end
+
+      def probe_timeout(value = nil)
+        return @probe_timeout if value.nil?
+
+        @probe_timeout = value.to_s
+      end
+
+      def threshold_requirements(*values)
+        @threshold_requirements = values.flatten.map(&:to_s)
+      end
+
+      def excluded_traffic(*values)
+        @excluded_traffic = values.flatten.map(&:to_s)
+      end
+
+      def caveats(*values)
+        @caveats = values.flatten.map(&:to_s)
+      end
+
+      def to_model
+        MeasurementDetails.new(
+          source: @source,
+          measurement_point: @measurement_point,
+          probe_interval: @probe_interval,
+          probe_timeout: @probe_timeout,
+          threshold_requirements: @threshold_requirements,
+          excluded_traffic: @excluded_traffic,
+          caveats: @caveats
+        )
+      end
+    end
+
+    class MissPolicyBuilder
+      def self.evaluate(&block)
+        new.tap { |builder| builder.instance_eval(&block) }.to_model
+      end
+
+      def trigger(value = nil)
+        return @trigger if value.nil?
+
+        @trigger = value.to_s
+      end
+
+      def response(value = nil)
+        return @response if value.nil?
+
+        @response = value.to_s
+      end
+
+      def authority(value = nil)
+        return @authority if value.nil?
+
+        @authority = value.to_s
+      end
+
+      def exit_condition(value = nil)
+        return @exit_condition if value.nil?
+
+        @exit_condition = value.to_s
+      end
+
+      def review_cadence(value = nil)
+        return @review_cadence if value.nil?
+
+        @review_cadence = value.to_s
+      end
+
+      def to_model
+        MissPolicy.new(
+          trigger: @trigger,
+          response: @response,
+          authority: @authority,
+          exit_condition: @exit_condition,
+          review_cadence: @review_cadence
+        )
       end
     end
   end

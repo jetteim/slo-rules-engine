@@ -25,6 +25,14 @@ SRE.define do
   sli do
     uid 'http-requests'
     title 'HTTP requests'
+    user_visible_rationale 'Represents whether customers can complete checkout requests.'
+
+    measurement_details do
+      source 'synthetic-otel-fixture'
+      measurement_point 'server-side request boundary'
+      threshold_requirements 'duration histogram with route and status dimensions'
+      caveats 'synthetic example data only'
+    end
 
     metric 'http.server.request.duration' do
       data_source 'otel'
@@ -61,6 +69,15 @@ SRE.define do
         alert_route_key 'checkout-api'
         dashboard_path '/d/slo/checkout-api'
         documentation 'Requests complete without service-side failure.'
+        miss_policy do
+          trigger 'error budget exhausted'
+          response 'assign one responder to restore service health'
+          authority 'pause risky changes for the affected service'
+          exit_condition 'burn rate returns below policy threshold'
+          review_cadence 'next business day'
+        end
+        reality_check_notes 'synthetic example objective; replace with historical review before production use'
+        observability_handoff 'bind provider queries', 'generate decision dashboard'
       end
     end
   end
