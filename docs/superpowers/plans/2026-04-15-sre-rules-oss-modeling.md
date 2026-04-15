@@ -191,11 +191,13 @@ Expected: PASS.
 
 ## Task 1: Public Safety Boundary
 
+Status: completed on branch `sre-rules-public-safety`.
+
 **Files:**
 - Modify: `test/forbidden_terms_test.rb`
 - Test: `test/forbidden_terms_test.rb`
 
-- [ ] **Step 1: Write failing test for private artifact filename patterns**
+- [x] **Step 1: Write failing test for private artifact filename patterns**
 
 Add this test:
 
@@ -210,22 +212,22 @@ def test_repository_does_not_contain_private_analysis_artifacts
     /nonpublic/i
   ]
 
-  findings = files.filter_map do |path|
+  findings = files.each_with_object([]) do |path, matches|
     relative = path.sub("#{ROOT}/", '')
-    forbidden_patterns.find { |pattern| relative.match?(pattern) } && relative
+    matches << relative if forbidden_patterns.any? { |pattern| relative.match?(pattern) }
   end
 
   assert_empty findings
 end
 ```
 
-- [ ] **Step 2: Run test to verify current safety**
+- [x] **Step 2: Run test to verify current safety**
 
 Run: `ruby -Ilib test/forbidden_terms_test.rb`
 
 Expected: PASS. If it fails, remove or rename only OSS-target files that violate the boundary; do not edit private source repos.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add test/forbidden_terms_test.rb
