@@ -47,6 +47,8 @@ git commit -m "docs: select sloth as next provider"
 
 ## Task 2: Sloth Provider Generation
 
+Status: completed on branch `sre-rules-sloth-provider`.
+
 **Files:**
 - Create: `lib/slo_rules_engine/providers/sloth.rb`
 - Modify: `lib/slo_rules_engine.rb`
@@ -54,7 +56,7 @@ git commit -m "docs: select sloth as next provider"
 - Modify: `test/providers_test.rb`
 - Modify: `test/provider_bindings_test.rb`
 
-- [ ] **Step 1: Write failing provider tests**
+- [x] **Step 1: Write failing provider tests**
 
 Add tests that:
 
@@ -63,7 +65,7 @@ Add tests that:
 - the generated spec has `version: prometheus/v1`, service `checkout-api`, objective `99.9`, and Sloth event queries;
 - the checkout metric has a `sloth` provider binding.
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run:
 
@@ -74,7 +76,7 @@ ruby -Ilib test/provider_bindings_test.rb
 
 Expected: FAIL because `sloth` is not registered and checkout has no Sloth binding.
 
-- [ ] **Step 3: Implement Sloth provider**
+- [x] **Step 3: Implement Sloth provider**
 
 Create `Providers::Sloth < Provider`. Use capabilities:
 
@@ -104,11 +106,11 @@ The Sloth spec must include:
 - `labels: { owner: definition.owner }`
 - one entry per SLO with `name`, `objective`, `description`, `sli.events.error_query`, `sli.events.total_query`, and `alerting` context.
 
-- [ ] **Step 4: Register provider and update checkout binding**
+- [x] **Step 4: Register provider and update checkout binding**
 
 Require `slo_rules_engine/providers/sloth` and register `Providers::Sloth.new`. Add a `provider_binding 'sloth'` block to the checkout metric using Prometheus-compatible data source, metric, range, and selector.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -119,7 +121,7 @@ ruby -Ilib test/provider_bindings_test.rb
 
 Expected: PASS.
 
-- [ ] **Step 6: Run full verification and commit**
+- [x] **Step 6: Run full verification and commit**
 
 Run:
 

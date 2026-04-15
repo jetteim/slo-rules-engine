@@ -15,6 +15,7 @@ class ProviderBindingsTest < Minitest::Test
 
     assert_equal 'http.server.request.duration', metric.binding_for('datadog').metric
     assert_equal 'http_server_request_duration_seconds_count', metric.binding_for('prometheus_stack').metric
+    assert_equal 'http_server_request_duration_seconds_count', metric.binding_for('sloth').metric
   end
 
   def test_datadog_provider_uses_datadog_binding
@@ -30,6 +31,13 @@ class ProviderBindingsTest < Minitest::Test
     rule = manifest[:artifacts][:recording_rules].fetch(0)
 
     assert_includes rule[:expr], 'http_server_request_duration_seconds_count'
+  end
+
+  def test_sloth_provider_uses_sloth_binding
+    manifest = SloRulesEngine.default_provider_registry.fetch('sloth').generate(@definition).to_h
+    slo = manifest[:artifacts][:sloth_specs].fetch(0)[:slos].fetch(0)
+
+    assert_includes slo[:sli][:events][:total_query], 'http_server_request_duration_seconds_count'
   end
 
   def test_provider_validation_reports_missing_binding

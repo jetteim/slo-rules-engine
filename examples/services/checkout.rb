@@ -53,6 +53,14 @@ SRE.define do
         type 'counter'
         selector service: 'checkout-api'
       end
+
+      provider_binding 'sloth' do
+        metric 'http_server_request_duration_seconds_count'
+        data_source 'prometheus'
+        type 'counter'
+        range '5m'
+        selector service: 'checkout-api'
+      end
     end
 
     instance do
