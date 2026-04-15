@@ -62,6 +62,17 @@ Expected artifacts:
 - Grafana dashboards
 - PromQL reality-check queries
 
+### `sloth`
+
+Prometheus-oriented provider that emits Sloth `prometheus/v1` SLO specs for Sloth rule generation.
+
+Expected artifacts:
+
+- Sloth SLO spec files
+- Prometheus event queries
+- page and ticket alert context labels
+- annotations carrying reviewed reliability intent
+
 ## Delivery Integrations
 
 Delivery integrations are not providers. They do not evaluate SLIs/SLOs or own dashboards.
