@@ -15,7 +15,9 @@ module SloRulesEngine
             notification_router_integration
             parameterized_dashboards
             reality_check
-          ]
+          ],
+          automation_mode: 'external_generator',
+          state_actions: %w[plan apply]
         )
       end
 

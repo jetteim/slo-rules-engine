@@ -15,7 +15,9 @@ module SloRulesEngine
             notification_router_integration
             parameterized_dashboards
             reality_check
-          ]
+          ],
+          automation_mode: 'manifest_bundle',
+          state_actions: %w[plan apply]
         )
       end
 
