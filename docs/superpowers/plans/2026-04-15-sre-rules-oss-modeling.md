@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build OSS-safe reliability modeling depth for the SLO rules engine, with the primary capability being SLI/SLO draft generation from existing telemetry inventory and without importing private rule definitions, private identifiers, or generated private artifacts.
+**Goal:** Build OSS-safe reliability modeling depth for the SLO rules engine, including first-class onboarding support for SLI/SLO draft generation from existing telemetry inventory and without importing private rule definitions, private identifiers, or generated private artifacts.
 
 **Architecture:** The engine remains a three-layer system: Ruby DSL, neutral reliability model, and provider/integration outputs. This plan strengthens the neutral reliability layer so SLI/SLO intent, miss-policy, measurement details, review gates, and observability handoff are explicit before any backend artifact generation.
 
@@ -28,9 +28,9 @@
 
 **Open questions:** Confirm whether model-report output should be JSON-only first, or JSON plus Markdown. Default plan uses JSON-only for testability and avoids accidental prose leakage.
 
-## Primary Capability: Generate SLIs And SLOs From Existing Telemetry
+## Onboarding Capability: Generate SLIs And SLOs From Existing Telemetry
 
-This is the most important capability. The intended onboarding path is not manual SLO authoring first; it is telemetry lookup first, then generated candidate review.
+For services with existing telemetry, this is the most important onboarding capability. The intended onboarding path is not manual SLO authoring first; it is telemetry lookup first, then generated candidate review.
 
 Explicit features to implement:
 

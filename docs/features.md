@@ -16,9 +16,9 @@ See [Evolution Plan](evolution-plan.md) for value streams, capability mapping, c
 - Compatibility reports for legacy DSL and implementation-coupled definitions.
 - Golden-style tests for generated artifacts.
 
-## Primary Capability: Generate SLIs And SLOs From Telemetry
+## Onboarding Capability: Generate SLIs And SLOs From Telemetry
 
-The most important onboarding path is telemetry lookup first, then generated candidate review. The engine should let maintainers start with existing measured telemetry and produce a reviewable service definition draft before any provider artifact generation.
+For services with existing telemetry, the most important onboarding path is telemetry lookup first, then generated candidate review. The engine should let maintainers start with measured telemetry and produce a reviewable service definition draft before any provider artifact generation.
 
 Explicit features:
 
