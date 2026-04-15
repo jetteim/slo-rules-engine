@@ -11,6 +11,23 @@ The engine has three layers:
 
 The core model is provider-neutral. Provider modules own backend syntax and capability gaps.
 
+## Value Streams
+
+The primary value stream is provider-independent SLO definition to backend artifact bundle:
+
+```text
+Ruby DSL or generated draft
+  -> neutral reliability intent
+  -> core validation
+  -> provider validation
+  -> backend artifact manifests
+  -> delivery integration route catalogs
+```
+
+Telemetry-derived draft generation is an onboarding stream that feeds the primary stream. Operational alert response, provider contribution, migration, backend state management, and reality checking are separate streams because they have different beneficiaries and outcomes.
+
+See [Evolution Plan](evolution-plan.md) for the full value-stream and capability map.
+
 ## Data Flow
 
 ```text

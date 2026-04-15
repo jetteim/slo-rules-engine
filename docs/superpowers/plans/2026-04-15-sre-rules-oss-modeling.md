@@ -42,23 +42,38 @@ Explicit features to implement:
 6. **Review Handoff:** Preserve findings and conservative review language so generated SLOs remain proposals, not automatic production policy.
 7. **Provider Handoff:** Keep backend provider generation downstream of accepted draft definitions; providers must not invent SLO policy.
 
-## Value Stream
+## Value Stream Context
 
-1. Author public-safe service reliability definition.
-2. Validate model completeness and public safety.
-3. Review SLI/SLO quality, objective realism, calculation basis, miss-policy, and observability handoff.
-4. Generate provider artifacts only after model review passes.
-5. Use synthetic examples to document adoption patterns.
+This plan belongs to the broader evolution map in `docs/evolution-plan.md`.
+
+Primary value stream:
+
+1. Provider-independent SLO definition to backend artifact bundle.
+
+Supporting streams:
+
+1. Existing telemetry to draft SLO definition.
+2. Reviewed SLO intent to operational alert response.
+3. Legacy or private rule evidence to OSS-safe engine capability.
+4. Provider contribution to supported backend bundle.
+5. Reviewed artifact manifest to managed backend state.
+6. Existing backend telemetry to SLO reality check.
+
+The active implementation packet starts with telemetry-derived drafting because it is the highest-value feeder into the provider-independent DSL stream, not because it replaces that stream.
 
 ## Capability Map
 
+- **Provider-Independent DSL Authoring:** Ruby DSL, service metadata, SLI/SLO blocks, metric bindings, route keys.
+- **Neutral Reliability Intent Model:** service profile, users/consumers, SLIs, SLI instances, SLOs, measurement details, miss-policy, observability handoff.
+- **Core Validation And Review Gates:** required fields, objective ranges, calculation basis, route references, miss-policy validation.
+- **Provider Artifact Generation:** Datadog manifests, Prometheus-compatible rules, dashboards, output directory layout.
 - **Telemetry-Derived SLO Drafting:** measured telemetry inventory, eligibility findings, SLI/SLO inference, draft DSL generation, validation handoff.
-- **Reliability Intent Capture:** service profile, users/consumers, SLIs, SLI instances, SLOs, measurement details, reality-check notes.
-- **Miss-Policy Modeling:** trigger, response, authority, exit condition, review cadence.
-- **Observability Handoff:** telemetry binding gaps, dashboard needs, alert context needs, backend generation requests.
+- **Operational Alert Context:** burn-rate alerts, telemetry-gap notifications, contextual annotations, dashboard variables.
+- **Delivery Integration Routing:** route catalogs, route availability checks, notification router integration.
+- **OSS-Safe Migration:** migration reports, forbidden-term scan, synthetic fixtures, anonymization helpers.
 - **Provider Contribution Safety:** provider boundaries, guardrails, fixture rules, deterministic output expectations, unsupported-field behavior, and review checklist.
-- **OSS Safety:** fixture taxonomy, forbidden-term expansion, local-only private input boundary.
-- **Model Review CLI:** machine-readable review report for SLO quality and readiness.
+- **Backend State Management:** artifact schemas, diff harness, explicit apply/prune commands, import existing resources.
+- **Reality Checking:** provider binding checks, missing metric checks, backend API adapters.
 
 ## Feature Packets
 
