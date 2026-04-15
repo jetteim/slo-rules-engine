@@ -20,11 +20,13 @@ module SloRulesEngine
   end
 
   class Provider
-    attr_reader :key, :capabilities
+    attr_reader :key, :capabilities, :automation_mode, :state_actions
 
-    def initialize(key:, capabilities:)
+    def initialize(key:, capabilities:, automation_mode: 'manifest_only', state_actions: [])
       @key = key
       @capabilities = capabilities
+      @automation_mode = automation_mode
+      @state_actions = state_actions
     end
 
     def generate(_definition)

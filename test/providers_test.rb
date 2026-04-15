@@ -19,6 +19,19 @@ class ProvidersTest < Minitest::Test
     assert_includes registry.fetch('sloth').capabilities, 'slo_evaluation'
   end
 
+  def test_provider_registry_lists_automation_modes_and_state_actions
+    providers = SloRulesEngine.default_provider_registry.list.to_h do |provider|
+      [provider.key, { automation_mode: provider.automation_mode, state_actions: provider.state_actions }]
+    end
+
+    assert_equal 'live_api', providers.fetch('datadog').fetch(:automation_mode)
+    assert_includes providers.fetch('datadog').fetch(:state_actions), 'apply'
+    assert_equal 'manifest_bundle', providers.fetch('prometheus_stack').fetch(:automation_mode)
+    assert_includes providers.fetch('prometheus_stack').fetch(:state_actions), 'apply'
+    assert_equal 'external_generator', providers.fetch('sloth').fetch(:automation_mode)
+    assert_includes providers.fetch('sloth').fetch(:state_actions), 'apply'
+  end
+
   def test_datadog_provider_generates_slo_monitor_and_dashboard
     manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h
 

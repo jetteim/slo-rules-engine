@@ -9,6 +9,17 @@ require 'tmpdir'
 class CLITest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
 
+  def test_providers_list_includes_automation_metadata
+    stdout, _stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'providers', 'list')
+
+    assert status.success?, stdout
+    providers = JSON.parse(stdout).to_h { |provider| [provider.fetch('key'), provider] }
+    assert_equal 'live_api', providers.fetch('datadog').fetch('automation_mode')
+    assert_includes providers.fetch('datadog').fetch('state_actions'), 'apply'
+    assert_equal 'manifest_bundle', providers.fetch('prometheus_stack').fetch('automation_mode')
+    assert_equal 'external_generator', providers.fetch('sloth').fetch('automation_mode')
+  end
+
   def test_generate_fails_when_provider_binding_is_missing
     Tempfile.create(['missing-binding', '.rb']) do |file|
       file.write(<<~RUBY)

@@ -76,7 +76,12 @@ module RulesCtl
     abort_usage('usage: providers list') unless subcommand == 'list'
 
     providers = SloRulesEngine.default_provider_registry.list.map do |provider|
-      { key: provider.key, capabilities: provider.capabilities }
+      {
+        key: provider.key,
+        capabilities: provider.capabilities,
+        automation_mode: provider.automation_mode,
+        state_actions: provider.state_actions
+      }
     end
     puts JSON.pretty_generate(providers)
   end
