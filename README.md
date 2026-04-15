@@ -28,6 +28,7 @@ Initial providers:
 
 - `datadog`: Datadog SLOs, monitors, dashboards, webhooks, and query validation.
 - `prometheus_stack`: Prometheus-compatible recording/alert rules, Alertmanager routing, Grafana dashboards, and PromQL reality checks.
+- `sloth`: Sloth `prometheus/v1` SLO specs for Prometheus rule generation.
 Initial integration:
 
 - `notification_router`: generated route catalog entries for contextual alert delivery used by backend providers.
@@ -35,8 +36,6 @@ Initial integration:
 Future provider candidates:
 
 - `grafana_cloud`
-- `openslo`
-- `sloth`
 - `pyrra`
 - `nobl9`
 - `perses`
@@ -45,6 +44,10 @@ Future provider candidates:
 - `chronosphere`
 - `terraform`
 - `kubernetes_custom_resources`
+
+Future interchange/export candidates:
+
+- `openslo`
 
 ## Early CLI Target
 
