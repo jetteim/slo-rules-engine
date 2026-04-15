@@ -37,4 +37,19 @@ class ReliabilityModelTest < Minitest::Test
     assert_equal 'error budget exhausted', policy.to_h.fetch(:trigger)
     assert_equal 'next business day', policy.to_h.fetch(:review_cadence)
   end
+
+  def test_model_report_summarizes_reliability_readiness
+    SloRulesEngine.clear_definitions
+    load File.expand_path('../examples/services/checkout.rb', __dir__)
+    definition = SloRulesEngine.definitions.fetch(0)
+
+    report = SloRulesEngine::ReliabilityModel::ReportBuilder.new.build([definition])
+
+    assert_equal 1, report.fetch(:service_count)
+    assert_equal 1, report.fetch(:slo_count)
+    assert_empty report.fetch(:private_identifiers)
+    assert_includes report.fetch(:observability_handoff_requests), 'bind provider queries'
+  ensure
+    SloRulesEngine.clear_definitions
+  end
 end

@@ -688,6 +688,8 @@ git commit -m "feat: validate reliability modeling gates"
 
 ## Task 5: Model Review CLI
 
+Status: completed on branch `sre-rules-model-report`.
+
 **Files:**
 - Create: `lib/slo_rules_engine/reliability_model.rb`
 - Modify: `lib/slo_rules_engine.rb`
@@ -695,7 +697,7 @@ git commit -m "feat: validate reliability modeling gates"
 - Create: `test/reliability_model_test.rb` additions
 - Modify: `test/cli_test.rb`
 
-- [ ] **Step 1: Write failing model report test**
+- [x] **Step 1: Write failing model report test**
 
 Add to `test/reliability_model_test.rb`:
 
@@ -714,13 +716,13 @@ def test_model_report_summarizes_reliability_readiness
 end
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `ruby -Ilib test/reliability_model_test.rb`
 
 Expected: FAIL because report builder does not exist.
 
-- [ ] **Step 3: Implement report builder**
+- [x] **Step 3: Implement report builder**
 
 Create `lib/slo_rules_engine/reliability_model.rb`:
 
@@ -757,7 +759,7 @@ Modify `lib/slo_rules_engine.rb`:
 require_relative 'slo_rules_engine/reliability_model'
 ```
 
-- [ ] **Step 4: Add CLI command test**
+- [x] **Step 4: Add CLI command test**
 
 Add to `test/cli_test.rb`:
 
@@ -771,7 +773,7 @@ def test_model_report_command_outputs_json
 end
 ```
 
-- [ ] **Step 5: Add CLI command**
+- [x] **Step 5: Add CLI command**
 
 In `bin/rules-ctl`, add command routing:
 
@@ -795,7 +797,7 @@ Add usage line:
 bin/rules-ctl model-report <definitionfile...>
 ```
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 Run: `ruby -Ilib test/reliability_model_test.rb && ruby -Ilib test/cli_test.rb`
 

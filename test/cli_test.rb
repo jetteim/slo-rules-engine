@@ -172,4 +172,14 @@ class CLITest < Minitest::Test
       assert_equal 'provider_specific_dsl', payload.fetch('findings').fetch(0).fetch('code')
     end
   end
+
+  def test_model_report_command_outputs_json
+    stdout, stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'model-report', "#{ROOT}/examples/services/checkout.rb")
+
+    assert status.success?, stderr
+    payload = JSON.parse(stdout)
+    assert_equal 1, payload.fetch('service_count')
+    assert_equal 1, payload.fetch('slo_count')
+    assert_includes payload.fetch('observability_handoff_requests'), 'bind provider queries'
+  end
 end
