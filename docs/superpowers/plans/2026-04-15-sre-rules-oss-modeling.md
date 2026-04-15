@@ -810,12 +810,14 @@ git commit -m "feat: add reliability model report"
 
 ## Task 6: Synthetic Low-Volume Example
 
+Status: completed on branch `sre-rules-low-volume-example`.
+
 **Files:**
 - Create: `examples/services/background-worker.rb`
 - Create: `examples/telemetry/background-worker-signals.json`
 - Modify: `test/reality_check_test.rb`
 
-- [ ] **Step 1: Add failing low-volume calculation-basis test**
+- [x] **Step 1: Add failing low-volume calculation-basis test**
 
 Add to `test/reality_check_test.rb`:
 
@@ -830,17 +832,17 @@ def test_low_volume_fixture_recommends_time_slice
 end
 ```
 
-- [ ] **Step 2: Run test**
+- [x] **Step 2: Run test**
 
 Run: `ruby -Ilib test/reality_check_test.rb`
 
 Expected: PASS if advisor behavior already exists. If it fails, restore the reliability model rule: fewer than two failed observations that can trigger an alert should recommend `time_slice`.
 
-- [ ] **Step 3: Add synthetic low-volume service fixture**
+- [x] **Step 3: Add synthetic low-volume service fixture**
 
 Create `examples/services/background-worker.rb` with a single synthetic SLI and SLO using `calculation_basis 'time_slice'`. Use generic names only: `background-worker`, `platform-team`, `job-completion`, `scheduled-run`, and `completed-runs`.
 
-- [ ] **Step 4: Add telemetry fixture**
+- [x] **Step 4: Add telemetry fixture**
 
 Create `examples/telemetry/background-worker-signals.json`:
 
@@ -858,7 +860,7 @@ Create `examples/telemetry/background-worker-signals.json`:
 ]
 ```
 
-- [ ] **Step 5: Validate fixtures and commit**
+- [x] **Step 5: Validate fixtures and commit**
 
 Run:
 

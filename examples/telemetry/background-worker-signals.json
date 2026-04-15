@@ -1,0 +1,11 @@
+[
+  {
+    "kind": "availability",
+    "metric": "worker.job.completed",
+    "user_visible": true,
+    "objective": 0.99,
+    "success_condition": "Scheduled job completes successfully.",
+    "observations_per_second": 0.1,
+    "failed_observations_to_alert": 1
+  }
+]

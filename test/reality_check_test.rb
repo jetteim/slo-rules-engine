@@ -24,6 +24,15 @@ class RealityCheckTest < Minitest::Test
     assert_equal 'high', result.confidence
   end
 
+  def test_low_volume_fixture_recommends_time_slice
+    recommendation = SloRulesEngine::RealityCheck::CalculationBasisAdvisor.new.recommend(
+      observations_per_second: 0.1,
+      failed_observations_to_alert: 1
+    )
+
+    assert_equal 'time_slice', recommendation.basis
+  end
+
   def test_checks_provider_bindings_against_measured_telemetry
     SloRulesEngine.clear_definitions
     load File.expand_path('../examples/services/checkout.rb', __dir__)
