@@ -373,13 +373,15 @@ git commit -m "feat: add neutral reliability model objects"
 
 ## Task 3: DSL Support For Reliability Intent
 
+Status: completed on branch `sre-rules-dsl-reliability-intent`.
+
 **Files:**
 - Modify: `lib/slo_rules_engine/model.rb`
 - Modify: `lib/slo_rules_engine/dsl/service_definition.rb`
 - Modify: `examples/services/checkout.rb`
 - Modify: `test/dsl_test.rb`
 
-- [ ] **Step 1: Write failing DSL test**
+- [x] **Step 1: Write failing DSL test**
 
 Add to `test/dsl_test.rb`:
 
@@ -396,13 +398,13 @@ def test_parses_reliability_intent_fields
 end
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `ruby -Ilib test/dsl_test.rb`
 
 Expected: FAIL because fields and DSL methods do not exist.
 
-- [ ] **Step 3: Add model fields**
+- [x] **Step 3: Add model fields**
 
 Extend `SLI` in `lib/slo_rules_engine/model.rb` with `:user_visible_rationale` and `:measurement_details`.
 
@@ -423,7 +425,7 @@ ObservabilityHandoff = Struct.new(:requests, keyword_init: true) do
 end
 ```
 
-- [ ] **Step 4: Add DSL methods**
+- [x] **Step 4: Add DSL methods**
 
 In `SLIBuilder`, add:
 
@@ -564,7 +566,7 @@ class MissPolicyBuilder
 end
 ```
 
-- [ ] **Step 5: Update synthetic example**
+- [x] **Step 5: Update synthetic example**
 
 Add to the sample SLI:
 
@@ -592,7 +594,7 @@ reality_check_notes 'synthetic example objective; replace with historical review
 observability_handoff 'bind provider queries', 'generate decision dashboard'
 ```
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 Run: `ruby -Ilib test/dsl_test.rb`
 

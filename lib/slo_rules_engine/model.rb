@@ -25,6 +25,8 @@ module SloRulesEngine
     :title,
     :metric,
     :instances,
+    :user_visible_rationale,
+    :measurement_details,
     :line_references,
     keyword_init: true
   ) do
@@ -103,6 +105,9 @@ module SloRulesEngine
     :documentation,
     :alert_route_key,
     :dashboard_path,
+    :miss_policy,
+    :reality_check_notes,
+    :observability_handoff,
     :line_references,
     keyword_init: true
   ) do
@@ -110,6 +115,17 @@ module SloRulesEngine
       super
       self.calculation_basis ||= 'observations'
       self.line_references ||= {}
+    end
+  end
+
+  ObservabilityHandoff = Struct.new(:requests, keyword_init: true) do
+    def initialize(**kwargs)
+      super
+      self.requests ||= []
+    end
+
+    def to_h
+      { requests: requests }
     end
   end
 
