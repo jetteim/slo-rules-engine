@@ -34,6 +34,10 @@ Explicit features:
 
 `rules-ctl model-report` summarizes the neutral reliability model for service definitions. It is intended for review before provider generation and uses synthetic examples in this repository.
 
+## Sloth Provider Generation
+
+`rules-ctl generate --provider sloth` emits Sloth `prometheus/v1` SLO specs from reviewed service definitions. The provider uses Prometheus-compatible query bindings and keeps OpenSLO as a future interchange/export path, not as a backend provider.
+
 ## Change
 
 - Provider abstraction means complete observability backend bundle.

@@ -72,6 +72,22 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_generate_outputs_sloth_provider_manifest
+    stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=sloth',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+
+    assert status.success?, stderr
+    payload = JSON.parse(stdout).fetch(0)
+    spec = payload.fetch('artifacts').fetch('sloth_specs').fetch(0)
+    assert_equal 'sloth', payload.fetch('provider')
+    assert_equal 'prometheus/v1', spec.fetch('version')
+  end
+
   def test_candidates_outputs_review_with_findings
     Tempfile.create(['signals', '.json']) do |file|
       file.write(JSON.generate([

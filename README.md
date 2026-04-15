@@ -55,6 +55,7 @@ Future interchange/export candidates:
 bin/rules-ctl validate examples/services/checkout.rb
 bin/rules-ctl generate --provider datadog examples/services/checkout.rb
 bin/rules-ctl generate --provider prometheus_stack examples/services/checkout.rb
+bin/rules-ctl generate --provider sloth examples/services/checkout.rb
 bin/rules-ctl generate --provider prometheus_stack --output-dir ./generated examples/services/checkout.rb
 bin/rules-ctl generate-routes --integration notification_router examples/services/checkout.rb
 # Returns candidate SLIs/SLOs plus findings for rejected or incomplete telemetry.

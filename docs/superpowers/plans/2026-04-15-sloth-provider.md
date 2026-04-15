@@ -142,6 +142,8 @@ git commit -m "feat: add sloth provider"
 
 ## Task 3: Sloth CLI And Documentation
 
+Status: completed on branch `sre-rules-sloth-provider`.
+
 **Files:**
 - Modify: `README.md`
 - Modify: `docs/provider-contract.md`
@@ -149,7 +151,7 @@ git commit -m "feat: add sloth provider"
 - Modify: `docs/superpowers/plans/2026-04-15-sloth-provider.md`
 - Modify: `test/cli_test.rb`
 
-- [ ] **Step 1: Write failing CLI test**
+- [x] **Step 1: Write failing CLI test**
 
 Add a CLI test for:
 
@@ -159,7 +161,7 @@ ruby bin/rules-ctl generate --provider=sloth examples/services/checkout.rb
 
 Assert that the command exits 0, provider is `sloth`, and the first Sloth spec has `version` equal to `prometheus/v1`.
 
-- [ ] **Step 2: Run test to verify failure or coverage gap**
+- [x] **Step 2: Run test to verify failure or coverage gap**
 
 Run:
 
@@ -169,11 +171,11 @@ ruby -Ilib test/cli_test.rb
 
 Expected: PASS if registry support is already enough, or FAIL if JSON output shape needs adjustment.
 
-- [ ] **Step 3: Update docs**
+- [x] **Step 3: Update docs**
 
 Update README CLI examples, provider contract, and feature docs to mention Sloth provider generation and OpenSLO as a future export/interchange target.
 
-- [ ] **Step 4: Run verification and commit**
+- [x] **Step 4: Run verification and commit**
 
 Run:
 

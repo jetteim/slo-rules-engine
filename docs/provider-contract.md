@@ -73,6 +73,8 @@ Expected artifacts:
 - page and ticket alert context labels
 - annotations carrying reviewed reliability intent
 
+The Sloth provider does not execute the Sloth CLI or apply generated rules. It produces reviewable spec artifacts that can be handed to Sloth in a separate workflow.
+
 ## Delivery Integrations
 
 Delivery integrations are not providers. They do not evaluate SLIs/SLOs or own dashboards.
