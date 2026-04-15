@@ -89,6 +89,52 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_draft_definition_outputs_loadable_dsl_from_telemetry
+    Tempfile.create(['signals', '.json']) do |signals_file|
+      signals_file.write(JSON.generate([
+        {
+          kind: 'latency',
+          metric: 'http.server.request.duration',
+          user_visible: true,
+          objective: 0.95,
+          observations_per_second: 25,
+          failed_observations_to_alert: 120
+        },
+        { kind: 'saturation', metric: 'runtime.heap.used', user_visible: false }
+      ]))
+      signals_file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'draft-definition',
+        '--service=checkout-api',
+        '--owner=payments-platform',
+        signals_file.path
+      )
+
+      assert status.success?, stderr
+      assert_includes stdout, "SRE.define"
+      assert_includes stdout, "uid 'request-latency'"
+      refute_includes stdout, "uid 'resource-saturation'"
+
+      Tempfile.create(['draft-definition', '.rb']) do |draft_file|
+        draft_file.write(stdout)
+        draft_file.flush
+
+        validate_stdout, _validate_stderr, validate_status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'validate',
+          draft_file.path
+        )
+
+        assert validate_status.success?, validate_stdout
+        assert_equal true, JSON.parse(validate_stdout).fetch(0).fetch('valid')
+      end
+    end
+  end
+
   def test_reality_check_reports_missing_telemetry
     Tempfile.create(['signals', '.json']) do |file|
       file.write(JSON.generate([{ metric: 'other.metric' }]))
