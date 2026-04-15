@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require_relative '../lib/slo_rules_engine'
+require 'tempfile'
+require_relative '../lib/sre'
 
 class OnboardingTest < Minitest::Test
   def test_generates_candidates_only_from_user_visible_telemetry
@@ -47,5 +48,48 @@ class OnboardingTest < Minitest::Test
     assert_equal 'high', review[:candidates].fetch(0)[:calculation_basis_recommendation][:confidence]
 
     assert_equal %w[non_user_visible unsupported_signal missing_metric], review[:findings].map { |finding| finding[:code] }
+  end
+
+  def test_generates_loadable_definition_draft_from_telemetry
+    generator = SloRulesEngine::Onboarding::DefinitionDraftGenerator.new
+
+    draft = generator.generate(
+      service: 'checkout-api',
+      owner: 'payments-platform',
+      signals: [
+        {
+          kind: 'latency',
+          metric: 'http.server.request.duration',
+          user_visible: true,
+          objective: 0.95,
+          observations_per_second: 25,
+          failed_observations_to_alert: 120
+        },
+        { kind: 'saturation', metric: 'runtime.heap.used', user_visible: false }
+      ]
+    )
+
+    assert_includes draft, "service 'checkout-api'"
+    assert_includes draft, "uid 'request-latency'"
+    assert_includes draft, "metric 'http.server.request.duration'"
+    refute_includes draft, "uid 'resource-saturation'"
+    assert_includes draft, '# finding: non_user_visible'
+
+    Tempfile.create(['draft-definition', '.rb']) do |file|
+      file.write(draft)
+      file.flush
+
+      SloRulesEngine.clear_definitions
+      load file.path
+      definition = SloRulesEngine.definitions.fetch(0)
+      result = SloRulesEngine::CoreValidator.new.validate(definition)
+
+      assert result.valid?, result.to_h.inspect
+      assert_equal 'checkout-api', definition.service
+      assert_equal 'request-latency', definition.slis.fetch(0).uid
+      assert_equal 'fast-enough', definition.slis.fetch(0).instances.fetch(0).slos.fetch(0).uid
+    end
+  ensure
+    SloRulesEngine.clear_definitions
   end
 end
