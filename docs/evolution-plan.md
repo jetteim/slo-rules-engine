@@ -137,21 +137,23 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 
 **Trigger:** reviewed artifact manifests are ready to compare or apply.
 
-**Outcome:** backend state can be diffed, imported, applied, pruned, or cost-checked through explicit safe commands.
+**Outcome:** backend state can be planned, diffed, imported, applied, pruned, or cost-checked through explicit safe commands.
 
 **Flow:**
 
 1. Generate reviewed manifests from accepted neutral intent.
 2. Compare generated output with current backend state.
 3. Report drift and destructive changes before any mutation.
-4. Apply or prune only through explicit commands.
-5. Record generated artifact provenance.
+4. Produce a dry-run apply plan.
+5. Apply or prune only through explicit commands.
+6. Record generated artifact provenance.
 
 **Measures:**
 
 - Drift detected before apply.
 - Irreversible changes require explicit confirmation.
 - Backend state changes trace to generated manifests.
+- Providers declare whether state is managed through live APIs, manifest bundles, or external-generator handoffs.
 
 ### 7. Existing Backend Telemetry To SLO Reality Check
 
@@ -189,8 +191,8 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 | Delivery integration routing | 3 | route catalogs, route availability checks, notification router integration |
 | OSS-safe migration | 4 | migration reports, forbidden-term scan, synthetic fixtures, anonymization helpers |
 | Provider contribution safety | 5 | provider contract, provider guide, deterministic tests, unsupported-field warnings |
-| Backend state management | 6 | artifact schemas, diff harness, apply/prune commands, import existing resources |
-| Reality checking | 7 | provider binding checks, missing metric checks, backend API adapters |
+| Backend state management | 6 | automation modes, artifact schemas, dry-run apply plans, diff harness, apply/prune commands, import existing resources |
+| Reality checking | 7 | provider binding checks, missing metric checks, backend telemetry lookup adapters |
 
 ## Delivery Order
 
@@ -200,7 +202,8 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 4. Strengthen validation and model reporting.
 5. Add provider contribution guide and guardrails.
 6. Add low-volume and reality-check examples with synthetic telemetry.
-7. Add apply-ready artifact schemas, diffing, and backend API adapters only after generated manifests are reviewable.
+7. Add apply-ready artifact schemas, diffing, and backend API adapters after generated manifests are reviewable.
+8. Keep provider apply behavior explicit for each provider: Datadog as live API, Prometheus-compatible bundles as manifest bundles, and Sloth as external-generator handoff.
 
 ## Guardrails
 
@@ -211,3 +214,4 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 - Missing telemetry is a reliability signal; it must not be silently ignored.
 - Provider contributions must use synthetic fixtures and explicit unsupported-field handling.
 - Public-safety checks must remain part of the normal test path.
+- Live backend mutation must require explicit confirmation and provider credentials.

@@ -34,6 +34,31 @@ Explicit features:
 
 `rules-ctl model-report` summarizes the neutral reliability model for service definitions. It is intended for review before provider generation and uses synthetic examples in this repository.
 
+## Backend Telemetry Lookup And Sanity Checks
+
+Telemetry-derived SLO generation should work from either a checked-in telemetry inventory fixture or backend lookup output. Lookup adapters normalize provider evidence before it reaches candidate generation, so SLI/SLO review does not depend on backend-specific query syntax.
+
+Explicit features:
+
+- **Provider telemetry lookup:** query Datadog or Prometheus-compatible backends through injectable clients and emit normalized telemetry inventory.
+- **Online sanity checks:** report missing metrics, missing time series, missing histogram buckets, and calculation-basis sensitivity.
+- **Calculation-basis evidence:** use observed request volume and estimated failed observations before alerting to recommend observations-based or time-slice-based SLOs.
+- **Candidate reuse:** feed lookup output into the same `candidates` and `draft-definition` flow as file-based telemetry inventory.
+- **No hidden policy:** lookup output is evidence for review, not automatic SLO acceptance.
+
+## Provider State Management
+
+Provider generation is read-only. Backend state changes belong to explicit apply workflows.
+
+Explicit features:
+
+- **Automation modes:** providers declare `live_api`, `manifest_bundle`, or `external_generator`.
+- **Apply planning:** dry-run apply emits planned create, update, write, or handoff operations.
+- **Explicit live mutation:** live backend changes require a separate command, confirmation, and credentials when the provider needs them.
+- **Datadog live API support:** Datadog can apply SLOs, monitors, telemetry-gap monitors, and dashboards through API calls.
+- **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but initially manage files and handoff plans rather than mutating live backends.
+- **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
+
 ## Sloth Provider Generation
 
 `rules-ctl generate --provider sloth` emits Sloth `prometheus/v1` SLO specs from reviewed service definitions. The provider uses Prometheus-compatible query bindings and keeps OpenSLO as a future interchange/export path, not as a backend provider.

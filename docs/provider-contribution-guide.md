@@ -10,6 +10,8 @@ A provider may:
 
 - map neutral metric bindings to backend query syntax;
 - render miss-policy, measurement caveats, notification routes, and dashboard variables;
+- declare its automation mode and supported state actions;
+- provide dry-run apply plans;
 - declare unsupported fields explicitly;
 - emit warnings when backend capabilities cannot represent the neutral model;
 - add backend-specific metadata needed to make generated artifacts useful and reviewable.
@@ -18,7 +20,7 @@ A provider may:
 
 A provider is not the source of reliability policy. It must not choose objectives, redefine calculation basis, invent service ownership, decide page policy, import private service definitions, store credentials, or apply changes to live systems as part of normal generation.
 
-Provider generation must not require network access. Live apply flows, if ever added, require a separate explicit command, dry-run output, confirmation flow, and dedicated tests.
+Provider generation must not require network access. Live apply flows require a separate explicit command, dry-run output, confirmation flow, injectable clients, and dedicated tests.
 
 ## Guardrails
 
@@ -32,13 +34,19 @@ Provider generation must not require network access. Live apply flows, if ever a
 - Keep backend-specific dependencies isolated to the provider layer.
 - Add tests for generated output shape and unsafe-term scanning.
 - Document every new provider option and its default behavior.
+- Document the provider automation mode: `live_api`, `manifest_bundle`, `external_generator`, or `manifest_only`.
+- Document state actions: `plan`, `apply`, `diff`, `import_existing`, and `prune`.
+- Keep live mutation unavailable unless credentials and explicit confirmation are present.
 
 ## Contribution Checklist
 
 - Provider contract updated.
+- Provider automation mode documented.
+- State actions documented.
 - Synthetic fixture added or reused.
 - Model report reviewed before provider generation.
 - Unit tests cover supported output.
+- Apply-plan tests cover dry-run behavior.
 - Unsupported fields produce warnings.
 - `ruby -Ilib test/all_test.rb` passes.
 - `scripts/verify.sh` passes.
