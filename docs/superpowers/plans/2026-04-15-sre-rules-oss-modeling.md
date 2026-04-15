@@ -957,6 +957,8 @@ git commit -m "docs: add provider contribution guide"
 
 ## Task 8: Documentation Update
 
+Status: completed on branch `sre-rules-modeling-docs`.
+
 **Files:**
 - Modify: `README.md`
 - Modify: `docs/design.md`
@@ -964,7 +966,7 @@ git commit -m "docs: add provider contribution guide"
 - Modify: `docs/provider-contract.md`
 - Modify: `docs/provider-contribution-guide.md`
 
-- [ ] **Step 1: Update README CLI list**
+- [x] **Step 1: Update README CLI list**
 
 Add:
 
@@ -972,7 +974,7 @@ Add:
 bin/rules-ctl model-report examples/services/checkout.rb
 ```
 
-- [ ] **Step 2: Update design docs**
+- [x] **Step 2: Update design docs**
 
 In `docs/design.md`, add a section:
 
@@ -982,7 +984,7 @@ In `docs/design.md`, add a section:
 The reliability model records SLI/SLO intent before backend generation. It includes measurement details, user-visible rationale, miss-policy, reality-check notes, and observability handoff requests. Providers may consume these fields, but they do not decide whether an SLO is appropriate.
 ```
 
-- [ ] **Step 3: Update feature docs**
+- [x] **Step 3: Update feature docs**
 
 In `docs/features.md`, add a concise feature entry for modeling-first review:
 
@@ -992,7 +994,7 @@ In `docs/features.md`, add a concise feature entry for modeling-first review:
 `rules-ctl model-report` summarizes the neutral reliability model for service definitions. It is intended for review before provider generation and uses synthetic examples in this repository.
 ```
 
-- [ ] **Step 4: Update provider contract**
+- [x] **Step 4: Update provider contract**
 
 In `docs/provider-contract.md`, add:
 
@@ -1000,11 +1002,11 @@ In `docs/provider-contract.md`, add:
 Providers receive reliability intent as input. They may render miss-policy, measurement caveats, playbook links, and dashboard variables into backend-specific artifacts, but objective selection and calculation-basis policy remain model decisions.
 ```
 
-- [ ] **Step 5: Update provider contribution guide**
+- [x] **Step 5: Update provider contribution guide**
 
 Ensure `docs/provider-contribution-guide.md` refers to the model-report command as the review point before provider generation.
 
-- [ ] **Step 6: Run verification and commit**
+- [x] **Step 6: Run verification and commit**
 
 Run:
 

@@ -23,6 +23,7 @@ Provider generation must not require network access. Live apply flows, if ever a
 ## Guardrails
 
 - Consume the neutral model; do not bypass DSL validation.
+- Use `bin/rules-ctl model-report` as the review point before provider generation.
 - Keep output deterministic for identical inputs.
 - Use synthetic fixtures only.
 - Do not include secrets, internal hostnames, private service names, private routing targets, or private metric selectors.
@@ -36,6 +37,7 @@ Provider generation must not require network access. Live apply flows, if ever a
 
 - Provider contract updated.
 - Synthetic fixture added or reused.
+- Model report reviewed before provider generation.
 - Unit tests cover supported output.
 - Unsupported fields produce warnings.
 - `ruby -Ilib test/all_test.rb` passes.

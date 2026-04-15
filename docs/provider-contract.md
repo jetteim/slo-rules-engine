@@ -34,6 +34,8 @@ Providers are downstream translators, not reliability policy owners. Objective s
 
 Do not use provider code to invent reliability policy. A provider may express reviewed intent in backend syntax, but it must not decide what the service should promise or when responders should be paged.
 
+Providers receive reliability intent as input. They may render miss-policy, measurement caveats, playbook links, and dashboard variables into backend-specific artifacts, but objective selection and calculation-basis policy remain model decisions.
+
 ## Initial Providers
 
 ### `datadog`
