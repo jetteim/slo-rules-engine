@@ -30,6 +30,10 @@ Explicit features:
 - **Review handoff:** preserve findings and conservative review wording so generated SLOs remain proposals until a maintainer accepts them.
 - **Provider handoff:** keep backend-specific generation downstream of accepted definitions; providers translate accepted intent and do not invent SLO policy.
 
+## Reliability Model Report
+
+`rules-ctl model-report` summarizes the neutral reliability model for service definitions. It is intended for review before provider generation and uses synthetic examples in this repository.
+
 ## Change
 
 - Provider abstraction means complete observability backend bundle.
