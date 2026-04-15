@@ -16,6 +16,7 @@ require_relative 'slo_rules_engine/integrations/notification_router'
 require_relative 'slo_rules_engine/reality_check'
 require_relative 'slo_rules_engine/onboarding/candidate_generator'
 require_relative 'slo_rules_engine/onboarding/definition_draft_generator'
+require_relative 'slo_rules_engine/reliability_model'
 
 module SloRulesEngine
   class << self

@@ -33,6 +33,8 @@ module RulesCtl
       reality_check(argv)
     when 'migration-report'
       migration_report(argv)
+    when 'model-report'
+      model_report(argv)
     else
       abort_usage("unknown command: #{command}")
     end
@@ -185,6 +187,11 @@ module RulesCtl
     exit(report.valid? ? 0 : 1)
   end
 
+  def model_report(argv)
+    definitions = load_definitions(argv)
+    puts JSON.pretty_generate(SloRulesEngine::ReliabilityModel::ReportBuilder.new.build(definitions))
+  end
+
   def load_definitions(paths)
     abort_usage('missing definition file') if paths.empty?
 
@@ -234,6 +241,7 @@ module RulesCtl
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
         bin/rules-ctl migration-report <legacyfile...>
+        bin/rules-ctl model-report <definitionfile...>
     USAGE
     exit 2
   end
