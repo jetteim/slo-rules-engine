@@ -128,6 +128,8 @@ The active implementation packet starts with telemetry-derived drafting because 
 
 ## Task 0: Telemetry-To-Draft SLO Generation
 
+Status: completed in PR #1 and merged to `main`.
+
 **Files:**
 - Create: `lib/slo_rules_engine/onboarding/definition_draft_generator.rb`
 - Modify: `lib/slo_rules_engine.rb`
@@ -136,11 +138,11 @@ The active implementation packet starts with telemetry-derived drafting because 
 - Modify: `test/cli_test.rb`
 - Modify: `docs/features.md`
 
-- [ ] **Step 1: Write failing generator test**
+- [x] **Step 1: Write failing generator test**
 
 Add coverage that a telemetry inventory with one eligible latency signal and one rejected saturation signal produces a Ruby DSL draft containing only the eligible candidate. Load the draft through the existing DSL and validate it.
 
-- [ ] **Step 2: Write failing CLI test**
+- [x] **Step 2: Write failing CLI test**
 
 Add coverage for:
 
@@ -150,7 +152,7 @@ bin/rules-ctl draft-definition --service=checkout-api --owner=payments-platform 
 
 Expected: command exits 0, prints a Ruby DSL draft, includes `request-latency`, excludes non-user-visible saturation, and can be validated after saving.
 
-- [ ] **Step 3: Implement draft generator**
+- [x] **Step 3: Implement draft generator**
 
 Use `SloRulesEngine::Onboarding::CandidateGenerator` as the source of candidate truth. Do not duplicate eligibility logic. The draft generator should:
 
@@ -162,7 +164,7 @@ Use `SloRulesEngine::Onboarding::CandidateGenerator` as the source of candidate 
 - create one proposed `slo` block using inferred objective, success shape, calculation basis, and documentation;
 - include comments for findings so rejected signals remain reviewable without becoming SLOs.
 
-- [ ] **Step 4: Add CLI command**
+- [x] **Step 4: Add CLI command**
 
 Add:
 
@@ -170,11 +172,11 @@ Add:
 bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
 ```
 
-- [ ] **Step 5: Document feature list**
+- [x] **Step 5: Document feature list**
 
 Update `docs/features.md` with the explicit telemetry-to-SLO feature list from this plan.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run:
 
