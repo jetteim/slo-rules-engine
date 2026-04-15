@@ -71,4 +71,6 @@ bin/rules-ctl validate examples/services/checkout.rb
 scripts/verify.sh
 ```
 
+Provider contributors should start with the [Provider Contribution Guide](docs/provider-contribution-guide.md) and the [Provider Contract](docs/provider-contract.md).
+
 No external Ruby dependencies are required for the initial skeleton.

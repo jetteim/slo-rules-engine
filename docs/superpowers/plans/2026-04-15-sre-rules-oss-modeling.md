@@ -878,12 +878,14 @@ git commit -m "docs: add synthetic low-volume reliability example"
 
 ## Task 7: Provider Contribution Guide
 
+Status: completed on branch `sre-rules-provider-guide`.
+
 **Files:**
 - Create: `docs/provider-contribution-guide.md`
 - Modify: `docs/provider-contract.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Write the provider boundary guide**
+- [x] **Step 1: Write the provider boundary guide**
 
 Create `docs/provider-contribution-guide.md` with these sections:
 
@@ -930,15 +932,15 @@ Provider generation must not require network access. Live apply flows, if ever a
 - `scripts/verify.sh` passes.
 ```
 
-- [ ] **Step 2: Cross-link provider contract**
+- [x] **Step 2: Cross-link provider contract**
 
 In `docs/provider-contract.md`, link the contribution guide and add a short warning that providers are translation adapters, not policy owners.
 
-- [ ] **Step 3: Link from README**
+- [x] **Step 3: Link from README**
 
 Add a provider contribution link in the README development or documentation section.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run:
 
