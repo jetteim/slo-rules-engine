@@ -52,6 +52,7 @@ Provider generation is read-only. Backend state changes belong to explicit apply
 
 Explicit features:
 
+- **State pipeline contract:** model backend management as sources, transforms, sinks, and findings.
 - **Automation modes:** providers declare `live_api`, `manifest_bundle`, or `external_generator`.
 - **Apply planning:** dry-run apply emits planned create, update, write, or handoff operations.
 - **Explicit live mutation:** live backend changes require a separate command, confirmation, and credentials when the provider needs them.

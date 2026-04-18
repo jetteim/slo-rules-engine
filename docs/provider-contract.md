@@ -44,6 +44,17 @@ Every provider must also declare supported state actions:
 
 Unsupported actions must fail with explicit provider validation output.
 
+## State Pipeline Contract
+
+Provider state management follows a pipeline contract:
+
+- **Sources:** neutral service definitions, generated manifests, telemetry lookup results, and imported backend state.
+- **Transforms:** provider validation, telemetry sanity checks, candidate generation, and apply-plan calculation.
+- **Sinks:** live backend APIs, manifest bundles, external generator handoffs, and route catalogs.
+- **Findings:** unsupported fields, missing telemetry, missing backend state, unsafe mutation, and unavailable provider actions.
+
+Provider generation is a transform and must stay deterministic. Provider apply is a sink and must be isolated behind dry-run, confirmation, and provider-specific state-action support.
+
 ## Provider Responsibilities
 
 Providers receive neutral intent and return generated artifacts.
