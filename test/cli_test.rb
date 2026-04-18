@@ -83,6 +83,24 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_apply_command_reports_unsupported_until_provider_applier_exists
+    stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'apply',
+      '--provider=datadog',
+      '--dry-run',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+
+    refute status.success?, stderr
+    payload = JSON.parse(stdout)
+    assert_equal false, payload.fetch('valid')
+    assert_equal 'datadog', payload.fetch('provider')
+    assert_equal 'live_api', payload.fetch('automation_mode')
+    assert_equal 'unsupported_apply_action', payload.fetch('error').fetch('code')
+  end
+
   def test_generate_outputs_sloth_provider_manifest
     stdout, stderr, status = Open3.capture3(
       'ruby',
