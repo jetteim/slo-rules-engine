@@ -14,6 +14,25 @@
 
 **Evidence:** Legacy implementation review found reusable public-safe patterns for metric inventory, Thanos/Prometheus validation, Datadog validation, Datadog API apply, dry-run, and prune. Current repo review found generation and static reality checks but no live lookup or applier layer.
 
+## Observability State Pipeline Model
+
+The provider-state workflow borrows the useful shape of observability pipeline tools: explicit sources, transforms, sinks, validation, and test fixtures. It does not copy a streaming DSL or make SLO policy an event-processing program.
+
+Pipeline stages:
+
+- **Sources:** reviewed service definitions, backend telemetry lookup output, generated provider manifests, and imported backend state.
+- **Transforms:** telemetry normalization, candidate generation, provider validation, reality checks, and apply-plan calculation.
+- **Sinks:** Datadog API, Prometheus-compatible manifest bundle, Sloth external-generator handoff, and route catalog outputs.
+- **Findings side path:** unsupported telemetry, missing backend series, missing provider bindings, unsafe live mutation, and unsupported provider state actions.
+
+Validation rules:
+
+- Every source must be explicit and reproducible.
+- Every transform must be deterministic for identical inputs.
+- Every sink must declare whether it mutates a live backend, writes files, or hands off to another generator.
+- Backend mutation must be isolated to sink/applier components.
+- Apply plans must be testable with fixture input and fake backend state before any live apply path is trusted.
+
 ## Capability Set
 
 ### Backend Telemetry To Reviewed SLO Definition
@@ -113,6 +132,7 @@ Required behavior:
 - Backend API Client: performs provider-specific HTTP or file operations through injectable transport.
 - Applier: executes an apply plan when explicitly confirmed.
 - CLI: exposes `generate`, `lookup-telemetry`, `reality-check`, `apply`, `diff`, `import`, and `prune` commands.
+- Findings Reporter: emits unsupported, unsafe, missing, or unverified pipeline facts as machine-readable output.
 
 ### Relationships
 
@@ -122,11 +142,14 @@ Required behavior:
 - Provider Generator -> Apply Planner: provides generated artifacts as desired state.
 - Apply Planner -> Backend API Client: imports current state when provider supports it.
 - Applier -> Backend API Client: executes confirmed state changes.
+- Apply Planner -> Findings Reporter: emits unsupported or unsafe operations instead of dropping them.
 
 ### Decisions
 
 - Generation and apply are separate commands.
 - Provider automation mode is explicit and testable.
+- Provider state management is modeled as a source-to-transform-to-sink pipeline.
+- Apply planning is a deterministic transform; live mutation is only a sink action.
 - Datadog is the first live API provider.
 - Prometheus-compatible output starts as manifest bundle state management.
 - Sloth starts as external-generator handoff.

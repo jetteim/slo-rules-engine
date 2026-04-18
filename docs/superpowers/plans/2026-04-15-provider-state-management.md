@@ -4,7 +4,7 @@
 
 **Goal:** Add provider-state management so reviewed SLO artifacts can be planned, dry-run applied, and eventually reconciled with backend state through provider-specific modes.
 
-**Architecture:** Keep `generate` deterministic and read-only. Add provider automation metadata, apply plans, provider appliers, and telemetry lookup adapters as separate components. Datadog gets live API support first; Prometheus-compatible and Sloth providers participate through explicit manifest and external-generator modes.
+**Architecture:** Keep `generate` deterministic and read-only. Model backend management as an observability state pipeline: sources become normalized evidence, transforms produce validation findings and apply plans, and sinks perform file writes, external-generator handoff, or confirmed backend API calls. Datadog gets live API support first; Prometheus-compatible and Sloth providers participate through explicit manifest and external-generator modes.
 
 **Tech Stack:** Ruby, Minitest, standard library JSON/FileUtils/Net::HTTP, existing `rules-ctl` CLI.
 
@@ -24,6 +24,14 @@
 - Modify `bin/rules-ctl`: add `apply`, `lookup-telemetry`, and online sanity-check options without changing `generate`.
 - Modify `README.md`, `docs/features.md`, `docs/evolution-plan.md`, `docs/provider-contract.md`, and `docs/provider-contribution-guide.md`.
 - Add tests in `test/providers_test.rb`, `test/apply_test.rb`, `test/datadog_apply_test.rb`, `test/telemetry_lookup_test.rb`, and `test/cli_test.rb`.
+
+## Pipeline Test Rules
+
+- Source fixtures must be public-safe service definitions, telemetry inventories, generated manifests, or fake backend state.
+- Transform tests assert deterministic outputs: candidate lists, findings, apply operations, and unsupported-action errors.
+- Sink tests use fake clients or temporary directories.
+- No test may contact Datadog, Prometheus, Kubernetes, Grafana, Alertmanager, or Sloth.
+- Every provider apply path must expose dry-run output before live mutation is implemented.
 
 ## Task 1: Provider Automation Metadata
 
@@ -159,6 +167,7 @@ class ApplyTest < Minitest::Test
     assert_equal 'dry_run', payload.fetch(:mode)
     assert_equal 'create', payload.fetch(:operations).fetch(0).fetch(:action)
     assert_equal 'datadog.slo', payload.fetch(:operations).fetch(0).fetch(:target)
+    assert_equal 'artifacts.slos[0]', payload.fetch(:operations).fetch(0).fetch(:source)
   end
 
   def test_apply_plan_knows_when_it_is_empty
