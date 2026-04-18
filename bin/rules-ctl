@@ -17,6 +17,8 @@ module RulesCtl
       validate(argv)
     when 'generate'
       generate(argv)
+    when 'apply'
+      apply(argv)
     when 'providers'
       providers(argv)
     when 'integrations'
@@ -69,6 +71,48 @@ module RulesCtl
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
     write_provider_manifests(output_dir, manifests) if output_dir
     puts JSON.pretty_generate(manifests)
+  end
+
+  def apply(argv)
+    provider_key = nil
+    dry_run = false
+    confirm = false
+    output_dir = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--dry-run', 'Plan apply without mutating backend state') { dry_run = true }
+      opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider apply') { |value| output_dir = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    definitions = load_definitions(argv)
+    validation = validate_for_provider(definitions, provider)
+    unless validation[:valid]
+      puts JSON.pretty_generate(validation)
+      exit 1
+    end
+
+    mode = confirm && !dry_run ? 'live' : 'dry_run'
+    manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have an applier yet"
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      output_dir: output_dir,
+      manifests: manifests || [],
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
   end
 
   def providers(argv)
@@ -238,6 +282,7 @@ module RulesCtl
       Usage:
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
+        bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] <definitionfile...>
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
