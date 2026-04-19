@@ -101,6 +101,54 @@ class CLITest < Minitest::Test
     assert_equal 'unsupported_apply_action', payload.fetch('error').fetch('code')
   end
 
+  def test_apply_manifest_bundle_dry_run_outputs_plan_without_writing_file
+    Dir.mktmpdir do |dir|
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'apply',
+        '--provider=prometheus_stack',
+        '--dry-run',
+        "--output-dir=#{dir}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout).fetch(0)
+      operation = payload.fetch('operations').fetch(0)
+      manifest_path = File.join(dir, 'checkout-api', 'prometheus_stack', 'manifest.json')
+      assert_equal 'prometheus_stack', payload.fetch('provider')
+      assert_equal 'dry_run', payload.fetch('mode')
+      assert_equal 'write', operation.fetch('action')
+      assert_equal manifest_path, operation.fetch('payload').fetch('path')
+      refute File.exist?(manifest_path), "expected dry-run not to write #{manifest_path}"
+    end
+  end
+
+  def test_apply_manifest_bundle_confirm_writes_manifest_file
+    Dir.mktmpdir do |dir|
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'apply',
+        '--provider=sloth',
+        '--confirm',
+        "--output-dir=#{dir}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout).fetch(0)
+      manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+      assert_equal 'sloth', payload.fetch('provider')
+      assert_equal 'live', payload.fetch('mode')
+      assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
+      manifest = JSON.parse(File.read(manifest_path))
+      assert_equal 'checkout-api', manifest.fetch('service')
+      assert_equal 'sloth', manifest.fetch('provider')
+    end
+  end
+
   def test_generate_outputs_sloth_provider_manifest
     stdout, stderr, status = Open3.capture3(
       'ruby',
