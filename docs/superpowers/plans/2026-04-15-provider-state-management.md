@@ -386,7 +386,7 @@ git push origin main
 - Test: `test/datadog_apply_test.rb`
 - Test: `test/cli_test.rb`
 
-- [ ] **Step 1: Write failing Datadog dry-run tests**
+- [x] **Step 1: Write failing Datadog dry-run tests**
 
 Create `test/datadog_apply_test.rb`:
 
@@ -433,13 +433,13 @@ class DatadogApplyTest < Minitest::Test
 end
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run: `ruby -Ilib test/datadog_apply_test.rb`
 
 Expected: failure because Datadog applier and client are not defined.
 
-- [ ] **Step 3: Implement Datadog client**
+- [x] **Step 3: Implement Datadog client**
 
 Create `lib/slo_rules_engine/datadog/client.rb` with:
 
@@ -515,7 +515,7 @@ module SloRulesEngine
 end
 ```
 
-- [ ] **Step 4: Implement Datadog applier**
+- [x] **Step 4: Implement Datadog applier**
 
 Map current Datadog artifacts into operations:
 
@@ -526,7 +526,7 @@ Map current Datadog artifacts into operations:
 
 Use imported state from `client.existing_state` to choose `create` or `update` by name.
 
-- [ ] **Step 5: Add live apply execution**
+- [x] **Step 5: Add live apply execution**
 
 Live Datadog apply requires `--confirm`. Use endpoints:
 
@@ -539,7 +539,7 @@ Live Datadog apply requires `--confirm`. Use endpoints:
 
 The first implementation may use synthetic payloads derived from generated artifacts; tests assert paths, methods, and payload provenance rather than contacting Datadog.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 Run:
 

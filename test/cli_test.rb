@@ -83,7 +83,7 @@ class CLITest < Minitest::Test
     end
   end
 
-  def test_apply_command_reports_unsupported_until_provider_applier_exists
+  def test_apply_datadog_dry_run_outputs_api_plan
     stdout, stderr, status = Open3.capture3(
       'ruby',
       "#{ROOT}/bin/rules-ctl",
@@ -93,12 +93,30 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
 
+    assert status.success?, stderr
+    payload = JSON.parse(stdout).fetch(0)
+    assert_equal 'datadog', payload.fetch('provider')
+    assert_equal 'dry_run', payload.fetch('mode')
+    assert_equal ['datadog.slo', 'datadog.monitor', 'datadog.monitor', 'datadog.dashboard'],
+                 payload.fetch('operations').map { |operation| operation.fetch('target') }
+  end
+
+  def test_apply_datadog_confirm_requires_credentials
+    stdout, stderr, status = Open3.capture3(
+      { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'apply',
+      '--provider=datadog',
+      '--confirm',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+
     refute status.success?, stderr
     payload = JSON.parse(stdout)
     assert_equal false, payload.fetch('valid')
     assert_equal 'datadog', payload.fetch('provider')
-    assert_equal 'live_api', payload.fetch('automation_mode')
-    assert_equal 'unsupported_apply_action', payload.fetch('error').fetch('code')
+    assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
   end
 
   def test_apply_manifest_bundle_dry_run_outputs_plan_without_writing_file

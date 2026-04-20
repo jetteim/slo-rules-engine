@@ -91,6 +91,7 @@ Expected state behavior:
 - live API apply when confirmed
 - credential validation through environment or explicit runtime configuration
 - retry handling for rate limiting and transient server errors
+- source-artifact provenance in each apply operation; provider-schema conformance must be verified before production use
 
 ### `prometheus_stack`
 
