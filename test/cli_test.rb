@@ -167,6 +167,36 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_lookup_telemetry_datadog_requires_credentials
+    stdout, stderr, status = Open3.capture3(
+      { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'lookup-telemetry',
+      '--provider=datadog',
+      '--metric=http.server.request.duration',
+      '--kind=latency'
+    )
+
+    refute status.success?, stderr
+    payload = JSON.parse(stdout)
+    assert_equal false, payload.fetch('valid')
+    assert_equal 'datadog', payload.fetch('provider')
+    assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+  end
+
+  def test_lookup_telemetry_requires_metric
+    _stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'lookup-telemetry',
+      '--provider=prometheus_stack'
+    )
+
+    refute status.success?
+    assert_includes stderr, 'missing --metric'
+  end
+
   def test_generate_outputs_sloth_provider_manifest
     stdout, stderr, status = Open3.capture3(
       'ruby',
@@ -293,4 +323,5 @@ class CLITest < Minitest::Test
     assert_equal 1, payload.fetch('slo_count')
     assert_includes payload.fetch('observability_handoff_requests'), 'bind provider queries'
   end
+
 end

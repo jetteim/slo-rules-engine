@@ -62,6 +62,8 @@ bin/rules-ctl generate --provider prometheus_stack --output-dir ./generated exam
 bin/rules-ctl generate-routes --integration notification_router examples/services/checkout.rb
 # Returns candidate SLIs/SLOs plus findings for rejected or incomplete telemetry.
 bin/rules-ctl candidates examples/telemetry/checkout-signals.json
+bin/rules-ctl lookup-telemetry --provider datadog --metric http.server.request.duration --kind latency --query 'p95:http.server.request.duration{service:checkout-api}'
+bin/rules-ctl lookup-telemetry --provider prometheus_stack --metric http_server_request_duration_seconds_count --kind errors --base-url http://localhost:9090
 bin/rules-ctl recommend-calculation-basis --observations-per-second=25 --failed-observations-to-alert=120
 bin/rules-ctl reality-check --provider datadog --telemetry examples/telemetry/checkout-signals.json examples/services/checkout.rb
 bin/rules-ctl apply --provider datadog --dry-run examples/services/checkout.rb

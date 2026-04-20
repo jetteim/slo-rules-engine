@@ -11,6 +11,10 @@ if env -u DD_API_KEY -u DD_APP_KEY bin/rules-ctl apply --provider=datadog --conf
   echo "expected confirmed Datadog apply without credentials to fail" >&2
   exit 1
 fi
+if env -u DD_API_KEY -u DD_APP_KEY bin/rules-ctl lookup-telemetry --provider=datadog --metric=http.server.request.duration --kind=latency >/tmp/slo-rules-engine-datadog-lookup-missing-creds.json; then
+  echo "expected Datadog telemetry lookup without credentials to fail" >&2
+  exit 1
+fi
 bin/rules-ctl generate-routes --integration=notification_router examples/services/checkout.rb >/tmp/slo-rules-engine-routes.json
 bin/rules-ctl candidates examples/telemetry/checkout-signals.json >/tmp/slo-rules-engine-candidates.json
 bin/rules-ctl recommend-calculation-basis --observations-per-second=0.01 --failed-observations-to-alert=1 >/tmp/slo-rules-engine-calculation-basis.json

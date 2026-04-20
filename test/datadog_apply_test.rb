@@ -89,6 +89,42 @@ class DatadogApplyTest < Minitest::Test
     assert_equal '/api/v1/monitor', http.requests.fetch(0).path
   end
 
+  def test_datadog_client_uses_rate_limit_reset_delay
+    http = RetryHttp.new([
+      FakeResponse.new('429', '{"errors":["rate limited"]}', 'X-RateLimit-Reset' => '7'),
+      FakeResponse.new('200', '{"ok":true}')
+    ])
+    sleeps = []
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(seconds) { sleeps << seconds }
+    )
+
+    client.request('GET', '/api/v1/query?from=1&to=2&query=up', retries: 2)
+
+    assert_equal [7], sleeps
+  end
+
+  def test_datadog_client_uses_rate_limit_period_when_reset_is_absent
+    http = RetryHttp.new([
+      FakeResponse.new('429', '{"errors":["rate limited"]}', 'X-RateLimit-Period' => '11'),
+      FakeResponse.new('200', '{"ok":true}')
+    ])
+    sleeps = []
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(seconds) { sleeps << seconds }
+    )
+
+    client.request('GET', '/api/v1/query?from=1&to=2&query=up', retries: 2)
+
+    assert_equal [11], sleeps
+  end
+
   private
 
   class FakeDatadogClient

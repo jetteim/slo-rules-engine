@@ -30,7 +30,7 @@ module SloRulesEngine
       def validate_credentials!
         return unless @api_key.to_s.empty? || @app_key.to_s.empty?
 
-        raise MissingCredentials, 'DD_API_KEY and DD_APP_KEY are required for live Datadog apply'
+        raise MissingCredentials, 'DD_API_KEY and DD_APP_KEY are required for Datadog API calls'
       end
 
       def existing_state
@@ -93,7 +93,8 @@ module SloRulesEngine
       def retry_after(response)
         retry_after = response['Retry-After'].to_i
         rate_limit_reset = response['X-RateLimit-Reset'].to_i
-        [retry_after, rate_limit_reset, 1].max
+        rate_limit_period = response['X-RateLimit-Period'].to_i
+        [retry_after, rate_limit_reset, rate_limit_period, 1].max
       end
 
       def parse_body(body)
