@@ -97,6 +97,15 @@ module RulesCtl
 
     mode = confirm && !dry_run ? 'live' : 'dry_run'
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    if provider.key == 'datadog'
+      applier = SloRulesEngine::Appliers::Datadog.new
+      plans = manifests.map do |manifest|
+        mode == 'live' ? applier.apply(manifest) : applier.plan(manifest)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      return
+    end
+
     if %w[manifest_bundle external_generator].include?(provider.automation_mode)
       abort_usage('missing --output-dir') unless output_dir
 
@@ -109,6 +118,19 @@ module RulesCtl
     end
 
     raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have an applier yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
   rescue SloRulesEngine::UnsupportedApplyAction => error
     puts JSON.pretty_generate(
       valid: false,
