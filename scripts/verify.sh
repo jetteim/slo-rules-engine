@@ -19,6 +19,7 @@ bin/rules-ctl generate-routes --integration=notification_router examples/service
 bin/rules-ctl candidates examples/telemetry/checkout-signals.json >/tmp/slo-rules-engine-candidates.json
 bin/rules-ctl recommend-calculation-basis --observations-per-second=0.01 --failed-observations-to-alert=1 >/tmp/slo-rules-engine-calculation-basis.json
 bin/rules-ctl reality-check --provider=datadog --telemetry=examples/telemetry/checkout-signals.json examples/services/checkout.rb >/tmp/slo-rules-engine-reality-check.json
+bin/rules-ctl reality-check --provider=datadog --lookup-result=examples/telemetry/checkout-lookup-result.json examples/services/checkout.rb >/tmp/slo-rules-engine-reality-check-lookup-result.json
 bin/rules-ctl migration-report examples/services/checkout.rb >/tmp/slo-rules-engine-migration-report.json
 
 echo "verification ok"

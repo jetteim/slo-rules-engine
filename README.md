@@ -66,6 +66,8 @@ bin/rules-ctl lookup-telemetry --provider datadog --metric http.server.request.d
 bin/rules-ctl lookup-telemetry --provider prometheus_stack --metric http_server_request_duration_seconds_count --kind errors --base-url http://localhost:9090
 bin/rules-ctl recommend-calculation-basis --observations-per-second=25 --failed-observations-to-alert=120
 bin/rules-ctl reality-check --provider datadog --telemetry examples/telemetry/checkout-signals.json examples/services/checkout.rb
+bin/rules-ctl reality-check --provider datadog --lookup-result examples/telemetry/checkout-lookup-result.json examples/services/checkout.rb
+bin/rules-ctl reality-check --provider datadog --online examples/services/checkout.rb
 bin/rules-ctl apply --provider datadog --dry-run examples/services/checkout.rb
 bin/rules-ctl apply --provider prometheus_stack --dry-run --output-dir ./generated examples/services/checkout.rb
 bin/rules-ctl apply --provider sloth --dry-run --output-dir ./generated examples/services/checkout.rb

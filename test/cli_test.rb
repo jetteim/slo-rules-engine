@@ -300,6 +300,53 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_reality_check_reads_lookup_result_findings
+    Tempfile.create(['lookup-result', '.json']) do |file|
+      file.write(JSON.generate(
+        provider: 'datadog',
+        signals: [{ metric: 'http.server.request.duration' }],
+        findings: [
+          {
+            code: 'missing_backend_series',
+            provider: 'datadog',
+            metric: 'http.server.request.duration',
+            message: 'no series'
+          }
+        ]
+      ))
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'reality-check',
+        '--provider=datadog',
+        "--lookup-result=#{file.path}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+      payload = JSON.parse(stdout)
+
+      refute status.success?
+      assert_equal 'missing_backend_series', payload.fetch('findings').fetch(0).fetch('code')
+    end
+  end
+
+  def test_reality_check_online_requires_explicit_lookup_flags
+    stdout, _stderr, status = Open3.capture3(
+      { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'reality-check',
+      '--provider=datadog',
+      '--online',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    payload = JSON.parse(stdout)
+
+    refute status.success?
+    assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+  end
+
   def test_migration_report_exits_nonzero_for_findings
     Tempfile.create(['legacy-sld', '.rb']) do |file|
       file.write("datadog_trace_slo\n")
