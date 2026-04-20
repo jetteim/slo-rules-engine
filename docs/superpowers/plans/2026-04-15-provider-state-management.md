@@ -570,7 +570,7 @@ git push origin main
 - Test: `test/telemetry_lookup_test.rb`
 - Test: `test/cli_test.rb`
 
-- [ ] **Step 1: Write failing telemetry lookup tests**
+- [x] **Step 1: Write failing telemetry lookup tests**
 
 Create `test/telemetry_lookup_test.rb`:
 
@@ -599,21 +599,21 @@ class TelemetryLookupTest < Minitest::Test
 end
 ```
 
-- [ ] **Step 2: Run focused test and verify it fails**
+- [x] **Step 2: Run focused test and verify it fails**
 
 Run: `ruby -Ilib test/telemetry_lookup_test.rb`
 
 Expected: failure because telemetry lookup objects are not defined.
 
-- [ ] **Step 3: Implement lookup objects**
+- [x] **Step 3: Implement lookup objects**
 
 Create `Signal`, `Finding`, and `Result` structs under `SloRulesEngine::TelemetryLookup`, each with `to_h`.
 
-- [ ] **Step 4: Add provider lookup adapters**
+- [x] **Step 4: Add provider lookup adapters**
 
 Add Datadog and Prometheus-compatible adapters that accept injectable clients. They should produce normalized `Signal` objects and findings without requiring live network in tests.
 
-- [ ] **Step 5: Add CLI command**
+- [x] **Step 5: Add CLI command**
 
 Add:
 
@@ -623,7 +623,7 @@ bin/rules-ctl lookup-telemetry --provider=<provider> --metric=<metric> [--kind=<
 
 The initial CLI may require explicit metric names. Backend discovery by service selector can be added in a later slice.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 Run:
 

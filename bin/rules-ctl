@@ -19,6 +19,8 @@ module RulesCtl
       generate(argv)
     when 'apply'
       apply(argv)
+    when 'lookup-telemetry'
+      lookup_telemetry(argv)
     when 'providers'
       providers(argv)
     when 'integrations'
@@ -161,6 +163,66 @@ module RulesCtl
       }
     end
     puts JSON.pretty_generate(providers)
+  end
+
+  def lookup_telemetry(argv)
+    provider_key = nil
+    metric = nil
+    kind = 'unknown'
+    query = nil
+    user_visible = true
+    base_url = nil
+    from = nil
+    to = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--metric=METRIC', 'Metric name to look up') { |value| metric = value }
+      opts.on('--kind=KIND', 'Signal kind for candidate generation') { |value| kind = value }
+      opts.on('--query=QUERY', 'Backend query expression, defaults to metric') { |value| query = value }
+      opts.on('--user-visible=VALUE', 'Whether the metric represents user-visible service quality') do |value|
+        user_visible = SloRulesEngine::TelemetryLookup.truthy?(value)
+      end
+      opts.on('--base-url=URL', 'Prometheus-compatible base URL') { |value| base_url = value }
+      opts.on('--from=TIMESTAMP', Integer, 'Lookup window start') { |value| from = value }
+      opts.on('--to=TIMESTAMP', Integer, 'Lookup window end') { |value| to = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+    abort_usage('missing --metric') unless metric
+
+    result = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to).lookup(
+      metric: metric,
+      kind: kind,
+      query: query,
+      user_visible: user_visible
+    )
+    puts JSON.pretty_generate(result.to_h)
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider_key,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def telemetry_lookup_adapter(provider_key, base_url:, from:, to:)
+    case provider_key
+    when 'datadog'
+      SloRulesEngine::TelemetryLookup::Datadog.new(from: from, to: to)
+    when 'prometheus_stack', 'sloth'
+      client = if base_url
+                 SloRulesEngine::TelemetryLookup::Prometheus::Client.new(base_url: base_url)
+               else
+                 SloRulesEngine::TelemetryLookup::Prometheus::Client.new
+               end
+      SloRulesEngine::TelemetryLookup::Prometheus.new(client: client, provider: provider_key)
+    else
+      abort_usage("unsupported telemetry lookup provider: #{provider_key}")
+    end
   end
 
   def integrations(argv)

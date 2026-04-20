@@ -90,7 +90,7 @@ Expected state behavior:
 - dry-run apply plan
 - live API apply when confirmed
 - credential validation through environment or explicit runtime configuration
-- retry handling for rate limiting and transient server errors
+- retry handling for rate limiting and transient server errors, including Datadog `X-RateLimit-Reset` and `X-RateLimit-Period` headers
 - source-artifact provenance in each apply operation; provider-schema conformance must be verified before production use
 
 ### `prometheus_stack`
