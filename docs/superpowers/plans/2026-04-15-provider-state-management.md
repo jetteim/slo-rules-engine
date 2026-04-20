@@ -651,7 +651,7 @@ git push origin main
 - Test: `test/reality_check_test.rb`
 - Test: `test/cli_test.rb`
 
-- [ ] **Step 1: Write failing online sanity-check tests**
+- [x] **Step 1: Write failing online sanity-check tests**
 
 Add tests that inject a fake provider lookup result and assert findings:
 
@@ -665,13 +665,13 @@ def test_reality_check_reports_missing_backend_series
 end
 ```
 
-- [ ] **Step 2: Run focused test and verify it fails for the new online case**
+- [x] **Step 2: Run focused test and verify it fails for the new online case**
 
 Run: `ruby -Ilib test/reality_check_test.rb`
 
 Expected: failure for any new methods not yet implemented.
 
-- [ ] **Step 3: Extend findings**
+- [x] **Step 3: Extend findings**
 
 Support these codes:
 
@@ -682,11 +682,11 @@ Support these codes:
 - `calculation_basis_low_volume`
 - `calculation_basis_high_volume`
 
-- [ ] **Step 4: Add CLI output**
+- [x] **Step 4: Add CLI output**
 
 Keep `reality-check` machine-readable. Add optional online adapter execution only when requested by explicit flags so normal verification remains offline.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run:
 

@@ -41,7 +41,7 @@ Telemetry-derived SLO generation should work from either a checked-in telemetry 
 Explicit features:
 
 - **Provider telemetry lookup:** query Datadog or Prometheus-compatible backends through injectable clients and emit normalized telemetry inventory.
-- **Online sanity checks:** report missing metrics, missing time series, missing histogram buckets, and calculation-basis sensitivity.
+- **Online sanity checks:** report missing metrics, missing time series, missing histogram buckets, and calculation-basis sensitivity from file telemetry, saved lookup results, or explicit online lookup.
 - **Calculation-basis evidence:** use observed request volume and estimated failed observations before alerting to recommend observations-based or time-slice-based SLOs.
 - **Candidate reuse:** feed lookup output into the same `candidates` and `draft-definition` flow as file-based telemetry inventory.
 - **No hidden policy:** lookup output is evidence for review, not automatic SLO acceptance.

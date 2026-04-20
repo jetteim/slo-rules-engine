@@ -300,18 +300,32 @@ module RulesCtl
   def reality_check(argv)
     provider_key = nil
     telemetry_path = nil
+    lookup_result_paths = []
+    online = false
+    base_url = nil
+    from = nil
+    to = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
       opts.on('--telemetry=FILE', 'Telemetry inventory JSON file') { |value| telemetry_path = value }
+      opts.on('--lookup-result=FILE', 'Telemetry lookup result JSON file') { |value| lookup_result_paths << value }
+      opts.on('--online', 'Run explicit backend telemetry lookup before checking') { online = true }
+      opts.on('--base-url=URL', 'Prometheus-compatible base URL for online lookup') { |value| base_url = value }
+      opts.on('--from=TIMESTAMP', Integer, 'Online lookup window start') { |value| from = value }
+      opts.on('--to=TIMESTAMP', Integer, 'Online lookup window end') { |value| to = value }
     end
     parser.parse!(argv)
     abort_usage('missing --provider') unless provider_key
-    abort_usage('missing --telemetry') unless telemetry_path
+    abort_usage('missing telemetry evidence') unless telemetry_path || !lookup_result_paths.empty? || online
 
-    telemetry_signals = JSON.parse(File.read(telemetry_path), symbolize_names: true)
+    telemetry_signals = telemetry_path ? JSON.parse(File.read(telemetry_path), symbolize_names: true) : []
+    lookup_results = lookup_result_paths.map { |path| JSON.parse(File.read(path), symbolize_names: true) }
     definitions = load_definitions(argv)
+    lookup_results.concat(online_lookup_results(definitions, provider_key, base_url: base_url, from: from, to: to)) if online
     checker = SloRulesEngine::RealityCheck::TelemetryBindingChecker.new(provider: provider_key)
-    reports = definitions.map { |definition| checker.check(definition, telemetry_signals).to_h.merge(service: definition.service) }
+    reports = definitions.map do |definition|
+      checker.check(definition, telemetry_signals, lookup_results: lookup_results).to_h.merge(service: definition.service)
+    end
     findings = reports.flat_map { |report| report.fetch(:findings) }
     payload = {
       valid: findings.empty?,
@@ -321,6 +335,41 @@ module RulesCtl
     }
     puts JSON.pretty_generate(payload)
     exit(payload[:valid] ? 0 : 1)
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider_key,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def online_lookup_results(definitions, provider_key, base_url:, from:, to:)
+    adapter = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to)
+    definitions.flat_map do |definition|
+      definition.slis.map do |sli|
+        binding = sli.metric.binding_for(provider_key)
+        adapter.lookup(
+          metric: binding.metric,
+          kind: signal_kind_for_sli(sli),
+          query: binding.query,
+          user_visible: true
+        ).to_h
+      end
+    end
+  end
+
+  def signal_kind_for_sli(sli)
+    text = [sli.uid, sli.title, sli.user_visible_rationale].compact.join(' ').downcase
+    return 'latency' if text.include?('latency') || text.include?('duration')
+    return 'errors' if text.include?('error') || text.include?('success')
+    return 'availability' if text.include?('availability')
+    return 'traffic' if text.include?('traffic') || text.include?('request')
+
+    'unknown'
   end
 
   def migration_report(argv)

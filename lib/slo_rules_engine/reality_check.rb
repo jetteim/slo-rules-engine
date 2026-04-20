@@ -69,8 +69,10 @@ module SloRulesEngine
         @provider = provider.to_s
       end
 
-      def check(definition, telemetry_signals)
-        available_metrics = Array(telemetry_signals).map { |signal| fetch_value(signal, :metric) }.compact
+      def check(definition, telemetry_signals, lookup_results: [])
+        normalized_lookup_results = Array(lookup_results)
+        signals = Array(telemetry_signals) + lookup_signals(normalized_lookup_results)
+        available_metrics = signals.map { |signal| fetch_value(signal, :metric) }.compact
         findings = []
 
         definition.slis.each do |sli|
@@ -84,12 +86,27 @@ module SloRulesEngine
           unless available_metrics.include?(binding.metric)
             findings << missing_metric_finding(definition, sli, binding.metric)
           end
+
+          findings.concat(histogram_bucket_findings(definition, sli, binding, available_metrics))
+          findings.concat(calculation_basis_findings(definition, sli, binding, signals))
         end
+
+        findings.concat(lookup_findings(normalized_lookup_results))
 
         TelemetryBindingReport.new(provider: @provider, findings: findings)
       end
 
       private
+
+      def lookup_signals(lookup_results)
+        lookup_results.flat_map { |result| fetch_value(result, :signals, []) }
+      end
+
+      def lookup_findings(lookup_results)
+        lookup_results.flat_map do |result|
+          Array(fetch_value(result, :findings, [])).map { |finding| normalize_finding(finding) }
+        end
+      end
 
       def missing_binding_finding(definition, sli)
         {
@@ -110,8 +127,111 @@ module SloRulesEngine
         }
       end
 
-      def fetch_value(hash, key)
-        hash[key] || hash[key.to_s]
+      def histogram_bucket_findings(definition, sli, binding, available_metrics)
+        return [] unless %w[prometheus_stack sloth].include?(@provider)
+        return [] unless histogram_required?(sli)
+
+        bucket_metric = histogram_bucket_metric(binding.metric)
+        return [] if available_metrics.include?(bucket_metric)
+
+        [
+          {
+            code: 'missing_histogram_bucket',
+            service: definition.service,
+            sli: sli.uid,
+            provider: @provider,
+            metric: bucket_metric
+          }
+        ]
+      end
+
+      def calculation_basis_findings(definition, sli, binding, signals)
+        matching_signals = signals.select { |signal| fetch_value(signal, :metric) == binding.metric }
+        matching_signals.flat_map do |signal|
+          volume = fetch_value(signal, :observations_per_second)
+          failed_to_alert = fetch_value(signal, :failed_observations_to_alert)
+          next [] if volume.nil? || failed_to_alert.nil?
+
+          recommendation = CalculationBasisAdvisor.new.recommend(
+            observations_per_second: volume,
+            failed_observations_to_alert: failed_to_alert
+          )
+          basis = fetch_value(signal, :calculation_basis)
+          basis ||= first_slo_basis(sli)
+
+          calculation_basis_finding(definition, sli, binding.metric, basis, recommendation)
+        end
+      end
+
+      def calculation_basis_finding(definition, sli, metric, basis, recommendation)
+        if recommendation.basis == 'time_slice' && basis != 'time_slice'
+          [
+            {
+              code: 'calculation_basis_low_volume',
+              service: definition.service,
+              sli: sli.uid,
+              provider: @provider,
+              metric: metric,
+              current_basis: basis,
+              recommended_basis: recommendation.basis,
+              reason: recommendation.reason
+            }
+          ]
+        elsif recommendation.basis == 'observations' && basis == 'time_slice'
+          [
+            {
+              code: 'calculation_basis_high_volume',
+              service: definition.service,
+              sli: sli.uid,
+              provider: @provider,
+              metric: metric,
+              current_basis: basis,
+              recommended_basis: recommendation.basis,
+              reason: recommendation.reason
+            }
+          ]
+        else
+          []
+        end
+      end
+
+      def first_slo_basis(sli)
+        instance = sli.instances.fetch(0, nil)
+        return nil unless instance
+
+        slo = instance.slos.fetch(0, nil)
+        slo&.calculation_basis
+      end
+
+      def histogram_required?(sli)
+        details = sli.measurement_details
+        return false unless details
+
+        values = Array(details.threshold_requirements) + Array(details.caveats)
+        values.any? { |value| value.to_s.downcase.include?('histogram') }
+      end
+
+      def histogram_bucket_metric(metric)
+        metric.to_s.sub(/_count\z/, '_bucket')
+      end
+
+      def normalize_finding(finding)
+        {
+          code: fetch_value(finding, :code),
+          service: fetch_value(finding, :service),
+          sli: fetch_value(finding, :sli),
+          provider: fetch_value(finding, :provider) || @provider,
+          metric: fetch_value(finding, :metric),
+          message: fetch_value(finding, :message),
+          details: fetch_value(finding, :details)
+        }.compact
+      end
+
+      def fetch_value(hash, key, default = nil)
+        return hash.public_send(key) if hash.respond_to?(key)
+        return default unless hash.respond_to?(:fetch)
+
+        hash.fetch(key) { hash.fetch(key.to_s, default) }
       end
     end
   end

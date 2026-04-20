@@ -1,0 +1,14 @@
+{
+  "provider": "datadog",
+  "signals": [
+    {
+      "kind": "latency",
+      "metric": "http.server.request.duration",
+      "user_visible": true,
+      "source": "datadog",
+      "series_count": 1,
+      "sample_count": 12
+    }
+  ],
+  "findings": []
+}
