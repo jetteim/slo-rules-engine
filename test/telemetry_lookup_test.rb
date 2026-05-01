@@ -57,6 +57,47 @@ class TelemetryLookupTest < Minitest::Test
     assert_equal ['http_requests_total'], client.series_selectors
   end
 
+  def test_datadog_discovery_lists_active_metrics_and_classifies_signals
+    client = FakeDatadogLookupClient.new(
+      '/api/v1/metrics?from=100&tag_filter=service%3Acheckout-api' => {
+        'metrics' => ['http.server.request.duration', 'runtime.heap.used']
+      }
+    )
+    lookup = SloRulesEngine::TelemetryLookup::Datadog.new(client: client, from: 100, to: 200)
+
+    result = lookup.discover(service: 'checkout-api')
+
+    assert_empty result.findings
+    assert_equal %w[latency saturation], result.signals.map(&:kind)
+    assert_equal [true, false], result.signals.map(&:user_visible)
+    assert_equal ['/api/v1/metrics?from=100&tag_filter=service%3Acheckout-api'], client.paths
+  end
+
+  def test_datadog_discovery_rejects_host_plus_service_filters
+    lookup = SloRulesEngine::TelemetryLookup::Datadog.new(client: FakeDatadogLookupClient.new({}), from: 100, to: 200)
+
+    error = assert_raises(ArgumentError) do
+      lookup.discover(service: 'checkout-api', host: 'checkout-host')
+    end
+
+    assert_includes error.message, 'cannot combine host'
+  end
+
+  def test_prometheus_discovery_uses_metric_name_label_values
+    client = FakePrometheusLookupClient.new(
+      series: [],
+      query_result: [],
+      label_values: %w[http_server_request_duration_seconds_count runtime_heap_used]
+    )
+    lookup = SloRulesEngine::TelemetryLookup::Prometheus.new(client: client, provider: 'prometheus_stack')
+
+    result = lookup.discover(service: 'checkout-api')
+
+    assert_empty result.findings
+    assert_equal %w[latency saturation], result.signals.map(&:kind)
+    assert_equal ['{service="checkout-api"}'], client.label_value_matchers
+  end
+
   private
 
   class FakeDatadogLookupClient
@@ -77,13 +118,15 @@ class TelemetryLookupTest < Minitest::Test
   end
 
   class FakePrometheusLookupClient
-    attr_reader :series_selectors, :queries
+    attr_reader :series_selectors, :queries, :label_value_matchers
 
-    def initialize(series:, query_result:)
+    def initialize(series:, query_result:, label_values: [])
       @series = series
       @query_result = query_result
+      @label_values = label_values
       @series_selectors = []
       @queries = []
+      @label_value_matchers = []
     end
 
     def series(selector)
@@ -94,6 +137,13 @@ class TelemetryLookupTest < Minitest::Test
     def query(expression)
       @queries << expression
       { 'result' => @query_result }
+    end
+
+    def label_values(label_name, matchers: [])
+      raise "unexpected label name #{label_name}" unless label_name == '__name__'
+
+      @label_value_matchers.concat(matchers)
+      @label_values
     end
   end
 end

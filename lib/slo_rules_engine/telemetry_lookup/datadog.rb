@@ -41,11 +41,48 @@ module SloRulesEngine
         )
       end
 
+      def discover(service: nil, selectors: {}, host: nil)
+        if !host.to_s.empty? && (!service.to_s.empty? || !selectors.empty?)
+          raise ArgumentError, 'Datadog discovery cannot combine host with service or selector filters'
+        end
+
+        response = @client.request('GET', metrics_path(service: service, selectors: selectors, host: host))
+        metrics = Array(fetch_value(response, :metrics, [])).sort
+
+        Result.new(
+          provider: 'datadog',
+          signals: metrics.map do |metric|
+            TelemetryLookup.discovered_signal(
+              metric: metric,
+              source: 'datadog'
+            )
+          end,
+          findings: []
+        )
+      end
+
       private
 
       def query_path(expression)
         params = URI.encode_www_form(from: from_timestamp, query: expression, to: to_timestamp)
         "/api/v1/query?#{params}"
+      end
+
+      def metrics_path(service:, selectors:, host:)
+        params = { from: from_timestamp }
+        tag_filter = datadog_tag_filter(service, selectors)
+        params[:tag_filter] = tag_filter unless tag_filter.empty?
+        params[:host] = host unless host.to_s.empty?
+        "/api/v1/metrics?#{URI.encode_www_form(params)}"
+      end
+
+      def datadog_tag_filter(service, selectors)
+        tags = []
+        tags << "service:#{service}" unless service.to_s.empty?
+        selectors.each do |key, value|
+          tags << "#{key}:#{value}"
+        end
+        tags.join(' AND ')
       end
 
       def from_timestamp

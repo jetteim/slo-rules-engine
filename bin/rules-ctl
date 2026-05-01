@@ -21,6 +21,8 @@ module RulesCtl
       apply(argv)
     when 'lookup-telemetry'
       lookup_telemetry(argv)
+    when 'discover-telemetry'
+      discover_telemetry(argv)
     when 'providers'
       providers(argv)
     when 'integrations'
@@ -252,7 +254,7 @@ module RulesCtl
   def candidates(argv)
     abort_usage('missing telemetry JSON file') if argv.empty?
 
-    signals = JSON.parse(File.read(argv.fetch(0)), symbolize_names: true)
+    signals = telemetry_signals_from_file(argv.fetch(0))
     puts JSON.pretty_generate(SloRulesEngine::Onboarding::CandidateGenerator.new.review(signals))
   end
 
@@ -270,7 +272,7 @@ module RulesCtl
     abort_usage('missing --owner') unless owner
     abort_usage('missing telemetry JSON file') if argv.empty?
 
-    signals = JSON.parse(File.read(argv.fetch(0)), symbolize_names: true)
+    signals = telemetry_signals_from_file(argv.fetch(0))
     puts SloRulesEngine::Onboarding::DefinitionDraftGenerator.new.generate(
       service: service,
       owner: owner,
@@ -347,6 +349,50 @@ module RulesCtl
     exit 1
   end
 
+  def discover_telemetry(argv)
+    provider_key = nil
+    service = nil
+    host = nil
+    selector_values = []
+    base_url = nil
+    from = nil
+    to = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--service=SERVICE', 'Service scope for discovery') { |value| service = value }
+      opts.on('--host=HOST', 'Host scope for Datadog discovery') { |value| host = value }
+      opts.on('--selector=KEY=VALUE', 'Additional selector scope') { |value| selector_values << value }
+      opts.on('--base-url=URL', 'Prometheus-compatible base URL') { |value| base_url = value }
+      opts.on('--from=TIMESTAMP', Integer, 'Discovery lookback start') { |value| from = value }
+      opts.on('--to=TIMESTAMP', Integer, 'Discovery lookback end') { |value| to = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+    selectors = parse_selectors(selector_values)
+    abort_usage('missing discovery scope') if service.to_s.empty? && selectors.empty? && host.to_s.empty?
+    if provider_key == 'datadog' && !host.to_s.empty? && (!service.to_s.empty? || !selectors.empty?)
+      abort_usage('datadog discovery cannot combine --host with --service or --selector')
+    end
+    abort_usage('--host is only supported for datadog discovery') if provider_key != 'datadog' && !host.to_s.empty?
+
+    result = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to).discover(
+      service: service,
+      selectors: selectors,
+      host: host
+    )
+    puts JSON.pretty_generate(result.to_h)
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider_key,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
   def online_lookup_results(definitions, provider_key, base_url:, from:, to:)
     adapter = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to)
     definitions.flat_map do |definition|
@@ -370,6 +416,20 @@ module RulesCtl
     return 'traffic' if text.include?('traffic') || text.include?('request')
 
     'unknown'
+  end
+
+  def telemetry_signals_from_file(path)
+    payload = JSON.parse(File.read(path), symbolize_names: true)
+    SloRulesEngine::TelemetryLookup.extract_signals(payload)
+  end
+
+  def parse_selectors(selector_values)
+    Array(selector_values).each_with_object({}) do |selector, parsed|
+      key, value = selector.split('=', 2)
+      abort_usage("invalid selector #{selector.inspect}") if key.to_s.empty? || value.to_s.empty?
+
+      parsed[key] = value
+    end
   end
 
   def migration_report(argv)
@@ -427,6 +487,7 @@ module RulesCtl
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] <definitionfile...>
+        bin/rules-ctl discover-telemetry --provider=<provider> [--service=<service>] [--selector=key=value] [--base-url=<url>]
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
