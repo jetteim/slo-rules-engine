@@ -82,25 +82,31 @@ module RulesCtl
     dry_run = false
     confirm = false
     output_dir = nil
+    manifest_path = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
       opts.on('--dry-run', 'Plan apply without mutating backend state') { dry_run = true }
       opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
       opts.on('--output-dir=DIR', 'Output directory for file-backed provider apply') { |value| output_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to apply instead of regenerating from definitions') { |value| manifest_path = value }
     end
     parser.parse!(argv)
     abort_usage('missing --provider') unless provider_key
 
     provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
-    definitions = load_definitions(argv)
-    validation = validate_for_provider(definitions, provider)
-    unless validation[:valid]
-      puts JSON.pretty_generate(validation)
-      exit 1
-    end
-
     mode = confirm && !dry_run ? 'live' : 'dry_run'
-    manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    manifests = if manifest_path
+                  abort_usage('manifest input does not accept definition files') unless argv.empty?
+                  load_apply_manifests(manifest_path, provider)
+                else
+                  definitions = load_definitions(argv)
+                  validation = validate_for_provider(definitions, provider)
+                  unless validation[:valid]
+                    puts JSON.pretty_generate(validation)
+                    exit 1
+                  end
+                  definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+                end
     if provider.key == 'datadog'
       applier = SloRulesEngine::Appliers::Datadog.new
       plans = manifests.map do |manifest|
@@ -418,6 +424,16 @@ module RulesCtl
     'unknown'
   end
 
+  def load_apply_manifests(path, provider)
+    payload = JSON.parse(File.read(path), symbolize_names: true)
+    manifests = payload.is_a?(Array) ? payload : [payload]
+    manifests.each do |manifest|
+      manifest_provider = manifest.fetch(:provider) { manifest.fetch('provider', nil) }
+      abort_usage("manifest provider mismatch: #{manifest_provider.inspect}") unless manifest_provider == provider.key
+    end
+    manifests
+  end
+
   def telemetry_signals_from_file(path)
     payload = JSON.parse(File.read(path), symbolize_names: true)
     SloRulesEngine::TelemetryLookup.extract_signals(payload)
@@ -486,7 +502,7 @@ module RulesCtl
       Usage:
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
-        bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] <definitionfile...>
+        bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl discover-telemetry --provider=<provider> [--service=<service>] [--selector=key=value] [--base-url=<url>]
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
