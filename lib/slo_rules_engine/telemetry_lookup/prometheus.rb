@@ -22,6 +22,11 @@ module SloRulesEngine
           get('/api/v1/query', [['query', expression]]).fetch('data')
         end
 
+        def label_values(label_name, matchers: [])
+          params = matchers.map { |matcher| ['match[]', matcher] }
+          get("/api/v1/label/#{label_name}/values", params).fetch('data')
+        end
+
         private
 
         def get(path, params)
@@ -55,6 +60,22 @@ module SloRulesEngine
         Result.new(provider: @provider, signals: signals, findings: findings)
       end
 
+      def discover(service: nil, selectors: {})
+        matcher = matcher_expression(service, selectors)
+        metrics = @client.label_values('__name__', matchers: [matcher]).sort
+
+        Result.new(
+          provider: @provider,
+          signals: metrics.map do |metric|
+            TelemetryLookup.discovered_signal(
+              metric: metric,
+              source: 'prometheus'
+            )
+          end,
+          findings: []
+        )
+      end
+
       private
 
       def signal(metric, kind, user_visible, expression, series, samples)
@@ -86,6 +107,15 @@ module SloRulesEngine
           metric: metric,
           message: 'Prometheus-compatible query returned no samples.'
         )
+      end
+
+      def matcher_expression(service, selectors)
+        parts = []
+        parts << %(service="#{service}") unless service.to_s.empty?
+        selectors.each do |key, value|
+          parts << %(#{key}="#{value}")
+        end
+        "{#{parts.join(',')}}"
       end
 
       def fetch_value(hash, key, default = nil)

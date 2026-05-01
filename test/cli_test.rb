@@ -197,6 +197,118 @@ class CLITest < Minitest::Test
     assert_includes stderr, 'missing --metric'
   end
 
+  def test_discover_telemetry_datadog_requires_credentials
+    stdout, stderr, status = Open3.capture3(
+      { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'discover-telemetry',
+      '--provider=datadog',
+      '--service=checkout-api'
+    )
+
+    refute status.success?, stderr
+    payload = JSON.parse(stdout)
+    assert_equal false, payload.fetch('valid')
+    assert_equal 'datadog', payload.fetch('provider')
+    assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+  end
+
+  def test_discover_telemetry_requires_scope
+    _stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'discover-telemetry',
+      '--provider=prometheus_stack'
+    )
+
+    refute status.success?
+    assert_includes stderr, 'missing discovery scope'
+  end
+
+  def test_discover_telemetry_rejects_datadog_host_plus_service_scope
+    _stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'discover-telemetry',
+      '--provider=datadog',
+      '--service=checkout-api',
+      '--host=checkout-host'
+    )
+
+    refute status.success?
+    assert_includes stderr, 'datadog discovery cannot combine --host with --service or --selector'
+  end
+
+  def test_discover_telemetry_rejects_host_for_prometheus_provider
+    _stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'discover-telemetry',
+      '--provider=prometheus_stack',
+      '--host=checkout-host'
+    )
+
+    refute status.success?
+    assert_includes stderr, '--host is only supported for datadog discovery'
+  end
+
+  def test_candidates_accept_lookup_result_envelope
+    Tempfile.create(['lookup-signals', '.json']) do |file|
+      file.write(JSON.generate(
+        provider: 'datadog',
+        signals: [
+          { kind: 'latency', metric: 'http.server.request.duration', user_visible: true, source: 'datadog' },
+          { kind: 'saturation', metric: 'runtime.heap.used', user_visible: false, source: 'datadog' }
+        ],
+        findings: []
+      ))
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'candidates', file.path)
+      payload = JSON.parse(stdout)
+
+      assert status.success?, stdout
+      assert_equal 1, payload.fetch('candidates').length
+      assert_equal 'request-latency', payload.fetch('candidates').fetch(0).fetch('sli_uid')
+      assert_equal ['non_user_visible'], payload.fetch('findings').map { |finding| finding.fetch('code') }
+    end
+  end
+
+  def test_draft_definition_accepts_lookup_result_envelope
+    Tempfile.create(['lookup-signals', '.json']) do |file|
+      file.write(JSON.generate(
+        provider: 'datadog',
+        signals: [
+          {
+            kind: 'latency',
+            metric: 'http.server.request.duration',
+            user_visible: true,
+            source: 'datadog',
+            observations_per_second: 25,
+            failed_observations_to_alert: 120
+          },
+          { kind: 'saturation', metric: 'runtime.heap.used', user_visible: false, source: 'datadog' }
+        ],
+        findings: []
+      ))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'draft-definition',
+        '--service=checkout-api',
+        '--owner=payments-platform',
+        file.path
+      )
+
+      assert status.success?, stderr
+      assert_includes stdout, "metric 'http.server.request.duration'"
+      refute_includes stdout, "metric 'runtime.heap.used'"
+    end
+  end
+
   def test_generate_outputs_sloth_provider_manifest
     stdout, stderr, status = Open3.capture3(
       'ruby',
