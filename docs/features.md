@@ -23,6 +23,7 @@ For services with existing telemetry, the most important onboarding path is tele
 Explicit features:
 
 - **Telemetry inventory ingestion:** accept measured telemetry inventory JSON as the starting input.
+- **Telemetry discovery baseline:** discover active metrics by service or selector scope before candidate review.
 - **Signal eligibility review:** reject unsupported, non-user-visible, or metric-less signals with machine-readable findings.
 - **SLI/SLO candidate inference:** map eligible signals to SLI identifiers, SLO identifiers, objectives, success conditions, and calculation-basis recommendations.
 - **Draft definition generation:** emit a public-safe Ruby DSL draft with candidate SLIs, metric bindings, instances, and proposed SLOs.
@@ -41,9 +42,10 @@ Telemetry-derived SLO generation should work from either a checked-in telemetry 
 Explicit features:
 
 - **Provider telemetry lookup:** query Datadog or Prometheus-compatible backends through injectable clients and emit normalized telemetry inventory.
+- **Service-scoped discovery:** inventory active metrics by service or selector scope through `discover-telemetry` and reuse the same normalized evidence shape as explicit lookup.
 - **Online sanity checks:** report missing metrics, missing time series, missing histogram buckets, and calculation-basis sensitivity from file telemetry, saved lookup results, or explicit online lookup.
 - **Calculation-basis evidence:** use observed request volume and estimated failed observations before alerting to recommend observations-based or time-slice-based SLOs.
-- **Candidate reuse:** feed lookup output into the same `candidates` and `draft-definition` flow as file-based telemetry inventory.
+- **Candidate reuse:** feed lookup or discovery output into the same `candidates` and `draft-definition` flow as file-based telemetry inventory.
 - **No hidden policy:** lookup output is evidence for review, not automatic SLO acceptance.
 
 ## Provider State Management

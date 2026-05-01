@@ -1,6 +1,6 @@
 # SLO Rules Engine
 
-Open-source SLI/SLO rules engine with a Ruby DSL, backend-neutral reliability intent, provider-based artifact generation, telemetry lookup, telemetry reality checks, provider apply planning, and contextual alert routing.
+Open-source SLI/SLO rules engine with a Ruby DSL, backend-neutral reliability intent, provider-based artifact generation, telemetry discovery and lookup, telemetry reality checks, provider apply planning, and contextual alert routing.
 
 The project keeps the useful shape of an SRE rules DSL while removing organization-specific platform assumptions. Providers are complete observability backend bundles, not individual tools.
 
@@ -10,7 +10,7 @@ The project keeps the useful shape of an SRE rules DSL while removing organizati
 - Convert DSL definitions into neutral service reliability intent.
 - Generate SLOs, alert rules, notification routing, and dashboards through providers.
 - Support reality checks against measured telemetry.
-- Generate candidate SLIs/SLOs from existing telemetry during onboarding.
+- Generate candidate SLIs/SLOs from existing telemetry during onboarding, starting from checked-in inventories or provider discovery output.
 - Manage generated backend state through explicit dry-run and apply workflows.
 - Keep the project public-safe: no organization names, internal domains, private services, or proprietary platform assumptions.
 
@@ -62,8 +62,14 @@ bin/rules-ctl generate --provider prometheus_stack --output-dir ./generated exam
 bin/rules-ctl generate-routes --integration notification_router examples/services/checkout.rb
 # Returns candidate SLIs/SLOs plus findings for rejected or incomplete telemetry.
 bin/rules-ctl candidates examples/telemetry/checkout-signals.json
+# Discovery inventories active metrics by service or host scope before candidate review.
+bin/rules-ctl discover-telemetry --provider datadog --service checkout-api
+bin/rules-ctl discover-telemetry --provider datadog --host checkout-host
+bin/rules-ctl discover-telemetry --provider prometheus_stack --service checkout-api --base-url http://localhost:9090
 bin/rules-ctl lookup-telemetry --provider datadog --metric http.server.request.duration --kind latency --query 'p95:http.server.request.duration{service:checkout-api}'
 bin/rules-ctl lookup-telemetry --provider prometheus_stack --metric http_server_request_duration_seconds_count --kind errors --base-url http://localhost:9090
+bin/rules-ctl candidates examples/telemetry/checkout-lookup-result.json
+bin/rules-ctl draft-definition --service checkout-api --owner payments-platform examples/telemetry/checkout-lookup-result.json
 bin/rules-ctl recommend-calculation-basis --observations-per-second=25 --failed-observations-to-alert=120
 bin/rules-ctl reality-check --provider datadog --telemetry examples/telemetry/checkout-signals.json examples/services/checkout.rb
 bin/rules-ctl reality-check --provider datadog --lookup-result examples/telemetry/checkout-lookup-result.json examples/services/checkout.rb
@@ -76,6 +82,8 @@ bin/rules-ctl model-report examples/services/checkout.rb
 bin/rules-ctl providers list
 bin/rules-ctl integrations list
 ```
+
+The `candidates` and `draft-definition` commands accept either a raw telemetry signal array or a normalized provider evidence envelope with `provider`, `signals`, and `findings`.
 
 ## Development
 

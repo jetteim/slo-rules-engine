@@ -16,7 +16,9 @@ class ProvidersTest < Minitest::Test
     assert_equal %w[datadog prometheus_stack sloth], registry.list.map(&:key)
     assert_includes registry.fetch('prometheus_stack').capabilities, 'parameterized_dashboards'
     assert_includes registry.fetch('datadog').capabilities, 'slo_evaluation'
+    assert_includes registry.fetch('datadog').capabilities, 'apply_plan'
     assert_includes registry.fetch('sloth').capabilities, 'slo_evaluation'
+    assert_includes registry.fetch('sloth').capabilities, 'apply_plan'
   end
 
   def test_provider_registry_lists_automation_modes_and_state_actions

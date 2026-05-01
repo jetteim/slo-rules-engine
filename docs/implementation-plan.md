@@ -29,7 +29,9 @@ This is the running plan for the long refactor.
 - [x] Add calculation-basis recommendation rules.
 - [x] Add alert route reference validation.
 - [x] Add offline telemetry binding reality-check hooks.
-- [ ] Add backend API reality-check adapters.
+- [x] Add backend API reality-check adapters.
+- [x] Allow lookup-result envelopes to feed onboarding commands.
+- [x] Add service-scoped telemetry discovery baseline.
 
 ## Phase 3: Provider Depth
 
@@ -43,11 +45,21 @@ This is the running plan for the long refactor.
 - [x] Add generated provider manifest output directory.
 - [ ] Add provider artifact schemas for apply-ready outputs.
 - [x] Add provider query binding reality-check report.
-- [ ] Add provider query/reality-check adapters.
+- [x] Add provider query/reality-check adapters.
+- [ ] Add real Datadog provider-schema payload translation and backend state import for create/update reconciliation.
+- [ ] Expand calculation-basis findings across every SLI instance and SLO.
+- [ ] Record Sloth external-generator handoff details in apply plans.
 
 ## Phase 4: Migration Tooling
 
 - [x] Add old-DSL compatibility report.
 - [ ] Add anonymization helper for examples.
+- [ ] Add reviewed manifest input path for apply workflows.
+- [ ] Add explicit diff, import, and prune commands.
 - [ ] Add generated artifact diff harness.
 - [ ] Add import guidance for existing service files.
+
+## Phase 5: Contract Hardening
+
+- [ ] Enforce provider capability metadata against the documented provider contract.
+- [ ] Separate reviewed manifest input from in-process regeneration during backend mutation workflows.
