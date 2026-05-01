@@ -76,4 +76,16 @@ class ApplyTest < Minitest::Test
       assert_equal path, plan.operations.fetch(0).payload.fetch(:path)
     end
   end
+
+  def test_external_generator_plan_records_sloth_handoff
+    manifest = { provider: 'sloth', service: 'checkout-api', artifacts: { sloth_specs: [] } }
+    applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: '/tmp/generated')
+
+    plan = applier.plan(manifest)
+
+    assert_equal %w[write handoff], plan.operations.map(&:action)
+    assert_equal 'external_generator', plan.operations.fetch(1).target
+    assert_includes plan.operations.fetch(1).payload.fetch(:command), 'sloth generate'
+    assert_equal '/tmp/generated/checkout-api/sloth/manifest.json', plan.operations.fetch(1).payload.fetch(:input_manifest)
+  end
 end

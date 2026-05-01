@@ -161,6 +161,7 @@ class CLITest < Minitest::Test
       manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
       assert_equal 'sloth', payload.fetch('provider')
       assert_equal 'live', payload.fetch('mode')
+      assert_equal %w[write handoff], payload.fetch('operations').map { |operation| operation.fetch('action') }
       assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
       manifest = JSON.parse(File.read(manifest_path))
       assert_equal 'checkout-api', manifest.fetch('service')
