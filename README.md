@@ -75,8 +75,11 @@ bin/rules-ctl reality-check --provider datadog --telemetry examples/telemetry/ch
 bin/rules-ctl reality-check --provider datadog --lookup-result examples/telemetry/checkout-lookup-result.json examples/services/checkout.rb
 bin/rules-ctl reality-check --provider datadog --online examples/services/checkout.rb
 bin/rules-ctl apply --provider datadog --dry-run examples/services/checkout.rb
+bin/rules-ctl apply --provider datadog --dry-run --manifest ./generated/checkout-api/datadog/manifest.json
 bin/rules-ctl apply --provider prometheus_stack --dry-run --output-dir ./generated examples/services/checkout.rb
+bin/rules-ctl apply --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
 bin/rules-ctl apply --provider sloth --dry-run --output-dir ./generated examples/services/checkout.rb
+bin/rules-ctl apply --provider sloth --confirm --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl migration-report path/to/legacy/service-definition.rb
 bin/rules-ctl model-report examples/services/checkout.rb
 bin/rules-ctl providers list
@@ -84,6 +87,7 @@ bin/rules-ctl integrations list
 ```
 
 The `candidates` and `draft-definition` commands accept either a raw telemetry signal array or a normalized provider evidence envelope with `provider`, `signals`, and `findings`.
+The `apply` command accepts either definition files or a reviewed provider manifest through `--manifest`.
 
 ## Development
 
