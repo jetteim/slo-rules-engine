@@ -156,20 +156,24 @@ module SloRulesEngine
             observations_per_second: volume,
             failed_observations_to_alert: failed_to_alert
           )
-          basis = fetch_value(signal, :calculation_basis)
-          basis ||= first_slo_basis(sli)
-
-          calculation_basis_finding(definition, sli, binding.metric, basis, recommendation)
+          sli.instances.flat_map do |instance|
+            instance.slos.flat_map do |slo|
+              basis = fetch_value(signal, :calculation_basis) || slo.calculation_basis
+              calculation_basis_finding(definition, sli, instance, slo, binding.metric, basis, recommendation)
+            end
+          end
         end
       end
 
-      def calculation_basis_finding(definition, sli, metric, basis, recommendation)
+      def calculation_basis_finding(definition, sli, instance, slo, metric, basis, recommendation)
         if recommendation.basis == 'time_slice' && basis != 'time_slice'
           [
             {
               code: 'calculation_basis_low_volume',
               service: definition.service,
               sli: sli.uid,
+              sli_instance: instance.uid,
+              slo: slo.uid,
               provider: @provider,
               metric: metric,
               current_basis: basis,
@@ -183,6 +187,8 @@ module SloRulesEngine
               code: 'calculation_basis_high_volume',
               service: definition.service,
               sli: sli.uid,
+              sli_instance: instance.uid,
+              slo: slo.uid,
               provider: @provider,
               metric: metric,
               current_basis: basis,
@@ -193,14 +199,6 @@ module SloRulesEngine
         else
           []
         end
-      end
-
-      def first_slo_basis(sli)
-        instance = sli.instances.fetch(0, nil)
-        return nil unless instance
-
-        slo = instance.slos.fetch(0, nil)
-        slo&.calculation_basis
       end
 
       def histogram_required?(sli)
