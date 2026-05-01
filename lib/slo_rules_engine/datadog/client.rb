@@ -10,6 +10,7 @@ module SloRulesEngine
     class ApiError < StandardError; end
 
     class Client
+      MANAGED_MONITOR_TAG = 'managed_by:slo-rules-engine'
       TRANSIENT_CODES = %w[429 500 502 503 504].freeze
       SUCCESS_CODES = %w[200 201 202].freeze
 
@@ -33,8 +34,14 @@ module SloRulesEngine
         raise MissingCredentials, 'DD_API_KEY and DD_APP_KEY are required for Datadog API calls'
       end
 
-      def existing_state
-        { slos: {}, monitors: {}, dashboards: {} }
+      def existing_state(desired: {})
+        return empty_state unless credentials_present?
+
+        {
+          slos: load_slos(Array(fetch_value(desired, :slos, []))),
+          monitors: load_monitors(Array(fetch_value(desired, :monitors, []))),
+          dashboards: load_dashboards(Array(fetch_value(desired, :dashboards, [])))
+        }
       end
 
       def request(method, path, payload: nil, retries: 3)
@@ -54,6 +61,70 @@ module SloRulesEngine
       end
 
       private
+
+      def credentials_present?
+        !@api_key.to_s.empty? && !@app_key.to_s.empty?
+      end
+
+      def empty_state
+        { slos: {}, monitors: {}, dashboards: {} }
+      end
+
+      def load_slos(names)
+        names.each_with_object({}) do |name, slos|
+          path = "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: name)}"
+          response = request('GET', path)
+          entries = Array(response.dig('data', 'attributes', 'slos'))
+          match = entries.find do |entry|
+            fetch_value(fetch_value(entry, :data, {}), :attributes, {}).fetch('name', nil) == name
+          end
+          next unless match
+
+          data = fetch_value(match, :data, {})
+          slos[name] = {
+            id: fetch_value(data, :id),
+            name: fetch_value(fetch_value(data, :attributes, {}), :name)
+          }.compact
+        end
+      end
+
+      def load_monitors(names)
+        names.each_with_object({}) do |name, monitors|
+          path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: MANAGED_MONITOR_TAG, name: name)}"
+          entries = Array(request('GET', path))
+          match = entries.find { |entry| fetch_value(entry, :name) == name }
+          next unless match
+
+          monitors[name] = {
+            id: fetch_value(match, :id),
+            name: fetch_value(match, :name)
+          }.compact
+        end
+      end
+
+      def load_dashboards(titles)
+        return {} if titles.empty?
+
+        dashboards = {}
+        lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
+        lists.each do |list|
+          list_id = fetch_value(list, :id)
+          next unless list_id
+
+          path = "/api/v1/dashboard/lists/manual/#{list_id}/dashboards"
+          entries = Array(fetch_value(request('GET', path), :dashboards, []))
+          entries.each do |entry|
+            title = fetch_value(entry, :title)
+            next unless titles.include?(title)
+
+            dashboards[title] ||= {
+              id: fetch_value(entry, :id),
+              title: title
+            }.compact
+          end
+        end
+        dashboards
+      end
 
       def uri_for(path)
         path_uri = URI(path)
@@ -101,6 +172,13 @@ module SloRulesEngine
         return {} if body.to_s.empty?
 
         JSON.parse(body)
+      end
+
+      def fetch_value(hash, key, default = nil)
+        return hash.public_send(key) if hash.respond_to?(key)
+        return default unless hash.respond_to?(:fetch)
+
+        hash.fetch(key) { hash.fetch(key.to_s, default) }
       end
     end
   end
