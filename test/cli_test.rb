@@ -167,6 +167,73 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_apply_datadog_dry_run_accepts_reviewed_manifest_input
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+
+    Tempfile.create(['datadog-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'apply',
+        '--provider=datadog',
+        '--dry-run',
+        "--manifest=#{file.path}"
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout).fetch(0)
+      assert_equal 'datadog', payload.fetch('provider')
+      assert_equal ['datadog.slo', 'datadog.monitor', 'datadog.monitor', 'datadog.dashboard'],
+                   payload.fetch('operations').map { |operation| operation.fetch('target') }
+    end
+  end
+
+  def test_apply_manifest_bundle_confirm_accepts_reviewed_manifest_input
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=sloth',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+
+    Tempfile.create(['sloth-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'apply',
+          '--provider=sloth',
+          '--confirm',
+          "--output-dir=#{dir}",
+          "--manifest=#{file.path}"
+        )
+
+        assert status.success?, stderr
+        payload = JSON.parse(stdout).fetch(0)
+        assert_equal 'sloth', payload.fetch('provider')
+        manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+        assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
+      end
+    end
+  end
+
   def test_lookup_telemetry_datadog_requires_credentials
     stdout, stderr, status = Open3.capture3(
       { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
