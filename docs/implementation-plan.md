@@ -47,7 +47,7 @@ This is the running plan for the long refactor.
 - [x] Add provider query binding reality-check report.
 - [x] Add provider query/reality-check adapters.
 - [ ] Add real Datadog provider-schema payload translation and backend state import for create/update reconciliation.
-- [ ] Expand calculation-basis findings across every SLI instance and SLO.
+- [x] Expand calculation-basis findings across every SLI instance and SLO.
 - [ ] Record Sloth external-generator handoff details in apply plans.
 
 ## Phase 4: Migration Tooling
