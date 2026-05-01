@@ -47,6 +47,47 @@ class DatadogApplyTest < Minitest::Test
                  client.existing_state_requests.fetch(0).fetch(:monitors)
   end
 
+  def test_datadog_applier_diff_reports_noop_when_payloads_match
+    seed_applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new)
+    desired_operations = seed_applier.plan(@manifest).operations
+    burn_rate_payload = Marshal.load(Marshal.dump(desired_operations.fetch(1).payload))
+    burn_rate_payload[:query] = burn_rate_payload.fetch(:query).gsub(
+      '__SLO_REF__[checkout-api http-requests public-api successful-requests]',
+      'slo-123'
+    )
+    state = {
+      slos: {
+        desired_operations.fetch(0).name => {
+          id: 'slo-123',
+          payload: desired_operations.fetch(0).payload
+        }
+      },
+      monitors: {
+        desired_operations.fetch(1).name => {
+          id: 456,
+          payload: burn_rate_payload
+        },
+        desired_operations.fetch(2).name => {
+          id: 789,
+          payload: desired_operations.fetch(2).payload
+        }
+      },
+      dashboards: {
+        desired_operations.fetch(3).name => {
+          id: 'dashboard-123',
+          payload: desired_operations.fetch(3).payload
+        }
+      }
+    }
+    applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new(**state))
+
+    plan = applier.diff(@manifest)
+
+    assert_equal 'diff', plan.mode
+    assert_equal %w[noop noop noop noop], plan.operations.map(&:action)
+    assert_equal [], plan.operations.fetch(0).changes
+  end
+
   def test_datadog_apply_translates_payloads_and_resolves_slo_ids_for_monitors
     client = FakeDatadogClient.new
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)
@@ -94,9 +135,17 @@ class DatadogApplyTest < Minitest::Test
         '200',
         '{"data":{"attributes":{"slos":[{"data":{"id":"slo-123","attributes":{"name":"checkout-api http-requests public-api successful-requests","all_tags":["managed_by:slo-rules-engine"]}}}]}},"meta":{"pagination":{"total":1,"number":0,"last_number":0}}}'
       ),
+      '/api/v1/slo/slo-123?with_configured_alert_ids=true' => FakeResponse.new(
+        '200',
+        '{"data":[{"id":"slo-123","name":"checkout-api http-requests public-api successful-requests","type":"metric","description":"Generated SLO from artifacts.slos[0]","query":{"numerator":"count:http.server.request.duration{route:/checkout,service:checkout-api,status:success}.as_count()","denominator":"count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count()"},"tags":["managed_by:slo-rules-engine","service:checkout-api"],"thresholds":[{"timeframe":"30d","target":99.9}],"timeframe":"30d","target_threshold":99.9}]}'
+      ),
       '/api/v1/monitor?monitor_tags=managed_by%3Aslo-rules-engine&name=SLO+burn+rate%3A+checkout-api%2Fhttp-requests%2Fpublic-api%2Fsuccessful-requests' => FakeResponse.new(
         '200',
         '[{"id":456,"name":"SLO burn rate: checkout-api/http-requests/public-api/successful-requests","tags":["managed_by:slo-rules-engine"]}]'
+      ),
+      '/api/v1/monitor/456' => FakeResponse.new(
+        '200',
+        '{"id":456,"name":"SLO burn rate: checkout-api/http-requests/public-api/successful-requests","type":"slo alert","query":"burn_rate(\"generated-slo-1\").over(\"30d\").long_window(\"1h\").short_window(\"5m\") > 14.4","message":"Error budget burn is elevated for checkout-api http-requests public-api successful-requests.","tags":["managed_by:slo-rules-engine","service:checkout-api","route_key:checkout-api"],"options":{"include_tags":true,"thresholds":{"critical":14.4}}}'
       ),
       '/api/v1/dashboard/lists/manual' => FakeResponse.new(
         '200',
@@ -105,6 +154,10 @@ class DatadogApplyTest < Minitest::Test
       '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
         '200',
         '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"}]}'
+      ),
+      '/api/v1/dashboard/abc123' => FakeResponse.new(
+        '200',
+        '{"id":"abc123","title":"checkout-api SLO decision dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[0]","layout_type":"ordered","template_variables":[{"name":"service","prefix":"service","default":"checkout-api"}],"widgets":[{"definition":{"type":"note","content":"Investigate request latency, traffic, and burn rate before paging."}}]}'
       )
     )
     client = SloRulesEngine::Datadog::Client.new(
@@ -125,6 +178,12 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'slo-123', state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:id)
     assert_equal 456, state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:id)
     assert_equal 'abc123', state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:id)
+    assert_equal 'metric',
+                 state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:payload).fetch(:type)
+    assert_equal 'slo alert',
+                 state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:payload).fetch(:type)
+    assert_equal 'ordered',
+                 state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:payload).fetch(:layout_type)
   end
 
   def test_datadog_live_apply_requires_credentials

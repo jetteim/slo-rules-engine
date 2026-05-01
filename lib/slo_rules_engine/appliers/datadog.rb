@@ -61,6 +61,21 @@ module SloRulesEngine
         ApplyPlan.new(provider: 'datadog', mode: mode, operations: operations)
       end
 
+      def diff(manifest)
+        state = @client.existing_state(desired: desired_state(manifest))
+        resolved_slo_ids = fetch_value(state, :slos, {}).each_with_object({}) do |(name, entry), resolved|
+          backend_id = fetch_value(entry, :id)
+          resolved[name] = backend_id.to_s if backend_id
+        end
+        operations = ARTIFACTS.flat_map do |spec|
+          collection(manifest, spec.fetch(:collection)).each_with_index.map do |artifact, index|
+            diff_operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
+          end
+        end
+
+        ApplyPlan.new(provider: 'datadog', mode: 'diff', operations: operations)
+      end
+
       def apply(manifest)
         @client.validate_credentials!
 
@@ -128,6 +143,43 @@ module SloRulesEngine
         else
           raise SloRulesEngine::UnsupportedApplyAction, "unsupported Datadog target #{target.inspect}"
         end
+      end
+
+      def diff_operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
+        source = "#{spec.fetch(:source_prefix)}[#{index}]"
+        name = artifact_name(artifact, spec.fetch(:target), index)
+        backend_state = fetch_value(fetch_value(state, spec.fetch(:state), {}), name)
+        backend_id = fetch_value(backend_state, :id)
+        desired_payload = comparable_payload(
+          spec.fetch(:target),
+          resolve_payload(payload_for(manifest, artifact, spec.fetch(:target), source), resolved_slo_ids)
+        )
+        actual_payload = comparable_payload(spec.fetch(:target), fetch_value(backend_state, :payload))
+        changes = if backend_state.nil?
+                    ['payload']
+                  elsif actual_payload.nil?
+                    ['payload']
+                  else
+                    SloRulesEngine::StateDiff.changed_paths(desired_payload, actual_payload)
+                  end
+        action = if backend_state.nil?
+                   'create'
+                 elsif changes.empty?
+                   'noop'
+                 else
+                   'update'
+                 end
+
+        ApplyOperation.new(
+          action: action,
+          target: spec.fetch(:target),
+          name: name,
+          source: source,
+          payload: desired_payload,
+          backend_id: backend_id,
+          actual: actual_payload,
+          changes: changes
+        )
       end
 
       def request_target(operation)
@@ -205,8 +257,7 @@ module SloRulesEngine
             thresholds: {
               critical: threshold
             }
-          },
-          source: source
+          }
         }
       end
 
@@ -226,8 +277,7 @@ module SloRulesEngine
             thresholds: {
               critical: 0
             }
-          },
-          source: source
+          }
         }
       end
 
@@ -378,6 +428,52 @@ module SloRulesEngine
         fetch_value(fetch_value(response, :data, []).fetch(0, {}), :id) ||
           fetch_value(fetch_value(response, :data, {}), :id) ||
           fetch_value(response, :id)
+      end
+
+      def comparable_payload(target, payload)
+        case target
+        when 'datadog.slo'
+          normalize_hash(payload) do |hash|
+            hash[:tags] = Array(fetch_value(hash, :tags, [])).map(&:to_s).sort
+            hash[:thresholds] = Array(fetch_value(hash, :thresholds, [])).map do |entry|
+              normalize_hash(entry)
+            end
+          end
+        when 'datadog.monitor'
+          normalize_hash(payload) do |hash|
+            hash[:tags] = Array(fetch_value(hash, :tags, [])).map(&:to_s).sort
+            options = normalize_hash(fetch_value(hash, :options, {}))
+            thresholds = normalize_hash(fetch_value(options, :thresholds, {}))
+            options[:thresholds] = thresholds
+            hash[:options] = options
+          end
+        when 'datadog.dashboard'
+          normalize_hash(payload) do |hash|
+            hash[:template_variables] = Array(fetch_value(hash, :template_variables, [])).map do |entry|
+              normalize_hash(entry)
+            end.sort_by { |entry| fetch_value(entry, :name).to_s }
+            hash[:widgets] = Array(fetch_value(hash, :widgets, [])).map do |entry|
+              normalize_hash(entry)
+            end
+          end
+        else
+          normalize_hash(payload)
+        end
+      end
+
+      def normalize_hash(value, &block)
+        case value
+        when Hash
+          normalized = value.each_with_object({}) do |(key, entry), hash|
+            hash[key.to_sym] = normalize_hash(entry)
+          end
+          block.call(normalized) if block
+          normalized
+        when Array
+          value.map { |entry| normalize_hash(entry) }
+        else
+          value
+        end
       end
 
       def fetch_value(hash, key, default = nil)

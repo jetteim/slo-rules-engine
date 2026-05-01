@@ -35,6 +35,35 @@ module SloRulesEngine
         end
       end
 
+      def diff(manifest)
+        path = manifest_path(manifest)
+        actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
+        changes = actual ? SloRulesEngine::StateDiff.changed_paths(manifest, actual) : ['manifest']
+        action = if actual.nil?
+                   'create'
+                 elsif changes.empty?
+                   'noop'
+                 else
+                   'update'
+                 end
+
+        ApplyPlan.new(
+          provider: manifest.fetch(:provider),
+          mode: 'diff',
+          operations: [
+            ApplyOperation.new(
+              action: action,
+              target: 'manifest_file',
+              name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
+              source: 'manifest',
+              payload: { path: path, manifest: manifest },
+              actual: actual,
+              changes: changes
+            )
+          ]
+        )
+      end
+
       private
 
       def manifest_path(manifest)

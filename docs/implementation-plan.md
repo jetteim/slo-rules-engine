@@ -56,7 +56,7 @@ This is the running plan for the long refactor.
 - [ ] Add anonymization helper for examples.
 - [x] Add reviewed manifest input path for apply workflows.
 - [ ] Add explicit diff, import, and prune commands.
-- [ ] Add generated artifact diff harness.
+- [x] Add generated artifact diff harness.
 - [ ] Add import guidance for existing service files.
 
 ## Phase 5: Contract Hardening

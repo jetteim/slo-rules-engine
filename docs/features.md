@@ -57,6 +57,7 @@ Explicit features:
 - **State pipeline contract:** model backend management as sources, transforms, sinks, and findings.
 - **Automation modes:** providers declare `live_api`, `manifest_bundle`, or `external_generator`.
 - **Reviewed manifest input:** apply workflows accept a reviewed provider manifest directly instead of forcing regeneration in the same command.
+- **Reviewed manifest diff:** diff workflows compare desired reviewed manifests to observed provider state and emit `create`, `update`, or `noop` operations with changed paths.
 - **Apply planning:** dry-run apply emits planned create, update, write, or handoff operations.
 - **Explicit live mutation:** live backend changes require a separate command, confirmation, and credentials when the provider needs them.
 - **Datadog live API support:** Datadog can apply SLOs, monitors, telemetry-gap monitors, and dashboards through API calls.
