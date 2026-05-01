@@ -28,10 +28,13 @@ class ProvidersTest < Minitest::Test
 
     assert_equal 'live_api', providers.fetch('datadog').fetch(:automation_mode)
     assert_includes providers.fetch('datadog').fetch(:state_actions), 'apply'
+    assert_includes providers.fetch('datadog').fetch(:state_actions), 'diff'
     assert_equal 'manifest_bundle', providers.fetch('prometheus_stack').fetch(:automation_mode)
     assert_includes providers.fetch('prometheus_stack').fetch(:state_actions), 'apply'
+    assert_includes providers.fetch('prometheus_stack').fetch(:state_actions), 'diff'
     assert_equal 'external_generator', providers.fetch('sloth').fetch(:automation_mode)
     assert_includes providers.fetch('sloth').fetch(:state_actions), 'apply'
+    assert_includes providers.fetch('sloth').fetch(:state_actions), 'diff'
   end
 
   def test_datadog_provider_generates_slo_monitor_and_dashboard

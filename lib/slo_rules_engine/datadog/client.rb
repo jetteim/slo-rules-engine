@@ -81,9 +81,12 @@ module SloRulesEngine
           next unless match
 
           data = fetch_value(match, :data, {})
+          detail = request('GET', "/api/v1/slo/#{fetch_value(data, :id)}?with_configured_alert_ids=true")
+          payload = normalize_slo_payload(first_resource(detail))
           slos[name] = {
             id: fetch_value(data, :id),
-            name: fetch_value(fetch_value(data, :attributes, {}), :name)
+            name: fetch_value(fetch_value(data, :attributes, {}), :name),
+            payload: payload
           }.compact
         end
       end
@@ -95,9 +98,11 @@ module SloRulesEngine
           match = entries.find { |entry| fetch_value(entry, :name) == name }
           next unless match
 
+          detail = request('GET', "/api/v1/monitor/#{fetch_value(match, :id)}")
           monitors[name] = {
             id: fetch_value(match, :id),
-            name: fetch_value(match, :name)
+            name: fetch_value(match, :name),
+            payload: normalize_monitor_payload(detail)
           }.compact
         end
       end
@@ -117,9 +122,11 @@ module SloRulesEngine
             title = fetch_value(entry, :title)
             next unless titles.include?(title)
 
+            detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
             dashboards[title] ||= {
               id: fetch_value(entry, :id),
-              title: title
+              title: title,
+              payload: normalize_dashboard_payload(detail)
             }.compact
           end
         end
@@ -172,6 +179,51 @@ module SloRulesEngine
         return {} if body.to_s.empty?
 
         JSON.parse(body)
+      end
+
+      def first_resource(response)
+        data = fetch_value(response, :data, response)
+        return data.fetch(0, {}) if data.is_a?(Array)
+
+        data
+      end
+
+      def normalize_slo_payload(payload)
+        normalize_hash(payload).tap do |normalized|
+          normalized[:tags] = Array(fetch_value(normalized, :tags, [])).map(&:to_s).sort
+          normalized[:thresholds] = Array(fetch_value(normalized, :thresholds, [])).map { |entry| normalize_hash(entry) }
+        end
+      end
+
+      def normalize_monitor_payload(payload)
+        normalize_hash(payload).tap do |normalized|
+          normalized[:tags] = Array(fetch_value(normalized, :tags, [])).map(&:to_s).sort
+          options = normalize_hash(fetch_value(normalized, :options, {}))
+          options[:thresholds] = normalize_hash(fetch_value(options, :thresholds, {}))
+          normalized[:options] = options
+        end
+      end
+
+      def normalize_dashboard_payload(payload)
+        normalize_hash(payload).tap do |normalized|
+          normalized[:template_variables] = Array(fetch_value(normalized, :template_variables, [])).map do |entry|
+            normalize_hash(entry)
+          end.sort_by { |entry| fetch_value(entry, :name).to_s }
+          normalized[:widgets] = Array(fetch_value(normalized, :widgets, [])).map { |entry| normalize_hash(entry) }
+        end
+      end
+
+      def normalize_hash(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, entry), hash|
+            hash[key.to_sym] = normalize_hash(entry)
+          end
+        when Array
+          value.map { |entry| normalize_hash(entry) }
+        else
+          value
+        end
       end
 
       def fetch_value(hash, key, default = nil)

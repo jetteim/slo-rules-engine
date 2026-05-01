@@ -3,6 +3,7 @@
 require 'json'
 require 'minitest/autorun'
 require 'open3'
+require 'fileutils'
 require 'tempfile'
 require 'tmpdir'
 
@@ -230,6 +231,48 @@ class CLITest < Minitest::Test
         assert_equal 'sloth', payload.fetch('provider')
         manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
         assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
+      end
+    end
+  end
+
+  def test_diff_manifest_bundle_accepts_reviewed_manifest_input
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=sloth',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+
+    Tempfile.create(['sloth-diff-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        managed_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+        FileUtils.mkdir_p(File.dirname(managed_path))
+        existing = Marshal.load(Marshal.dump(manifest))
+        existing.fetch('artifacts').fetch('sloth_specs').fetch(0).fetch('labels')['owner'] = 'old-owner'
+        File.write(managed_path, JSON.pretty_generate(existing))
+
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'diff',
+          '--provider=sloth',
+          "--output-dir=#{dir}",
+          "--manifest=#{file.path}"
+        )
+
+        assert status.success?, stderr
+        payload = JSON.parse(stdout).fetch(0)
+        operation = payload.fetch('operations').fetch(0)
+        assert_equal 'sloth', payload.fetch('provider')
+        assert_equal 'diff', payload.fetch('mode')
+        assert_equal 'update', operation.fetch('action')
+        assert_includes operation.fetch('changes'), 'artifacts.sloth_specs[0].labels.owner'
       end
     end
   end

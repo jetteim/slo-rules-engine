@@ -19,6 +19,8 @@ module RulesCtl
       generate(argv)
     when 'apply'
       apply(argv)
+    when 'diff'
+      diff(argv)
     when 'lookup-telemetry'
       lookup_telemetry(argv)
     when 'discover-telemetry'
@@ -95,18 +97,7 @@ module RulesCtl
 
     provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
     mode = confirm && !dry_run ? 'live' : 'dry_run'
-    manifests = if manifest_path
-                  abort_usage('manifest input does not accept definition files') unless argv.empty?
-                  load_apply_manifests(manifest_path, provider)
-                else
-                  definitions = load_definitions(argv)
-                  validation = validate_for_provider(definitions, provider)
-                  unless validation[:valid]
-                    puts JSON.pretty_generate(validation)
-                    exit 1
-                  end
-                  definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
-                end
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
     if provider.key == 'datadog'
       applier = SloRulesEngine::Appliers::Datadog.new
       plans = manifests.map do |manifest|
@@ -150,6 +141,64 @@ module RulesCtl
       mode: mode,
       output_dir: output_dir,
       manifests: manifests || [],
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def diff(argv)
+    provider_key = nil
+    output_dir = nil
+    manifest_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider diff') { |value| output_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to diff instead of regenerating from definitions') { |value| manifest_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    if provider.key == 'datadog'
+      applier = SloRulesEngine::Appliers::Datadog.new
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.diff(manifest).to_h })
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: output_dir)
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.diff(manifest).to_h })
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have a diff adapter yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'diff',
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'diff',
+      output_dir: output_dir,
       error: {
         code: 'unsupported_apply_action',
         message: error.message
@@ -434,6 +483,21 @@ module RulesCtl
     manifests
   end
 
+  def resolve_state_manifests(argv, provider, manifest_path)
+    if manifest_path
+      abort_usage('manifest input does not accept definition files') unless argv.empty?
+      return load_apply_manifests(manifest_path, provider)
+    end
+
+    definitions = load_definitions(argv)
+    validation = validate_for_provider(definitions, provider)
+    unless validation[:valid]
+      puts JSON.pretty_generate(validation)
+      exit 1
+    end
+    definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+  end
+
   def telemetry_signals_from_file(path)
     payload = JSON.parse(File.read(path), symbolize_names: true)
     SloRulesEngine::TelemetryLookup.extract_signals(payload)
@@ -503,6 +567,7 @@ module RulesCtl
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
+        bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl discover-telemetry --provider=<provider> [--service=<service>] [--selector=key=value] [--base-url=<url>]
         bin/rules-ctl providers list
         bin/rules-ctl integrations list

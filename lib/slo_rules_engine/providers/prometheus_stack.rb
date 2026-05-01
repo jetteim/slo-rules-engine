@@ -18,7 +18,7 @@ module SloRulesEngine
             apply_plan
           ],
           automation_mode: 'manifest_bundle',
-          state_actions: %w[plan apply]
+          state_actions: %w[plan apply diff]
         )
       end
 
