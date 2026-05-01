@@ -40,13 +40,13 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 
 **Customer / beneficiary:** maintainers onboarding services with telemetry but no reviewed SLO definition.
 
-**Trigger:** measured telemetry inventory exists.
+**Trigger:** measured telemetry inventory or backend discovery output exists.
 
 **Outcome:** a loadable Ruby DSL draft with candidate SLIs/SLOs and findings for rejected signals.
 
 **Flow:**
 
-1. Ingest telemetry inventory.
+1. Discover or ingest telemetry inventory.
 2. Classify signals by reliability meaning.
 3. Reject unsupported, non-user-visible, or incomplete signals with findings.
 4. Infer candidate SLIs, SLOs, objectives, success conditions, and calculation basis.
@@ -56,7 +56,7 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 
 **Measures:**
 
-- Time from telemetry inventory to validated draft.
+- Time from telemetry discovery or inventory to validated draft.
 - Eligible signal conversion rate.
 - Findings per telemetry inventory.
 
@@ -159,16 +159,16 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 
 **Customer / beneficiary:** maintainers verifying that definitions can be evaluated by a backend.
 
-**Trigger:** a service definition exists and measured telemetry inventory is available.
+**Trigger:** a service definition exists and measured telemetry inventory, saved lookup output, or explicit backend lookup is available.
 
 **Outcome:** report identifies missing provider bindings, missing backend metrics, or telemetry gaps before provider artifacts are trusted.
 
 **Flow:**
 
 1. Load service definition.
-2. Load measured telemetry inventory.
+2. Load measured telemetry inventory or normalized lookup output.
 3. Inspect provider-specific query bindings.
-4. Compare required metrics with measured telemetry.
+4. Compare required metrics with measured telemetry or explicit backend lookup.
 5. Report missing bindings and missing metrics.
 6. Feed findings back into definition or instrumentation work.
 
@@ -186,13 +186,13 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 | Neutral reliability intent model | 1, 3 | service model, SLI model, SLO model, measurement details, miss-policy, observability handoff |
 | Core validation and review gates | 1, 3 | required fields, objective ranges, calculation basis, route references, miss-policy validation |
 | Provider artifact generation | 1 | Datadog manifests, Prometheus-compatible rules, dashboards, output directory layout |
-| Telemetry-derived draft generation | 2 | telemetry inventory ingestion, findings, candidate inference, `draft-definition` |
+| Telemetry-derived draft generation | 2 | telemetry discovery, inventory ingestion, lookup-envelope reuse, findings, candidate inference, `draft-definition` |
 | Operational alert context | 3 | burn-rate alerts, telemetry-gap notifications, contextual annotations, dashboard variables |
 | Delivery integration routing | 3 | route catalogs, route availability checks, notification router integration |
 | OSS-safe migration | 4 | migration reports, forbidden-term scan, synthetic fixtures, anonymization helpers |
 | Provider contribution safety | 5 | provider contract, provider guide, deterministic tests, unsupported-field warnings |
 | Backend state management | 6 | automation modes, artifact schemas, dry-run apply plans, diff harness, apply/prune commands, import existing resources |
-| Reality checking | 7 | provider binding checks, missing metric checks, backend telemetry lookup adapters |
+| Reality checking | 7 | provider binding checks, missing metric checks, backend telemetry lookup and discovery adapters |
 
 ## Delivery Order
 

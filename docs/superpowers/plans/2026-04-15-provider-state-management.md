@@ -733,6 +733,7 @@ Update feature docs so telemetry-derived SLI/SLO generation uses:
 
 - file inventory
 - backend lookup output
+- backend discovery output
 - candidate review
 - draft definition generation
 - provider generation
@@ -766,3 +767,11 @@ git push origin main
 - Placeholder scan: no deferred placeholders are required for the first implementation slice; out-of-scope behavior is explicitly listed in the design spec.
 - Type consistency: `ApplyOperation`, `ApplyPlan`, provider `automation_mode`, provider `state_actions`, and `TelemetryLookup` objects are named consistently across tasks.
 - Public-safety: all fixtures are synthetic and tests must keep `test/forbidden_terms_test.rb` green.
+
+## Follow-Up Backlog From Implementation Review
+
+- [ ] Add real Datadog provider-schema payload translation and backend state import so `live_api` means real create/update reconciliation instead of endpoint dispatch only.
+- [ ] Add explicit reviewed-manifest input plus `diff`, `import`, and `prune` commands.
+- [ ] Enforce provider capability metadata such as `apply_plan` against the documented provider contract.
+- [ ] Expand calculation-basis findings across every SLI instance and SLO, not only the first.
+- [ ] Record Sloth external-generator handoff details in apply plans instead of file write alone.

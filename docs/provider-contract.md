@@ -55,6 +55,20 @@ Provider state management follows a pipeline contract:
 
 Provider generation is a transform and must stay deterministic. Provider apply is a sink and must be isolated behind dry-run, confirmation, and provider-specific state-action support.
 
+## Telemetry Evidence Contract
+
+Providers may support explicit metric lookup, service-scoped discovery, or both.
+
+When telemetry evidence is supported:
+
+- `lookup-telemetry` returns normalized evidence for one explicit metric or query.
+- `discover-telemetry` returns normalized evidence for a documented service, selector, host, or backend-specific scope.
+- results must normalize to `provider`, `signals`, and `findings` so onboarding and reality-check flows can reuse them without backend-specific parsing.
+- unsupported scopes or filters must fail explicitly.
+- provider-specific scope limits must be documented.
+
+Discovery is evidence for review, not automatic SLO policy. Candidate generation and `draft-definition` consume normalized `signals`; backend-specific payload details stay inside provider adapters.
+
 ## Provider Responsibilities
 
 Providers receive neutral intent and return generated artifacts.
@@ -93,6 +107,12 @@ Expected state behavior:
 - retry handling for rate limiting and transient server errors, including Datadog `X-RateLimit-Reset` and `X-RateLimit-Period` headers
 - source-artifact provenance in each apply operation; provider-schema conformance must be verified before production use
 
+Expected telemetry behavior:
+
+- explicit metric lookup through Datadog query APIs
+- service/tag-filter discovery or host-scoped discovery through the active metrics API
+- host scope must not be combined with tag-filter discovery in one request
+
 ### `prometheus_stack`
 
 Multi-tool provider treated as one backend bundle.
@@ -113,6 +133,12 @@ Expected state behavior:
 - confirmed file write into an output directory
 - direct backend mutation only through a future dedicated adapter
 
+Expected telemetry behavior:
+
+- explicit metric lookup through Prometheus-compatible series and query APIs
+- service or selector-scoped discovery through metric-name label values
+- normalized lookup output reusable by onboarding and reality-check flows
+
 ### `sloth`
 
 Prometheus-oriented provider that emits Sloth `prometheus/v1` SLO specs for Sloth rule generation.
@@ -127,6 +153,10 @@ Expected artifacts:
 - annotations carrying reviewed reliability intent
 
 The Sloth provider does not execute the Sloth CLI or apply generated rules. It produces reviewable spec artifacts and an external-generator handoff plan.
+
+Expected telemetry behavior:
+
+- reuse the Prometheus-compatible lookup and discovery baseline for onboarding and sanity checks
 
 ## Delivery Integrations
 
