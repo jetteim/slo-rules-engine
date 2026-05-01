@@ -42,9 +42,12 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'update', plan.operations.fetch(1).action
     assert_equal 456, plan.operations.fetch(1).backend_id
     assert_equal 'create', plan.operations.fetch(2).action
+    assert_equal [slo_name], client.existing_state_requests.fetch(0).fetch(:slos)
+    assert_equal [monitor_name, @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)],
+                 client.existing_state_requests.fetch(0).fetch(:monitors)
   end
 
-  def test_datadog_apply_calls_api_paths_through_injected_client
+  def test_datadog_apply_translates_payloads_and_resolves_slo_ids_for_monitors
     client = FakeDatadogClient.new
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)
 
@@ -57,7 +60,71 @@ class DatadogApplyTest < Minitest::Test
       ['POST', '/api/v1/monitor'],
       ['POST', '/api/v1/dashboard']
     ], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
-    assert_equal 'artifacts.slos[0]', client.requests.fetch(0).fetch(:payload).fetch(:source)
+
+    slo_payload = client.requests.fetch(0).fetch(:payload)
+    assert_equal 'metric', slo_payload.fetch(:type)
+    assert_equal 'checkout-api http-requests public-api successful-requests', slo_payload.fetch(:name)
+    assert_equal '30d', slo_payload.fetch(:timeframe)
+    assert_equal 99.9, slo_payload.fetch(:target_threshold)
+    assert_equal 'count:http.server.request.duration{route:/checkout,service:checkout-api,status:success}.as_count()',
+                 slo_payload.fetch(:query).fetch(:numerator)
+    assert_equal 'count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count()',
+                 slo_payload.fetch(:query).fetch(:denominator)
+
+    burn_rate_payload = client.requests.fetch(1).fetch(:payload)
+    assert_equal 'slo alert', burn_rate_payload.fetch(:type)
+    assert_includes burn_rate_payload.fetch(:query), 'burn_rate("generated-slo-1").over("30d").long_window("1h").short_window("5m") > 14.4'
+    assert_equal 14.4, burn_rate_payload.fetch(:options).fetch(:thresholds).fetch(:critical)
+
+    telemetry_gap_payload = client.requests.fetch(2).fetch(:payload)
+    assert_equal 'query alert', telemetry_gap_payload.fetch(:type)
+    assert_equal true, telemetry_gap_payload.fetch(:options).fetch(:notify_no_data)
+    assert_includes telemetry_gap_payload.fetch(:query), 'avg(last_10m):count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count() < 0'
+
+    dashboard_payload = client.requests.fetch(3).fetch(:payload)
+    assert_equal 'ordered', dashboard_payload.fetch(:layout_type)
+    assert_equal 'checkout-api SLO decision dashboard', dashboard_payload.fetch(:title)
+    assert_equal %w[service sli sli_instance slo],
+                 dashboard_payload.fetch(:template_variables).map { |variable| variable.fetch(:name) }
+  end
+
+  def test_datadog_client_imports_existing_state_for_desired_resource_names
+    http = RoutingHttp.new(
+      '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=20&query=checkout-api+http-requests+public-api+successful-requests' => FakeResponse.new(
+        '200',
+        '{"data":{"attributes":{"slos":[{"data":{"id":"slo-123","attributes":{"name":"checkout-api http-requests public-api successful-requests","all_tags":["managed_by:slo-rules-engine"]}}}]}},"meta":{"pagination":{"total":1,"number":0,"last_number":0}}}'
+      ),
+      '/api/v1/monitor?monitor_tags=managed_by%3Aslo-rules-engine&name=SLO+burn+rate%3A+checkout-api%2Fhttp-requests%2Fpublic-api%2Fsuccessful-requests' => FakeResponse.new(
+        '200',
+        '[{"id":456,"name":"SLO burn rate: checkout-api/http-requests/public-api/successful-requests","tags":["managed_by:slo-rules-engine"]}]'
+      ),
+      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
+        '200',
+        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
+      ),
+      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+        '200',
+        '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"}]}'
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.existing_state(
+      desired: {
+        slos: ['checkout-api http-requests public-api successful-requests'],
+        monitors: ['SLO burn rate: checkout-api/http-requests/public-api/successful-requests'],
+        dashboards: ['checkout-api SLO decision dashboard']
+      }
+    )
+
+    assert_equal 'slo-123', state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:id)
+    assert_equal 456, state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:id)
+    assert_equal 'abc123', state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:id)
   end
 
   def test_datadog_live_apply_requires_credentials
@@ -128,14 +195,16 @@ class DatadogApplyTest < Minitest::Test
   private
 
   class FakeDatadogClient
-    attr_reader :requests
+    attr_reader :requests, :existing_state_requests
 
     def initialize(slos: {}, monitors: {}, dashboards: {})
       @state = { slos: slos, monitors: monitors, dashboards: dashboards }
       @requests = []
+      @existing_state_requests = []
     end
 
-    def existing_state
+    def existing_state(desired: nil)
+      @existing_state_requests << desired
       @state
     end
 
@@ -145,7 +214,16 @@ class DatadogApplyTest < Minitest::Test
 
     def request(method, path, payload: nil)
       @requests << { method: method, path: path, payload: payload }
-      { 'id' => "request-#{@requests.length}" }
+      case path
+      when '/api/v1/slo'
+        { 'data' => [{ 'id' => 'generated-slo-1' }] }
+      when '/api/v1/monitor'
+        { 'id' => "monitor-#{@requests.length}" }
+      when '/api/v1/dashboard'
+        { 'id' => 'dashboard-1' }
+      else
+        { 'id' => "request-#{@requests.length}" }
+      end
     end
   end
 
@@ -166,6 +244,25 @@ class DatadogApplyTest < Minitest::Test
     def request(request)
       @requests << request
       @responses.shift
+    end
+  end
+
+  class RoutingHttp
+    def initialize(routes)
+      @routes = routes
+    end
+
+    def start(_host, _port, use_ssl:)
+      raise 'expected TLS for Datadog API' unless use_ssl
+
+      yield self
+    end
+
+    def request(request)
+      response = @routes.fetch(request.path) do
+        raise "unexpected Datadog request path #{request.path}"
+      end
+      response
     end
   end
 
