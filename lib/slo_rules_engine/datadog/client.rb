@@ -20,6 +20,7 @@ module SloRulesEngine
       MANAGED_MONITOR_TAG = 'managed_by:slo-rules-engine'
       TRANSIENT_CODES = %w[429 500 502 503 504].freeze
       SUCCESS_CODES = %w[200 201 202].freeze
+      WAIT_ATTEMPTS = 20
 
       def initialize(
         api_key: ENV['DD_API_KEY'],
@@ -87,6 +88,25 @@ module SloRulesEngine
 
       def delete_dashboard(id)
         request('DELETE', "/api/v1/dashboard/#{id}", not_found_ok: true)
+      end
+
+      def create_and_wait_slo(payload)
+        response = request('POST', '/api/v1/slo', payload: payload)
+        slo_id = fetch_value(fetch_value(response, :data, []).fetch(0, {}), :id) ||
+          fetch_value(fetch_value(response, :data, {}), :id)
+        wait_for_resource("/api/v1/slo/#{slo_id}") do |result|
+          fetch_value(fetch_value(result, :data, {}), :id) == slo_id
+        end
+        response
+      end
+
+      def create_and_wait_monitor(payload)
+        response = request('POST', '/api/v1/monitor', payload: payload)
+        monitor_id = fetch_value(response, :id)
+        wait_for_resource("/api/v1/monitor/#{monitor_id}") do |result|
+          fetch_value(result, :id) == monitor_id
+        end
+        response
       end
 
       private
@@ -214,6 +234,20 @@ module SloRulesEngine
         return {} if body.to_s.empty?
 
         JSON.parse(body)
+      end
+
+      def wait_for_resource(path)
+        attempts = 1
+
+        loop do
+          result = request('GET', path, retries: 0)
+          return result if yield(result)
+        rescue ApiError
+          raise if attempts >= WAIT_ATTEMPTS
+
+          @sleep_fn.call([0.2 * attempts, 2].min)
+          attempts += 1
+        end
       end
 
       def first_resource(response)

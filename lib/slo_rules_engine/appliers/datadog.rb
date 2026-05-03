@@ -58,9 +58,10 @@ module SloRulesEngine
 
       def plan(manifest, mode: 'dry_run')
         state = @client.existing_state(desired: desired_state(manifest))
+        resolved_slo_ids = resolved_slo_ids_from_state(state)
         operations = ARTIFACTS.flat_map do |spec|
           collection(manifest, spec.fetch(:collection)).each_with_index.map do |artifact, index|
-            operation_for(manifest, artifact, index, spec, state)
+            operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
           end
         end
 
@@ -121,12 +122,10 @@ module SloRulesEngine
             resolved[operation.name] = operation.backend_id.to_s
           end
           apply_plan.operations.each do |operation|
-            method, path = request_target(operation)
-            payload = resolve_payload(operation.payload, resolved_slo_ids)
-            response = @client.request(method, path, payload: payload)
+            response = apply_operation(operation, resolved_slo_ids)
             next unless operation.target == 'datadog.slo'
 
-            generated_id = datadog_id_from_response(response)
+            generated_id = operation.backend_id || datadog_id_from_response(response)
             resolved_slo_ids[operation.name] = generated_id if generated_id
           end
         end
@@ -134,11 +133,20 @@ module SloRulesEngine
 
       private
 
-      def operation_for(manifest, artifact, index, spec, state)
+      def operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
         source = "#{spec.fetch(:source_prefix)}[#{index}]"
         name = artifact_name(artifact, spec.fetch(:target), index)
         backend_id = backend_id_for(state, spec.fetch(:state), name)
-        action = backend_id ? 'update' : 'create'
+        action = action_for(
+          manifest,
+          artifact,
+          spec,
+          source,
+          name,
+          backend_id,
+          state,
+          resolved_slo_ids
+        )
 
         ApplyOperation.new(
           action: action,
@@ -148,6 +156,14 @@ module SloRulesEngine
           payload: payload_for(manifest, artifact, spec.fetch(:target), source),
           backend_id: backend_id
         )
+      end
+
+      def action_for(manifest, artifact, spec, source, name, backend_id, state, resolved_slo_ids)
+        return 'create_and_wait' if spec.fetch(:target) == 'datadog.slo' && backend_id.nil?
+        return 'create' if backend_id.nil?
+        return 'recreate' if recreate_monitor?(manifest, artifact, spec, source, name, state, resolved_slo_ids)
+
+        'update'
       end
 
       def collection(manifest, key)
@@ -199,6 +215,8 @@ module SloRulesEngine
                   end
         action = if backend_state.nil?
                    'create'
+                 elsif recreate_monitor?(manifest, artifact, spec, source, name, state, resolved_slo_ids)
+                   'recreate'
                  elsif changes.empty?
                    'noop'
                  else
@@ -220,7 +238,7 @@ module SloRulesEngine
       def request_target(operation)
         spec = ARTIFACTS.find { |candidate| candidate.fetch(:target) == operation.target }
         endpoint = case operation.action
-                   when 'create'
+                   when 'create', 'create_and_wait', 'recreate', 'recreate_and_wait'
                      spec.fetch(:create)
                    when 'update'
                      spec.fetch(:update)
@@ -234,9 +252,67 @@ module SloRulesEngine
         [method, format(path_template, id: operation.backend_id)]
       end
 
+      def apply_operation(operation, resolved_slo_ids)
+        payload = resolve_payload(operation.payload, resolved_slo_ids)
+
+        case operation.action
+        when 'create_and_wait'
+          create_and_wait(operation, payload)
+        when 'recreate'
+          recreate(operation, payload)
+        when 'recreate_and_wait'
+          recreate_and_wait(operation, payload)
+        else
+          method, path = request_target(operation)
+          @client.request(method, path, payload: payload)
+        end
+      end
+
+      def create_and_wait(operation, payload)
+        case operation.target
+        when 'datadog.slo'
+          @client.create_and_wait_slo(payload)
+        when 'datadog.monitor'
+          @client.create_and_wait_monitor(payload)
+        else
+          method, path = request_target(operation)
+          @client.request(method, path, payload: payload)
+        end
+      end
+
+      def recreate(operation, payload)
+        case operation.target
+        when 'datadog.monitor'
+          @client.delete_monitor(operation.backend_id)
+          @client.request('POST', '/api/v1/monitor', payload: payload)
+        when 'datadog.dashboard'
+          @client.delete_dashboard(operation.backend_id)
+          @client.request('POST', '/api/v1/dashboard', payload: payload)
+        else
+          raise SloRulesEngine::UnsupportedApplyAction, "unsupported Datadog recreate target #{operation.target.inspect}"
+        end
+      end
+
+      def recreate_and_wait(operation, payload)
+        case operation.target
+        when 'datadog.monitor'
+          @client.delete_monitor(operation.backend_id)
+          @client.create_and_wait_monitor(payload)
+        else
+          recreate(operation, payload)
+        end
+      end
+
       def prune_specs
         PRUNE_ORDER.map do |collection_key|
           ARTIFACTS.find { |spec| spec.fetch(:collection) == collection_key }
+        end
+      end
+
+      def resolved_slo_ids_from_state(state)
+        fetch_value(state, :slos, {}).each_with_object({}) do |(name, entry), resolved|
+          backend_id = fetch_value(entry, :id)
+          resolved[name] = backend_id.to_s if backend_id
         end
       end
 
@@ -537,6 +613,19 @@ module SloRulesEngine
         else
           normalize_hash(payload)
         end
+      end
+
+      def recreate_monitor?(manifest, artifact, spec, source, name, state, resolved_slo_ids)
+        return false unless spec.fetch(:target) == 'datadog.monitor'
+        return false unless fetch_value(artifact, :type) == 'burn_rate'
+
+        current_slo_id = resolved_slo_ids[slo_reference_name_from_context(artifact)]
+        return false if current_slo_id.to_s.empty?
+
+        actual_query = fetch_value(fetch_value(fetch_value(state, :monitors, {}).fetch(name, {}), :payload, {}), :query)
+        return false if actual_query.to_s.empty?
+
+        !actual_query.include?(%("#{current_slo_id}"))
       end
 
       def normalize_hash(value, &block)
