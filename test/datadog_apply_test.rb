@@ -21,7 +21,7 @@ class DatadogApplyTest < Minitest::Test
 
     assert_equal 'datadog', plan.provider
     assert_equal 'dry_run', plan.mode
-    assert_equal %w[create create create create], plan.operations.map(&:action)
+    assert_equal %w[create_and_wait create create create], plan.operations.map(&:action)
     assert_equal ['datadog.slo', 'datadog.monitor', 'datadog.monitor', 'datadog.dashboard'], plan.operations.map(&:target)
     assert_equal ['artifacts.slos[0]', 'artifacts.monitors[0]', 'artifacts.telemetry_gap_monitors[0]', 'artifacts.dashboards[0]'], plan.operations.map(&:source)
   end
@@ -45,6 +45,29 @@ class DatadogApplyTest < Minitest::Test
     assert_equal [slo_name], client.existing_state_requests.fetch(0).fetch(:slos)
     assert_equal [monitor_name, @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)],
                  client.existing_state_requests.fetch(0).fetch(:monitors)
+  end
+
+  def test_datadog_applier_marks_stale_burn_rate_monitors_for_recreate
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    client = FakeDatadogClient.new(
+      slos: { slo_name => { id: 'slo-123' } },
+      monitors: {
+        monitor_name => {
+          id: 456,
+          payload: {
+            query: 'burn_rate("stale-slo-999").over("30d").long_window("1h").short_window("5m") > 14.4'
+          }
+        }
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.plan(@manifest)
+
+    assert_equal 'update', plan.operations.fetch(0).action
+    assert_equal 'recreate', plan.operations.fetch(1).action
+    assert_equal 456, plan.operations.fetch(1).backend_id
   end
 
   def test_datadog_applier_diff_reports_noop_when_payloads_match
@@ -166,6 +189,7 @@ class DatadogApplyTest < Minitest::Test
       ['POST', '/api/v1/monitor'],
       ['POST', '/api/v1/dashboard']
     ], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
+    assert_equal 1, client.created_and_waited_slos.length
 
     slo_payload = client.requests.fetch(0).fetch(:payload)
     assert_equal 'metric', slo_payload.fetch(:type)
@@ -192,6 +216,33 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'checkout-api SLO decision dashboard', dashboard_payload.fetch(:title)
     assert_equal %w[service sli sli_instance slo],
                  dashboard_payload.fetch(:template_variables).map { |variable| variable.fetch(:name) }
+  end
+
+  def test_datadog_apply_recreates_stale_monitors_with_current_slo_ids
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    client = FakeDatadogClient.new(
+      slos: { slo_name => { id: 'slo-123' } },
+      monitors: {
+        monitor_name => {
+          id: 456,
+          payload: {
+            query: 'burn_rate("stale-slo-999").over("30d").long_window("1h").short_window("5m") > 14.4'
+          }
+        }
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.apply(@manifest)
+
+    assert_equal 'live', plan.mode
+    assert_equal [
+      ['PUT', '/api/v1/slo/slo-123'],
+      ['DELETE', '/api/v1/monitor/456'],
+      ['POST', '/api/v1/monitor']
+    ], client.requests.first(3).map { |request| [request.fetch(:method), request.fetch(:path)] }
+    assert_includes client.requests.fetch(2).fetch(:payload).fetch(:query), 'burn_rate("slo-123")'
   end
 
   def test_datadog_client_imports_existing_state_for_desired_resource_names
@@ -386,15 +437,65 @@ class DatadogApplyTest < Minitest::Test
     assert_nil result
   end
 
+  def test_datadog_client_create_and_wait_for_slo_polls_until_resource_exists
+    http = SequencedRoutingHttp.new(
+      '/api/v1/slo' => [
+        FakeResponse.new('200', '{"data":[{"id":"slo-123"}]}')
+      ],
+      '/api/v1/slo/slo-123' => [
+        FakeResponse.new('404', '{"errors":["not ready"]}'),
+        FakeResponse.new('200', '{"data":{"id":"slo-123"}}')
+      ]
+    )
+    sleeps = []
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(seconds) { sleeps << seconds }
+    )
+
+    response = client.create_and_wait_slo(name: 'checkout')
+
+    assert_equal 'slo-123', response.fetch('data').fetch(0).fetch('id')
+    assert_equal [0.2], sleeps
+  end
+
+  def test_datadog_client_create_and_wait_for_monitor_polls_until_resource_exists
+    http = SequencedRoutingHttp.new(
+      '/api/v1/monitor' => [
+        FakeResponse.new('200', '{"id":456,"name":"monitor"}')
+      ],
+      '/api/v1/monitor/456' => [
+        FakeResponse.new('404', '{"errors":["not ready"]}'),
+        FakeResponse.new('200', '{"id":456,"name":"monitor"}')
+      ]
+    )
+    sleeps = []
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(seconds) { sleeps << seconds }
+    )
+
+    response = client.create_and_wait_monitor(name: 'monitor')
+
+    assert_equal 456, response.fetch('id')
+    assert_equal [0.2], sleeps
+  end
+
   private
 
   class FakeDatadogClient
-    attr_reader :requests, :existing_state_requests
+    attr_reader :requests, :existing_state_requests, :created_and_waited_slos, :created_and_waited_monitors
 
     def initialize(slos: {}, monitors: {}, dashboards: {})
       @state = { slos: slos, monitors: monitors, dashboards: dashboards }
       @requests = []
       @existing_state_requests = []
+      @created_and_waited_slos = []
+      @created_and_waited_monitors = []
     end
 
     def existing_state(desired: nil)
@@ -418,6 +519,16 @@ class DatadogApplyTest < Minitest::Test
       else
         { 'id' => "request-#{@requests.length}" }
       end
+    end
+
+    def create_and_wait_slo(payload)
+      @created_and_waited_slos << payload
+      request('POST', '/api/v1/slo', payload: payload)
+    end
+
+    def create_and_wait_monitor(payload)
+      @created_and_waited_monitors << payload
+      request('POST', '/api/v1/monitor', payload: payload)
     end
 
     def delete_slo(id, force: false)
@@ -494,6 +605,27 @@ class DatadogApplyTest < Minitest::Test
         raise "unexpected Datadog request path #{request.path}"
       end
       response
+    end
+  end
+
+  class SequencedRoutingHttp
+    def initialize(routes)
+      @routes = routes
+    end
+
+    def start(_host, _port, use_ssl:)
+      raise 'expected TLS for Datadog API' unless use_ssl
+
+      yield self
+    end
+
+    def request(request)
+      responses = @routes.fetch(request.path) do
+        raise "unexpected Datadog request path #{request.path}"
+      end
+      raise "no response left for Datadog request path #{request.path}" if responses.empty?
+
+      responses.shift
     end
   end
 
