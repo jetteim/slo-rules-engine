@@ -53,7 +53,7 @@ Provider state management follows a pipeline contract:
 - **Sinks:** live backend APIs, manifest bundles, external generator handoffs, and route catalogs.
 - **Findings:** unsupported fields, missing telemetry, missing backend state, unsafe mutation, and unavailable provider actions.
 
-Provider generation is a transform and must stay deterministic. Provider apply is a sink and must be isolated behind dry-run, confirmation, and provider-specific state-action support.
+Provider generation is a transform and must stay deterministic. Provider apply is a sink and must be isolated behind dry-run, confirmation, and provider-specific state-action support. Generated manifests and reviewed manifest inputs must validate against provider schema before diff, apply, import, or prune.
 
 ## Telemetry Evidence Contract
 
@@ -82,6 +82,8 @@ Do not use provider code to invent reliability policy. A provider may express re
 Providers receive reliability intent as input. They may render miss-policy, measurement caveats, playbook links, and dashboard variables into backend-specific artifacts, but objective selection and calculation-basis policy remain model decisions.
 
 Generation must not mutate live systems. Backend state changes must use explicit apply commands. Dry-run plans must be available before live mutation. Live mutation must require confirmation and must not store credentials.
+
+Provider contributors must extend schema validation for every new artifact collection they introduce. Reviewed manifest compatibility is part of the provider contract, not optional helper logic.
 
 ## Initial Providers
 

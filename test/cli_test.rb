@@ -245,6 +245,41 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_apply_datadog_dry_run_rejects_invalid_reviewed_manifest_schema
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+    manifest.fetch('artifacts').fetch('slos').fetch(0).fetch('query').delete('success_selector')
+
+    Tempfile.create(['datadog-invalid-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'apply',
+        '--provider=datadog',
+        '--dry-run',
+        "--manifest=#{file.path}"
+      )
+
+      refute status.success?, stderr
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'invalid_manifest_schema', payload.fetch('error').fetch('code')
+      assert payload.fetch('errors').any? do |error|
+        error.fetch('path') == 'artifacts.slos[0].query.success_selector'
+      end
+    end
+  end
+
   def test_apply_manifest_bundle_confirm_accepts_reviewed_manifest_input
     generate_stdout, generate_stderr, generate_status = Open3.capture3(
       'ruby',

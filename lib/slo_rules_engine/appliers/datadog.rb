@@ -57,6 +57,7 @@ module SloRulesEngine
       end
 
       def plan(manifest, mode: 'dry_run')
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         state = @client.existing_state(desired: desired_state(manifest))
         resolved_slo_ids = resolved_slo_ids_from_state(state)
         operations = ARTIFACTS.flat_map do |spec|
@@ -69,6 +70,7 @@ module SloRulesEngine
       end
 
       def diff(manifest)
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         state = @client.existing_state(desired: desired_state(manifest))
         resolved_slo_ids = fetch_value(state, :slos, {}).each_with_object({}) do |(name, entry), resolved|
           backend_id = fetch_value(entry, :id)
@@ -84,6 +86,7 @@ module SloRulesEngine
       end
 
       def import(manifest)
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
 
         ImportedState.new(
@@ -95,6 +98,7 @@ module SloRulesEngine
       end
 
       def prune(manifest, mode: 'dry_run')
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
         state = @client.existing_state(desired: desired_state(manifest))
         operations = prune_specs.flat_map do |spec|
@@ -113,6 +117,7 @@ module SloRulesEngine
       end
 
       def apply(manifest)
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
 
         plan(manifest, mode: 'live').tap do |apply_plan|

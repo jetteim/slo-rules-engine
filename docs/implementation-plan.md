@@ -43,7 +43,7 @@ This is the running plan for the long refactor.
 - [x] Add provider capability validation.
 - [x] Add provider route-source validation.
 - [x] Add generated provider manifest output directory.
-- [ ] Add provider artifact schemas for apply-ready outputs.
+- [x] Add provider artifact schemas for apply-ready outputs.
 - [x] Add provider query binding reality-check report.
 - [x] Add provider query/reality-check adapters.
 - [ ] Add real Datadog provider-schema payload translation and backend state import for create/update reconciliation.

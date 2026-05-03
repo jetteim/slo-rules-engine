@@ -31,7 +31,7 @@ class ApplyTest < Minitest::Test
   end
 
   def test_manifest_bundle_applier_plans_manifest_write
-    manifest = { provider: 'prometheus_stack', service: 'checkout-api', artifacts: { recording_rules: [] } }
+    manifest = valid_prometheus_manifest
     applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: '/tmp/generated')
 
     plan = applier.plan(manifest)
@@ -44,27 +44,22 @@ class ApplyTest < Minitest::Test
   end
 
   def test_manifest_bundle_diff_reports_update_when_existing_manifest_differs
-    manifest = {
-      provider: 'prometheus_stack',
-      service: 'checkout-api',
-      artifacts: {
-        recording_rules: [
-          { record: 'slo:checkout-api:availability', expr: 'new_expr' }
-        ]
-      }
-    }
+    manifest = valid_prometheus_manifest
+    manifest[:artifacts][:recording_rules] = [
+      { record: 'slo:checkout-api:availability', expr: 'new_expr', labels: { service: 'checkout-api' } }
+    ]
 
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'checkout-api', 'prometheus_stack', 'manifest.json')
       FileUtils.mkdir_p(File.dirname(path))
       File.write(path, JSON.pretty_generate(
-        provider: 'prometheus_stack',
-        service: 'checkout-api',
-        artifacts: {
-          recording_rules: [
-            { record: 'slo:checkout-api:availability', expr: 'old_expr' }
-          ]
-        }
+        valid_prometheus_manifest.merge(
+          artifacts: valid_prometheus_manifest[:artifacts].merge(
+            recording_rules: [
+              { record: 'slo:checkout-api:availability', expr: 'old_expr', labels: { service: 'checkout-api' } }
+            ]
+          )
+        )
       ))
 
       applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
@@ -78,7 +73,7 @@ class ApplyTest < Minitest::Test
   end
 
   def test_external_generator_plan_records_sloth_handoff
-    manifest = { provider: 'sloth', service: 'checkout-api', artifacts: { sloth_specs: [] } }
+    manifest = valid_sloth_manifest
     applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: '/tmp/generated')
 
     plan = applier.plan(manifest)
@@ -87,5 +82,32 @@ class ApplyTest < Minitest::Test
     assert_equal 'external_generator', plan.operations.fetch(1).target
     assert_includes plan.operations.fetch(1).payload.fetch(:command), 'sloth generate'
     assert_equal '/tmp/generated/checkout-api/sloth/manifest.json', plan.operations.fetch(1).payload.fetch(:input_manifest)
+  end
+
+  private
+
+  def valid_prometheus_manifest
+    {
+      provider: 'prometheus_stack',
+      service: 'checkout-api',
+      artifacts: {
+        recording_rules: [],
+        burn_rate_rules: [],
+        missing_telemetry_rules: [],
+        alert_rules: [],
+        alertmanager_routes: [],
+        grafana_dashboards: []
+      }
+    }
+  end
+
+  def valid_sloth_manifest
+    {
+      provider: 'sloth',
+      service: 'checkout-api',
+      artifacts: {
+        sloth_specs: []
+      }
+    }
   end
 end
