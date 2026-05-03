@@ -97,6 +97,7 @@ module RulesCtl
 
     provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
     mode = confirm && !dry_run ? 'live' : 'dry_run'
+    abort_usage('live apply requires --manifest reviewed manifest input') if mode == 'live' && manifest_path.to_s.empty?
     manifests = resolve_state_manifests(argv, provider, manifest_path)
     if provider.key == 'datadog'
       applier = SloRulesEngine::Appliers::Datadog.new

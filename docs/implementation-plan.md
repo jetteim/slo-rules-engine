@@ -62,4 +62,4 @@ This is the running plan for the long refactor.
 ## Phase 5: Contract Hardening
 
 - [ ] Enforce provider capability metadata against the documented provider contract.
-- [ ] Separate reviewed manifest input from in-process regeneration during backend mutation workflows.
+- [x] Separate reviewed manifest input from in-process regeneration during backend mutation workflows.

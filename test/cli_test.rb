@@ -103,8 +103,40 @@ class CLITest < Minitest::Test
   end
 
   def test_apply_datadog_confirm_requires_credentials
-    stdout, stderr, status = Open3.capture3(
-      { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+
+    Tempfile.create(['datadog-live-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'apply',
+        '--provider=datadog',
+        '--confirm',
+        "--manifest=#{file.path}"
+      )
+
+      refute status.success?, stderr
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'datadog', payload.fetch('provider')
+      assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+    end
+  end
+
+  def test_apply_confirm_requires_reviewed_manifest_input
+    _stdout, stderr, status = Open3.capture3(
       'ruby',
       "#{ROOT}/bin/rules-ctl",
       'apply',
@@ -113,11 +145,8 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
 
-    refute status.success?, stderr
-    payload = JSON.parse(stdout)
-    assert_equal false, payload.fetch('valid')
-    assert_equal 'datadog', payload.fetch('provider')
-    assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+    refute status.success?
+    assert_includes stderr, 'live apply requires --manifest'
   end
 
   def test_apply_manifest_bundle_dry_run_outputs_plan_without_writing_file
@@ -145,27 +174,42 @@ class CLITest < Minitest::Test
   end
 
   def test_apply_manifest_bundle_confirm_writes_manifest_file
-    Dir.mktmpdir do |dir|
-      stdout, stderr, status = Open3.capture3(
-        'ruby',
-        "#{ROOT}/bin/rules-ctl",
-        'apply',
-        '--provider=sloth',
-        '--confirm',
-        "--output-dir=#{dir}",
-        "#{ROOT}/examples/services/checkout.rb"
-      )
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=sloth',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
 
-      assert status.success?, stderr
-      payload = JSON.parse(stdout).fetch(0)
-      manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
-      assert_equal 'sloth', payload.fetch('provider')
-      assert_equal 'live', payload.fetch('mode')
-      assert_equal %w[write handoff], payload.fetch('operations').map { |operation| operation.fetch('action') }
-      assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
-      manifest = JSON.parse(File.read(manifest_path))
-      assert_equal 'checkout-api', manifest.fetch('service')
-      assert_equal 'sloth', manifest.fetch('provider')
+    Tempfile.create(['sloth-live-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'apply',
+          '--provider=sloth',
+          '--confirm',
+          "--output-dir=#{dir}",
+          "--manifest=#{file.path}"
+        )
+
+        assert status.success?, stderr
+        payload = JSON.parse(stdout).fetch(0)
+        manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+        assert_equal 'sloth', payload.fetch('provider')
+        assert_equal 'live', payload.fetch('mode')
+        assert_equal %w[write handoff], payload.fetch('operations').map { |operation| operation.fetch('action') }
+        assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
+        manifest = JSON.parse(File.read(manifest_path))
+        assert_equal 'checkout-api', manifest.fetch('service')
+        assert_equal 'sloth', manifest.fetch('provider')
+      end
     end
   end
 
