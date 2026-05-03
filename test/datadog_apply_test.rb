@@ -88,6 +88,28 @@ class DatadogApplyTest < Minitest::Test
     assert_equal [], plan.operations.fetch(0).changes
   end
 
+  def test_datadog_applier_import_returns_existing_backend_state
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    dashboard_name = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      slos: { slo_name => { id: 'slo-123', payload: { type: 'metric' } } },
+      monitors: { monitor_name => { id: 456, payload: { type: 'slo alert' } } },
+      dashboards: { dashboard_name => { id: 'dashboard-123', payload: { layout_type: 'ordered' } } }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    imported = applier.import(@manifest)
+
+    assert_equal 'datadog', imported.provider
+    assert_equal 'checkout-api', imported.service
+    assert_equal 'backend_api', imported.source
+    assert_equal 'slo-123', imported.state.fetch(:slos).fetch(slo_name).fetch(:id)
+    assert_equal [slo_name], client.existing_state_requests.fetch(0).fetch(:slos)
+    assert_equal [monitor_name, @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)],
+                 client.existing_state_requests.fetch(0).fetch(:monitors)
+  end
+
   def test_datadog_apply_translates_payloads_and_resolves_slo_ids_for_monitors
     client = FakeDatadogClient.new
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)

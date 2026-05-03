@@ -48,6 +48,25 @@ module SloRulesEngine
     end
   end
 
+  ImportedState = Struct.new(:provider, :service, :mode, :source, :state, :findings, keyword_init: true) do
+    def initialize(**kwargs)
+      super
+      self.mode ||= 'import_existing'
+      self.findings ||= []
+    end
+
+    def to_h
+      {
+        provider: provider,
+        service: service,
+        mode: mode,
+        source: source,
+        state: state,
+        findings: findings
+      }
+    end
+  end
+
   module StateDiff
     module_function
 

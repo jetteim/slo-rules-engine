@@ -322,6 +322,58 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_import_datadog_requires_credentials
+    stdout, stderr, status = Open3.capture3(
+      { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'import',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+
+    refute status.success?, stderr
+    payload = JSON.parse(stdout)
+    assert_equal false, payload.fetch('valid')
+    assert_equal 'datadog', payload.fetch('provider')
+    assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+  end
+
+  def test_import_manifest_bundle_reads_existing_manifest_file
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=sloth',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+
+    Dir.mktmpdir do |dir|
+      manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(manifest_path))
+      File.write(manifest_path, JSON.pretty_generate(manifest))
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'import',
+        '--provider=sloth',
+        "--output-dir=#{dir}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout).fetch(0)
+      assert_equal 'sloth', payload.fetch('provider')
+      assert_equal 'import_existing', payload.fetch('mode')
+      assert_equal 'manifest_file', payload.fetch('source')
+      assert_equal 'checkout-api', payload.fetch('state').fetch('service')
+      assert_equal [], payload.fetch('findings')
+    end
+  end
+
   def test_lookup_telemetry_datadog_requires_credentials
     stdout, stderr, status = Open3.capture3(
       { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },

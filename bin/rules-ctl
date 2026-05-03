@@ -21,6 +21,8 @@ module RulesCtl
       apply(argv)
     when 'diff'
       diff(argv)
+    when 'import'
+      import_existing(argv)
     when 'lookup-telemetry'
       lookup_telemetry(argv)
     when 'discover-telemetry'
@@ -199,6 +201,64 @@ module RulesCtl
       automation_mode: provider&.automation_mode,
       state_actions: provider&.state_actions || [],
       mode: 'diff',
+      output_dir: output_dir,
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def import_existing(argv)
+    provider_key = nil
+    output_dir = nil
+    manifest_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider import') { |value| output_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to import against instead of regenerating from definitions') { |value| manifest_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    if provider.key == 'datadog'
+      applier = SloRulesEngine::Appliers::Datadog.new
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.import(manifest).to_h })
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: output_dir)
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.import(manifest).to_h })
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have an import adapter yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'import_existing',
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'import_existing',
       output_dir: output_dir,
       error: {
         code: 'unsupported_apply_action',
@@ -569,6 +629,7 @@ module RulesCtl
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
+        bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl discover-telemetry --provider=<provider> [--service=<service>] [--selector=key=value] [--base-url=<url>]
         bin/rules-ctl providers list
         bin/rules-ctl integrations list

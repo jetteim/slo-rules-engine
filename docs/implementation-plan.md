@@ -55,7 +55,9 @@ This is the running plan for the long refactor.
 - [x] Add old-DSL compatibility report.
 - [ ] Add anonymization helper for examples.
 - [x] Add reviewed manifest input path for apply workflows.
-- [ ] Add explicit diff, import, and prune commands.
+- [x] Add explicit diff command.
+- [x] Add explicit import command.
+- [ ] Add explicit prune command.
 - [x] Add generated artifact diff harness.
 - [ ] Add import guidance for existing service files.
 
