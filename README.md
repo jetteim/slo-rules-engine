@@ -78,14 +78,17 @@ bin/rules-ctl apply --provider datadog --dry-run examples/services/checkout.rb
 bin/rules-ctl apply --provider datadog --dry-run --manifest ./generated/checkout-api/datadog/manifest.json
 bin/rules-ctl diff --provider datadog --manifest ./generated/checkout-api/datadog/manifest.json
 bin/rules-ctl import --provider datadog --manifest ./generated/checkout-api/datadog/manifest.json
+bin/rules-ctl prune --provider datadog --dry-run --manifest ./generated/checkout-api/datadog/manifest.json
 bin/rules-ctl apply --provider prometheus_stack --dry-run --output-dir ./generated examples/services/checkout.rb
 bin/rules-ctl apply --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
 bin/rules-ctl diff --provider prometheus_stack --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
 bin/rules-ctl import --provider prometheus_stack --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
+bin/rules-ctl prune --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
 bin/rules-ctl apply --provider sloth --dry-run --output-dir ./generated examples/services/checkout.rb
 bin/rules-ctl apply --provider sloth --confirm --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl diff --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl import --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
+bin/rules-ctl prune --provider sloth --confirm --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl migration-report path/to/legacy/service-definition.rb
 bin/rules-ctl model-report examples/services/checkout.rb
 bin/rules-ctl providers list
@@ -95,8 +98,10 @@ bin/rules-ctl integrations list
 The `candidates` and `draft-definition` commands accept either a raw telemetry signal array or a normalized provider evidence envelope with `provider`, `signals`, and `findings`.
 
 Confirmed `apply` now requires `--manifest` so live state changes always use reviewed provider artifacts instead of regenerating definitions inline.
+Confirmed `prune` now requires `--manifest` so destructive state removal is also tied to reviewed provider artifacts.
 The `apply` command accepts either definition files or a reviewed provider manifest through `--manifest`.
 The `diff` command accepts the same reviewed manifest input and compares desired artifacts to observed provider state before mutation.
+The `import` and `prune` commands accept the same reviewed manifest input; Datadog prune treats already-missing resources as success.
 
 ## Development
 

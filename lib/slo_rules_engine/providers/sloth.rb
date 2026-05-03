@@ -18,7 +18,7 @@ module SloRulesEngine
             apply_plan
           ],
           automation_mode: 'external_generator',
-          state_actions: %w[plan apply diff import_existing]
+          state_actions: %w[plan apply diff import_existing prune]
         )
       end
 

@@ -7,7 +7,14 @@ require 'uri'
 module SloRulesEngine
   module Datadog
     class MissingCredentials < StandardError; end
-    class ApiError < StandardError; end
+    class ApiError < StandardError
+      attr_reader :response
+
+      def initialize(message, response: nil)
+        @response = response
+        super(message)
+      end
+    end
 
     class Client
       MANAGED_MONITOR_TAG = 'managed_by:slo-rules-engine'
@@ -44,20 +51,42 @@ module SloRulesEngine
         }
       end
 
-      def request(method, path, payload: nil, retries: 3)
+      def request(method, path, payload: nil, retries: 3, not_found_ok: false)
         validate_credentials!
         uri = uri_for(path)
         attempt = 0
+        transport_attempt = 0
 
         loop do
-          attempt += 1
           response = perform(method.to_s.upcase, uri, payload)
+          transport_attempt = 0
           return parse_body(response.body) if SUCCESS_CODES.include?(response.code)
+          return nil if not_found_ok && response.code == '404'
 
-          raise ApiError, "Datadog #{method} #{path} failed with #{response.code}: #{response.body}" unless transient?(response, attempt, retries)
+          attempt += 1
+          raise ApiError.new("Datadog #{method} #{path} failed with #{response.code}: #{response.body}", response: response) unless transient?(response, attempt, retries)
 
           @sleep_fn.call(retry_after(response))
         end
+      rescue Errno::ECONNRESET
+        transport_attempt += 1
+        raise if transport_attempt > retries
+
+        @sleep_fn.call(transport_retry_delay(transport_attempt))
+        retry
+      end
+
+      def delete_slo(id, force: false)
+        query = force ? '?force=true' : ''
+        request('DELETE', "/api/v1/slo/#{id}#{query}", not_found_ok: true)
+      end
+
+      def delete_monitor(id)
+        request('DELETE', "/api/v1/monitor/#{id}", not_found_ok: true)
+      end
+
+      def delete_dashboard(id)
+        request('DELETE', "/api/v1/dashboard/#{id}", not_found_ok: true)
       end
 
       private
@@ -169,10 +198,16 @@ module SloRulesEngine
       end
 
       def retry_after(response)
+        return 60 if %w[500 502 503 504].include?(response.code)
+
         retry_after = response['Retry-After'].to_i
         rate_limit_reset = response['X-RateLimit-Reset'].to_i
         rate_limit_period = response['X-RateLimit-Period'].to_i
         [retry_after, rate_limit_reset, rate_limit_period, 1].max
+      end
+
+      def transport_retry_delay(attempt)
+        (2**attempt) / 1000.0
       end
 
       def parse_body(body)
