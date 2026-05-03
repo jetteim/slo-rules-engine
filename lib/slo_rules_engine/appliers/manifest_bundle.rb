@@ -69,6 +69,20 @@ module SloRulesEngine
         )
       end
 
+      def import(manifest)
+        path = manifest_path(manifest)
+        actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
+        findings = actual.nil? ? [missing_manifest_finding(path)] : []
+
+        ImportedState.new(
+          provider: manifest.fetch(:provider),
+          service: manifest.fetch(:service),
+          source: 'manifest_file',
+          state: actual,
+          findings: findings
+        )
+      end
+
       private
 
       def manifest_path(manifest)
@@ -90,6 +104,14 @@ module SloRulesEngine
             review_required: true
           }
         )
+      end
+
+      def missing_manifest_finding(path)
+        {
+          code: 'missing_managed_manifest',
+          path: path,
+          message: "managed manifest does not exist at #{path}"
+        }
       end
     end
   end

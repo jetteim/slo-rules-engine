@@ -18,7 +18,7 @@ module SloRulesEngine
             apply_plan
           ],
           automation_mode: 'live_api',
-          state_actions: %w[plan apply diff]
+          state_actions: %w[plan apply diff import_existing]
         )
       end
 

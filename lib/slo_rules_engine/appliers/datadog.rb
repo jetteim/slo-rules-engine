@@ -76,6 +76,17 @@ module SloRulesEngine
         ApplyPlan.new(provider: 'datadog', mode: 'diff', operations: operations)
       end
 
+      def import(manifest)
+        @client.validate_credentials!
+
+        ImportedState.new(
+          provider: 'datadog',
+          service: manifest.fetch(:service),
+          source: 'backend_api',
+          state: @client.existing_state(desired: desired_state(manifest))
+        )
+      end
+
       def apply(manifest)
         @client.validate_credentials!
 
