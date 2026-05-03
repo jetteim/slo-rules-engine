@@ -23,6 +23,8 @@ module RulesCtl
       diff(argv)
     when 'import'
       import_existing(argv)
+    when 'prune'
+      prune(argv)
     when 'lookup-telemetry'
       lookup_telemetry(argv)
     when 'discover-telemetry'
@@ -259,6 +261,76 @@ module RulesCtl
       automation_mode: provider&.automation_mode,
       state_actions: provider&.state_actions || [],
       mode: 'import_existing',
+      output_dir: output_dir,
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def prune(argv)
+    provider_key = nil
+    dry_run = false
+    confirm = false
+    output_dir = nil
+    manifest_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--dry-run', 'Plan prune without mutating backend state') { dry_run = true }
+      opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider prune') { |value| output_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to prune instead of regenerating from definitions') { |value| manifest_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    mode = confirm && !dry_run ? 'live' : 'dry_run'
+    abort_usage('live prune requires --manifest reviewed manifest input') if mode == 'live' && manifest_path.to_s.empty?
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    if provider.key == 'datadog'
+      applier = SloRulesEngine::Appliers::Datadog.new
+      plans = manifests.map do |manifest|
+        applier.prune(manifest, mode: mode)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: output_dir)
+      plans = manifests.map do |manifest|
+        applier.prune(manifest, mode: mode)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have a prune adapter yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
       output_dir: output_dir,
       error: {
         code: 'unsupported_apply_action',
@@ -630,6 +702,7 @@ module RulesCtl
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
+        bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl discover-telemetry --provider=<provider> [--service=<service>] [--selector=key=value] [--base-url=<url>]
         bin/rules-ctl providers list
         bin/rules-ctl integrations list

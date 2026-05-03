@@ -110,6 +110,49 @@ class DatadogApplyTest < Minitest::Test
                  client.existing_state_requests.fetch(0).fetch(:monitors)
   end
 
+  def test_datadog_applier_prune_plans_delete_operations_for_existing_state
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_name = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      slos: { slo_name => { id: 'slo-123' } },
+      monitors: { monitor_name => { id: 456 }, gap_monitor_name => { id: 789 } },
+      dashboards: { dashboard_name => { id: 'dashboard-123' } }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.prune(@manifest)
+
+    assert_equal 'dry_run', plan.mode
+    assert_equal %w[delete delete delete delete], plan.operations.map(&:action)
+    assert_equal ['datadog.monitor', 'datadog.monitor', 'datadog.dashboard', 'datadog.slo'], plan.operations.map(&:target)
+    assert_equal [456, 789, 'dashboard-123', 'slo-123'], plan.operations.map(&:backend_id)
+  end
+
+  def test_datadog_applier_prune_deletes_existing_resources
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_name = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      slos: { slo_name => { id: 'slo-123' } },
+      monitors: { monitor_name => { id: 456 }, gap_monitor_name => { id: 789 } },
+      dashboards: { dashboard_name => { id: 'dashboard-123' } }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.prune(@manifest, mode: 'live')
+
+    assert_equal 'live', plan.mode
+    assert_equal [
+      ['DELETE', '/api/v1/monitor/456'],
+      ['DELETE', '/api/v1/monitor/789'],
+      ['DELETE', '/api/v1/dashboard/dashboard-123'],
+      ['DELETE', '/api/v1/slo/slo-123?force=true']
+    ], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
+  end
+
   def test_datadog_apply_translates_payloads_and_resolves_slo_ids_for_monitors
     client = FakeDatadogClient.new
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)
@@ -273,6 +316,76 @@ class DatadogApplyTest < Minitest::Test
     assert_equal [11], sleeps
   end
 
+  def test_datadog_client_uses_60_second_delay_for_transient_server_errors_without_headers
+    http = RetryHttp.new([
+      FakeResponse.new('500', '{"errors":["backend failed"]}'),
+      FakeResponse.new('200', '{"ok":true}')
+    ])
+    sleeps = []
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(seconds) { sleeps << seconds }
+    )
+
+    client.request('GET', '/api/v1/query?from=1&to=2&query=up', retries: 2)
+
+    assert_equal [60], sleeps
+  end
+
+  def test_datadog_client_retries_connection_reset
+    http = ConnectionResetHttp.new([
+      Errno::ECONNRESET,
+      FakeResponse.new('200', '{"ok":true}')
+    ])
+    sleeps = []
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(seconds) { sleeps << seconds }
+    )
+
+    response = client.request('GET', '/api/v1/query?from=1&to=2&query=up', retries: 2)
+
+    assert_equal({ 'ok' => true }, response)
+    assert_equal 2, http.request_count
+    assert_operator sleeps.fetch(0), :>, 0
+  end
+
+  def test_datadog_client_delete_slo_uses_force_query_and_ignores_not_found
+    http = RoutingHttp.new(
+      '/api/v1/slo/slo-123?force=true' => FakeResponse.new('404', '{"errors":["not found"]}')
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    result = client.delete_slo('slo-123', force: true)
+
+    assert_nil result
+  end
+
+  def test_datadog_client_delete_monitor_ignores_not_found
+    http = RoutingHttp.new(
+      '/api/v1/monitor/456' => FakeResponse.new('404', '{"errors":["not found"]}')
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    result = client.delete_monitor(456)
+
+    assert_nil result
+  end
+
   private
 
   class FakeDatadogClient
@@ -306,6 +419,19 @@ class DatadogApplyTest < Minitest::Test
         { 'id' => "request-#{@requests.length}" }
       end
     end
+
+    def delete_slo(id, force: false)
+      path = force ? "/api/v1/slo/#{id}?force=true" : "/api/v1/slo/#{id}"
+      request('DELETE', path)
+    end
+
+    def delete_monitor(id)
+      request('DELETE', "/api/v1/monitor/#{id}")
+    end
+
+    def delete_dashboard(id)
+      request('DELETE', "/api/v1/dashboard/#{id}")
+    end
   end
 
   class RetryHttp
@@ -325,6 +451,30 @@ class DatadogApplyTest < Minitest::Test
     def request(request)
       @requests << request
       @responses.shift
+    end
+  end
+
+  class ConnectionResetHttp
+    attr_reader :request_count
+
+    def initialize(responses)
+      @responses = responses
+      @request_count = 0
+    end
+
+    def start(_host, _port, use_ssl:)
+      raise 'expected TLS for Datadog API' unless use_ssl
+
+      yield self
+    end
+
+    def request(_request)
+      @request_count += 1
+      response = @responses.shift
+      raise response if response.is_a?(Class) && response <= SystemCallError
+      raise response if response.is_a?(Exception)
+
+      response
     end
   end
 

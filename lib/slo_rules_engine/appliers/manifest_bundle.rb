@@ -83,6 +83,28 @@ module SloRulesEngine
         )
       end
 
+      def prune(manifest, mode: 'dry_run')
+        path = manifest_path(manifest)
+        exists = File.exist?(path)
+        operation = ApplyOperation.new(
+          action: exists ? 'delete' : 'noop',
+          target: 'manifest_file',
+          name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
+          source: 'manifest',
+          payload: { path: path }
+        )
+
+        ApplyPlan.new(
+          provider: manifest.fetch(:provider),
+          mode: mode,
+          operations: [operation]
+        ).tap do |plan|
+          next unless mode == 'live' && exists
+
+          File.delete(path)
+        end
+      end
+
       private
 
       def manifest_path(manifest)

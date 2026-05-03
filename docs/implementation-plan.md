@@ -57,7 +57,7 @@ This is the running plan for the long refactor.
 - [x] Add reviewed manifest input path for apply workflows.
 - [x] Add explicit diff command.
 - [x] Add explicit import command.
-- [ ] Add explicit prune command.
+- [x] Add explicit prune command.
 - [x] Add generated artifact diff harness.
 - [ ] Add import guidance for existing service files.
 

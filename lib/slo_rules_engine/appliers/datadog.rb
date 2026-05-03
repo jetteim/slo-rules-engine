@@ -18,7 +18,8 @@ module SloRulesEngine
           target: 'datadog.slo',
           source_prefix: 'artifacts.slos',
           create: ['POST', '/api/v1/slo'],
-          update: ['PUT', '/api/v1/slo/%<id>s']
+          update: ['PUT', '/api/v1/slo/%<id>s'],
+          delete: ['DELETE', '/api/v1/slo/%<id>s']
         },
         {
           collection: :monitors,
@@ -26,7 +27,8 @@ module SloRulesEngine
           target: 'datadog.monitor',
           source_prefix: 'artifacts.monitors',
           create: ['POST', '/api/v1/monitor'],
-          update: ['PUT', '/api/v1/monitor/%<id>s']
+          update: ['PUT', '/api/v1/monitor/%<id>s'],
+          delete: ['DELETE', '/api/v1/monitor/%<id>s']
         },
         {
           collection: :telemetry_gap_monitors,
@@ -34,7 +36,8 @@ module SloRulesEngine
           target: 'datadog.monitor',
           source_prefix: 'artifacts.telemetry_gap_monitors',
           create: ['POST', '/api/v1/monitor'],
-          update: ['PUT', '/api/v1/monitor/%<id>s']
+          update: ['PUT', '/api/v1/monitor/%<id>s'],
+          delete: ['DELETE', '/api/v1/monitor/%<id>s']
         },
         {
           collection: :dashboards,
@@ -42,9 +45,12 @@ module SloRulesEngine
           target: 'datadog.dashboard',
           source_prefix: 'artifacts.dashboards',
           create: ['POST', '/api/v1/dashboard'],
-          update: ['PUT', '/api/v1/dashboard/%<id>s']
+          update: ['PUT', '/api/v1/dashboard/%<id>s'],
+          delete: ['DELETE', '/api/v1/dashboard/%<id>s']
         }
       ].freeze
+
+      PRUNE_ORDER = %i[monitors telemetry_gap_monitors dashboards slos].freeze
 
       def initialize(client: SloRulesEngine::Datadog::Client.new)
         @client = client
@@ -85,6 +91,24 @@ module SloRulesEngine
           source: 'backend_api',
           state: @client.existing_state(desired: desired_state(manifest))
         )
+      end
+
+      def prune(manifest, mode: 'dry_run')
+        @client.validate_credentials!
+        state = @client.existing_state(desired: desired_state(manifest))
+        operations = prune_specs.flat_map do |spec|
+          collection(manifest, spec.fetch(:collection)).each_with_index.map do |artifact, index|
+            prune_operation_for(artifact, index, spec, state)
+          end.compact
+        end
+
+        ApplyPlan.new(provider: 'datadog', mode: mode, operations: operations).tap do |plan|
+          next unless mode == 'live'
+
+          plan.operations.each do |operation|
+            prune_operation(operation)
+          end
+        end
       end
 
       def apply(manifest)
@@ -195,10 +219,53 @@ module SloRulesEngine
 
       def request_target(operation)
         spec = ARTIFACTS.find { |candidate| candidate.fetch(:target) == operation.target }
-        endpoint = operation.action == 'update' ? spec.fetch(:update) : spec.fetch(:create)
+        endpoint = case operation.action
+                   when 'create'
+                     spec.fetch(:create)
+                   when 'update'
+                     spec.fetch(:update)
+                   when 'delete'
+                     spec.fetch(:delete)
+                   else
+                     spec.fetch(:create)
+                   end
         method = endpoint.fetch(0)
         path_template = endpoint.fetch(1)
         [method, format(path_template, id: operation.backend_id)]
+      end
+
+      def prune_specs
+        PRUNE_ORDER.map do |collection_key|
+          ARTIFACTS.find { |spec| spec.fetch(:collection) == collection_key }
+        end
+      end
+
+      def prune_operation_for(artifact, index, spec, state)
+        source = "#{spec.fetch(:source_prefix)}[#{index}]"
+        name = artifact_name(artifact, spec.fetch(:target), index)
+        backend_id = backend_id_for(state, spec.fetch(:state), name)
+        return unless backend_id
+
+        ApplyOperation.new(
+          action: 'delete',
+          target: spec.fetch(:target),
+          name: name,
+          source: source,
+          backend_id: backend_id
+        )
+      end
+
+      def prune_operation(operation)
+        case operation.target
+        when 'datadog.slo'
+          @client.delete_slo(operation.backend_id, force: true)
+        when 'datadog.monitor'
+          @client.delete_monitor(operation.backend_id)
+        when 'datadog.dashboard'
+          @client.delete_dashboard(operation.backend_id)
+        else
+          raise SloRulesEngine::UnsupportedApplyAction, "unsupported Datadog prune target #{operation.target.inspect}"
+        end
       end
 
       def desired_state(manifest)
