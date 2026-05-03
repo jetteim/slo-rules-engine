@@ -590,34 +590,7 @@ module SloRulesEngine
       end
 
       def comparable_payload(target, payload)
-        case target
-        when 'datadog.slo'
-          normalize_hash(payload) do |hash|
-            hash[:tags] = Array(fetch_value(hash, :tags, [])).map(&:to_s).sort
-            hash[:thresholds] = Array(fetch_value(hash, :thresholds, [])).map do |entry|
-              normalize_hash(entry)
-            end
-          end
-        when 'datadog.monitor'
-          normalize_hash(payload) do |hash|
-            hash[:tags] = Array(fetch_value(hash, :tags, [])).map(&:to_s).sort
-            options = normalize_hash(fetch_value(hash, :options, {}))
-            thresholds = normalize_hash(fetch_value(options, :thresholds, {}))
-            options[:thresholds] = thresholds
-            hash[:options] = options
-          end
-        when 'datadog.dashboard'
-          normalize_hash(payload) do |hash|
-            hash[:template_variables] = Array(fetch_value(hash, :template_variables, [])).map do |entry|
-              normalize_hash(entry)
-            end.sort_by { |entry| fetch_value(entry, :name).to_s }
-            hash[:widgets] = Array(fetch_value(hash, :widgets, [])).map do |entry|
-              normalize_hash(entry)
-            end
-          end
-        else
-          normalize_hash(payload)
-        end
+        SloRulesEngine::Datadog::PayloadCanonicalizer.canonicalize(target, payload)
       end
 
       def recreate_monitor?(manifest, artifact, spec, source, name, state, resolved_slo_ids)
@@ -631,21 +604,6 @@ module SloRulesEngine
         return false if actual_query.to_s.empty?
 
         !actual_query.include?(%("#{current_slo_id}"))
-      end
-
-      def normalize_hash(value, &block)
-        case value
-        when Hash
-          normalized = value.each_with_object({}) do |(key, entry), hash|
-            hash[key.to_sym] = normalize_hash(entry)
-          end
-          block.call(normalized) if block
-          normalized
-        when Array
-          value.map { |entry| normalize_hash(entry) }
-        else
-          value
-        end
       end
 
       def fetch_value(hash, key, default = nil)
