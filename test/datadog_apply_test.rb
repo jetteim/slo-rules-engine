@@ -70,6 +70,20 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 456, plan.operations.fetch(1).backend_id
   end
 
+  def test_datadog_applier_rejects_invalid_manifest_schema
+    manifest = Marshal.load(Marshal.dump(@manifest))
+    manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:query).delete(:success_selector)
+    applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new)
+
+    error = assert_raises(SloRulesEngine::ManifestSchemaError) do
+      applier.plan(manifest)
+    end
+
+    assert error.result.errors.any? do |entry|
+      entry.path == 'artifacts.slos[0].query.success_selector' && entry.message == 'is required'
+    end
+  end
+
   def test_datadog_applier_diff_reports_noop_when_payloads_match
     seed_applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new)
     desired_operations = seed_applier.plan(@manifest).operations

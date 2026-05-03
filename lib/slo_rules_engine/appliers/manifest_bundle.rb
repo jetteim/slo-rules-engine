@@ -10,6 +10,7 @@ module SloRulesEngine
       end
 
       def plan(manifest, mode: 'dry_run')
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         operations = [
           ApplyOperation.new(
             action: 'write',
@@ -29,6 +30,7 @@ module SloRulesEngine
       end
 
       def apply(manifest)
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         plan(manifest, mode: 'live').tap do |apply_plan|
           apply_plan.operations.each do |operation|
             next unless operation.action == 'write'
@@ -41,6 +43,7 @@ module SloRulesEngine
       end
 
       def diff(manifest)
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         path = manifest_path(manifest)
         actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
         changes = actual ? SloRulesEngine::StateDiff.changed_paths(manifest, actual) : ['manifest']
@@ -70,6 +73,7 @@ module SloRulesEngine
       end
 
       def import(manifest)
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         path = manifest_path(manifest)
         actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
         findings = actual.nil? ? [missing_manifest_finding(path)] : []
@@ -84,6 +88,7 @@ module SloRulesEngine
       end
 
       def prune(manifest, mode: 'dry_run')
+        manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         path = manifest_path(manifest)
         exists = File.exist?(path)
         operation = ApplyOperation.new(

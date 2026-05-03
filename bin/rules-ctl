@@ -79,8 +79,11 @@ module RulesCtl
       exit 1
     end
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    validate_manifests!(manifests)
     write_provider_manifests(output_dir, manifests) if output_dir
     puts JSON.pretty_generate(manifests)
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'generate', error: error)
   end
 
   def apply(argv)
@@ -137,6 +140,8 @@ module RulesCtl
       }
     )
     exit 1
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
   rescue SloRulesEngine::UnsupportedApplyAction => error
     puts JSON.pretty_generate(
       valid: false,
@@ -196,6 +201,8 @@ module RulesCtl
       }
     )
     exit 1
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'diff', error: error)
   rescue SloRulesEngine::UnsupportedApplyAction => error
     puts JSON.pretty_generate(
       valid: false,
@@ -254,6 +261,8 @@ module RulesCtl
       }
     )
     exit 1
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'import_existing', error: error)
   rescue SloRulesEngine::UnsupportedApplyAction => error
     puts JSON.pretty_generate(
       valid: false,
@@ -324,6 +333,8 @@ module RulesCtl
       }
     )
     exit 1
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
   rescue SloRulesEngine::UnsupportedApplyAction => error
     puts JSON.pretty_generate(
       valid: false,
@@ -613,6 +624,7 @@ module RulesCtl
       manifest_provider = manifest.fetch(:provider) { manifest.fetch('provider', nil) }
       abort_usage("manifest provider mismatch: #{manifest_provider.inspect}") unless manifest_provider == provider.key
     end
+    validate_manifests!(manifests)
     manifests
   end
 
@@ -628,7 +640,9 @@ module RulesCtl
       puts JSON.pretty_generate(validation)
       exit 1
     end
-    definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    validate_manifests!(manifests)
+    manifests
   end
 
   def telemetry_signals_from_file(path)
@@ -691,6 +705,27 @@ module RulesCtl
       FileUtils.mkdir_p(File.dirname(path))
       File.write(path, JSON.pretty_generate(manifest))
     end
+  end
+
+  def validate_manifests!(manifests)
+    Array(manifests).each { |manifest| SloRulesEngine::ManifestSchemaValidator.validate!(manifest) }
+  end
+
+  def render_manifest_schema_error(provider:, provider_key:, mode:, error:)
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'invalid_manifest_schema',
+        message: error.message
+      },
+      errors: error.result.errors.map(&:to_h),
+      warnings: error.result.warnings.map(&:to_h)
+    )
+    exit 1
   end
 
   def abort_usage(message = nil)
