@@ -43,6 +43,35 @@ class ProvidersTest < Minitest::Test
     assert_includes providers.fetch('sloth').fetch(:state_actions), 'prune'
   end
 
+  def test_provider_contract_requires_required_capabilities_for_non_manifest_only_providers
+    error = assert_raises(SloRulesEngine::ProviderContractError) do
+      SloRulesEngine::Provider.new(
+        key: 'broken',
+        capabilities: %w[sli_query_binding slo_evaluation],
+        automation_mode: 'live_api',
+        state_actions: %w[plan apply diff import_existing prune]
+      )
+    end
+
+    assert_includes error.message, 'missing required capabilities'
+    assert_includes error.message, 'apply_plan'
+  end
+
+  def test_provider_contract_requires_all_state_actions_for_non_manifest_only_providers
+    error = assert_raises(SloRulesEngine::ProviderContractError) do
+      SloRulesEngine::Provider.new(
+        key: 'broken',
+        capabilities: production_capabilities,
+        automation_mode: 'live_api',
+        state_actions: %w[plan apply]
+      )
+    end
+
+    assert_includes error.message, 'missing required state actions'
+    assert_includes error.message, 'diff'
+    assert_includes error.message, 'prune'
+  end
+
   def test_datadog_provider_generates_slo_monitor_and_dashboard
     manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h
 
@@ -105,5 +134,21 @@ class ProvidersTest < Minitest::Test
 
     refute result.valid?
     assert result.errors.any? { |error| error.path == 'notification_routes' && error.message.include?('datadog') }
+  end
+
+  private
+
+  def production_capabilities
+    %w[
+      sli_query_binding
+      slo_evaluation
+      burn_rate_alerting
+      missing_telemetry_detection
+      contextual_alerts
+      notification_router_integration
+      parameterized_dashboards
+      reality_check
+      apply_plan
+    ]
   end
 end
