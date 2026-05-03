@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module SloRulesEngine
+  class ProviderContractError < StandardError; end
+
   class ProviderRegistry
     def initialize
       @providers = {}
@@ -20,13 +22,28 @@ module SloRulesEngine
   end
 
   class Provider
+    REQUIRED_CAPABILITIES = %w[
+      sli_query_binding
+      slo_evaluation
+      burn_rate_alerting
+      missing_telemetry_detection
+      contextual_alerts
+      notification_router_integration
+      parameterized_dashboards
+      reality_check
+      apply_plan
+    ].freeze
+    VALID_AUTOMATION_MODES = %w[live_api manifest_bundle external_generator manifest_only].freeze
+    REQUIRED_STATE_ACTIONS = %w[plan apply diff import_existing prune].freeze
+
     attr_reader :key, :capabilities, :automation_mode, :state_actions
 
     def initialize(key:, capabilities:, automation_mode: 'manifest_only', state_actions: [])
       @key = key
-      @capabilities = capabilities
-      @automation_mode = automation_mode
-      @state_actions = state_actions
+      @capabilities = Array(capabilities).map(&:to_s).uniq
+      @automation_mode = automation_mode.to_s
+      @state_actions = Array(state_actions).map(&:to_s).uniq
+      validate_contract!
     end
 
     def generate(_definition)
@@ -52,6 +69,34 @@ module SloRulesEngine
     end
 
     private
+
+    def validate_contract!
+      raise ProviderContractError, 'provider key is required' if key.to_s.empty?
+      unless VALID_AUTOMATION_MODES.include?(automation_mode)
+        raise ProviderContractError,
+              "provider #{key.inspect} declares unsupported automation mode #{automation_mode.inspect}"
+      end
+
+      unknown_state_actions = state_actions - REQUIRED_STATE_ACTIONS
+      unless unknown_state_actions.empty?
+        raise ProviderContractError,
+              "provider #{key.inspect} declares unsupported state actions #{unknown_state_actions.inspect}"
+      end
+
+      return if automation_mode == 'manifest_only'
+
+      missing_capabilities = REQUIRED_CAPABILITIES - capabilities
+      unless missing_capabilities.empty?
+        raise ProviderContractError,
+              "provider #{key.inspect} is missing required capabilities #{missing_capabilities.inspect}"
+      end
+
+      missing_state_actions = REQUIRED_STATE_ACTIONS - state_actions
+      return if missing_state_actions.empty?
+
+      raise ProviderContractError,
+            "provider #{key.inspect} is missing required state actions #{missing_state_actions.inspect}"
+    end
 
     def validate_binding(result, path, binding)
       result.error("#{path}.metric", 'is required') if binding.metric.to_s.empty?
