@@ -316,6 +316,118 @@ class DatadogApplyTest < Minitest::Test
                  state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:payload).fetch(:layout_type)
   end
 
+  def test_datadog_diff_ignores_backend_only_fields_from_live_imported_state
+    desired_operations = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations
+    slo_name = desired_operations.fetch(0).name
+    burn_monitor_name = desired_operations.fetch(1).name
+    gap_monitor_name = desired_operations.fetch(2).name
+    dashboard_title = desired_operations.fetch(3).name
+    slo_payload = Marshal.load(Marshal.dump(desired_operations.fetch(0).payload))
+    burn_payload = Marshal.load(Marshal.dump(desired_operations.fetch(1).payload))
+    burn_payload[:query] = burn_payload.fetch(:query).sub(/__SLO_REF__\[.*?\]/, 'slo-123')
+    gap_payload = Marshal.load(Marshal.dump(desired_operations.fetch(2).payload))
+    dashboard_payload = Marshal.load(Marshal.dump(desired_operations.fetch(3).payload))
+
+    http = RoutingHttp.new(
+      "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: slo_name)}" => FakeResponse.new(
+        '200',
+        JSON.generate(
+          data: {
+            attributes: {
+              slos: [
+                {
+                  data: {
+                    id: 'slo-123',
+                    attributes: {
+                      name: slo_name,
+                      all_tags: ['managed_by:slo-rules-engine']
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          meta: { pagination: { total: 1, number: 0, last_number: 0 } }
+        )
+      ),
+      '/api/v1/slo/slo-123?with_configured_alert_ids=true' => FakeResponse.new(
+        '200',
+        JSON.generate(
+          data: [
+            slo_payload.merge(
+              id: 'slo-123',
+              modified_at: '2026-05-03T10:00:00Z',
+              monitor_ids: [456],
+              creator: { email: 'bot@example.com' }
+            )
+          ]
+        )
+      ),
+      "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: 'managed_by:slo-rules-engine', name: burn_monitor_name)}" => FakeResponse.new(
+        '200',
+        JSON.generate([{ id: 456, name: burn_monitor_name, tags: ['managed_by:slo-rules-engine'] }])
+      ),
+      '/api/v1/monitor/456' => FakeResponse.new(
+        '200',
+        JSON.generate(
+          burn_payload.merge(
+            id: 456,
+            overall_state: 'OK',
+            creator: { email: 'bot@example.com' },
+            options: burn_payload.fetch(:options).merge(evaluation_delay: 300)
+          )
+        )
+      ),
+      "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: 'managed_by:slo-rules-engine', name: gap_monitor_name)}" => FakeResponse.new(
+        '200',
+        JSON.generate([{ id: 789, name: gap_monitor_name, tags: ['managed_by:slo-rules-engine'] }])
+      ),
+      '/api/v1/monitor/789' => FakeResponse.new(
+        '200',
+        JSON.generate(
+          gap_payload.merge(
+            id: 789,
+            overall_state: 'OK',
+            creator: { email: 'bot@example.com' },
+            options: gap_payload.fetch(:options).merge(groupby_simple_monitor: false)
+          )
+        )
+      ),
+      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
+        '200',
+        JSON.generate(dashboard_lists: [{ id: 101, name: 'Generated Dashboards' }])
+      ),
+      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+        '200',
+        JSON.generate(dashboards: [{ id: 'abc123', title: dashboard_title, url: '/dashboard/abc123' }])
+      ),
+      '/api/v1/dashboard/abc123' => FakeResponse.new(
+        '200',
+        JSON.generate(
+          dashboard_payload.merge(
+            id: 'abc123',
+            author_handle: 'bot@datadog',
+            notify_list: [],
+            widgets: dashboard_payload.fetch(:widgets).each_with_index.map do |widget, index|
+              widget.merge(id: index + 1, layout: { x: 0, y: index * 2, width: 47, height: 6 })
+            end
+          )
+        )
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.diff(@manifest)
+
+    assert_equal %w[noop noop noop noop], plan.operations.map(&:action)
+  end
+
   def test_datadog_live_apply_requires_credentials
     client = SloRulesEngine::Datadog::Client.new(api_key: nil, app_key: nil)
 

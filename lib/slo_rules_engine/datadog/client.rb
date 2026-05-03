@@ -258,41 +258,15 @@ module SloRulesEngine
       end
 
       def normalize_slo_payload(payload)
-        normalize_hash(payload).tap do |normalized|
-          normalized[:tags] = Array(fetch_value(normalized, :tags, [])).map(&:to_s).sort
-          normalized[:thresholds] = Array(fetch_value(normalized, :thresholds, [])).map { |entry| normalize_hash(entry) }
-        end
+        PayloadCanonicalizer.canonicalize('datadog.slo', payload)
       end
 
       def normalize_monitor_payload(payload)
-        normalize_hash(payload).tap do |normalized|
-          normalized[:tags] = Array(fetch_value(normalized, :tags, [])).map(&:to_s).sort
-          options = normalize_hash(fetch_value(normalized, :options, {}))
-          options[:thresholds] = normalize_hash(fetch_value(options, :thresholds, {}))
-          normalized[:options] = options
-        end
+        PayloadCanonicalizer.canonicalize('datadog.monitor', payload)
       end
 
       def normalize_dashboard_payload(payload)
-        normalize_hash(payload).tap do |normalized|
-          normalized[:template_variables] = Array(fetch_value(normalized, :template_variables, [])).map do |entry|
-            normalize_hash(entry)
-          end.sort_by { |entry| fetch_value(entry, :name).to_s }
-          normalized[:widgets] = Array(fetch_value(normalized, :widgets, [])).map { |entry| normalize_hash(entry) }
-        end
-      end
-
-      def normalize_hash(value)
-        case value
-        when Hash
-          value.each_with_object({}) do |(key, entry), hash|
-            hash[key.to_sym] = normalize_hash(entry)
-          end
-        when Array
-          value.map { |entry| normalize_hash(entry) }
-        else
-          value
-        end
+        PayloadCanonicalizer.canonicalize('datadog.dashboard', payload)
       end
 
       def fetch_value(hash, key, default = nil)
