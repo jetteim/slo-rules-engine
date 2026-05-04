@@ -147,6 +147,20 @@ class DatadogApplyTest < Minitest::Test
                  client.existing_state_requests.fetch(0).fetch(:monitors)
   end
 
+  def test_datadog_applier_import_reports_missing_expected_backend_resources
+    applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new)
+
+    imported = applier.import(@manifest)
+
+    assert_equal 'datadog', imported.provider
+    assert_equal 'checkout-api', imported.service
+    assert_equal 'backend_api', imported.source
+    assert_equal 4, imported.findings.length
+    assert_equal ['missing_backend_resource'], imported.findings.map { |finding| finding[:code] }.uniq
+    assert_equal ['artifacts.dashboards[0]', 'artifacts.monitors[0]', 'artifacts.slos[0]', 'artifacts.telemetry_gap_monitors[0]'],
+                 imported.findings.map { |finding| finding[:source] }.sort
+  end
+
   def test_datadog_applier_prune_plans_delete_operations_for_existing_state
     slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
