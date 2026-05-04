@@ -259,6 +259,7 @@ module SloRulesEngine
 
       def apply_operation(operation, resolved_slo_ids)
         payload = resolve_payload(operation.payload, resolved_slo_ids)
+        SloRulesEngine::Datadog::PayloadValidator.validate!(operation.target, payload)
 
         case operation.action
         when 'create_and_wait'
@@ -584,9 +585,15 @@ module SloRulesEngine
       end
 
       def datadog_id_from_response(response)
-        fetch_value(fetch_value(response, :data, []).fetch(0, {}), :id) ||
-          fetch_value(fetch_value(response, :data, {}), :id) ||
-          fetch_value(response, :id)
+        data = fetch_value(response, :data)
+        id = case data
+             when Array
+               fetch_value(data.fetch(0, {}), :id)
+             when Hash
+               fetch_value(data, :id)
+             end
+
+        id || fetch_value(response, :id)
       end
 
       def comparable_payload(target, payload)
