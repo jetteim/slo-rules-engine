@@ -62,7 +62,7 @@ module SloRulesEngine
         resolved_slo_ids = resolved_slo_ids_from_state(state)
         operations = ARTIFACTS.flat_map do |spec|
           collection(manifest, spec.fetch(:collection)).each_with_index.map do |artifact, index|
-            operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
+            plan_operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
           end
         end
 
@@ -127,6 +127,8 @@ module SloRulesEngine
             resolved[operation.name] = operation.backend_id.to_s
           end
           apply_plan.operations.each do |operation|
+            next if operation.action == 'noop'
+
             response = apply_operation(operation, resolved_slo_ids)
             next unless operation.target == 'datadog.slo'
 
@@ -138,37 +140,12 @@ module SloRulesEngine
 
       private
 
-      def operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
-        source = "#{spec.fetch(:source_prefix)}[#{index}]"
-        name = artifact_name(artifact, spec.fetch(:target), index)
-        backend_id = backend_id_for(state, spec.fetch(:state), name)
-        action = action_for(
-          manifest,
-          artifact,
-          spec,
-          source,
-          name,
-          backend_id,
-          state,
-          resolved_slo_ids
-        )
-
-        ApplyOperation.new(
-          action: action,
-          target: spec.fetch(:target),
-          name: name,
-          source: source,
-          payload: payload_for(manifest, artifact, spec.fetch(:target), source),
-          backend_id: backend_id
-        )
-      end
-
-      def action_for(manifest, artifact, spec, source, name, backend_id, state, resolved_slo_ids)
-        return 'create_and_wait' if spec.fetch(:target) == 'datadog.slo' && backend_id.nil?
-        return 'create' if backend_id.nil?
-        return 'recreate' if recreate_monitor?(manifest, artifact, spec, source, name, state, resolved_slo_ids)
-
-        'update'
+      def plan_operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
+        operation = diff_operation_for(manifest, artifact, index, spec, state, resolved_slo_ids)
+        if operation.action == 'create' && spec.fetch(:target) == 'datadog.slo'
+          operation.action = 'create_and_wait'
+        end
+        operation
       end
 
       def collection(manifest, key)
