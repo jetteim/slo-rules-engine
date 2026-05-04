@@ -161,6 +161,45 @@ class DatadogApplyTest < Minitest::Test
                  imported.findings.map { |finding| finding[:source] }.sort
   end
 
+  def test_datadog_applier_import_reports_orphan_managed_backend_resources
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_name = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      slos: { slo_name => { id: 'slo-123', payload: { type: 'metric' } } },
+      monitors: {
+        monitor_name => { id: 456, payload: { type: 'slo alert' } },
+        gap_monitor_name => { id: 789, payload: { type: 'query alert' } }
+      },
+      dashboards: { dashboard_name => { id: 'dashboard-123', payload: { layout_type: 'ordered' } } },
+      managed_state: {
+        slos: [
+          { id: 'slo-123', name: slo_name },
+          { id: 'slo-orphan', name: 'checkout-api orphan slo' }
+        ],
+        monitors: [
+          { id: 456, name: monitor_name },
+          { id: 789, name: gap_monitor_name },
+          { id: 999, name: 'SLO burn rate: checkout-api/orphan-sli/orphan-instance/orphan-slo' }
+        ],
+        dashboards: [
+          { id: 'dashboard-123', title: dashboard_name },
+          { id: 'dashboard-orphan', title: 'checkout-api orphan dashboard' }
+        ]
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    imported = applier.import(@manifest)
+
+    orphan_findings = imported.findings.select { |finding| finding[:code] == 'orphan_backend_resource' }
+
+    assert_equal 3, orphan_findings.length
+    assert_equal ['managed_state.dashboards[1]', 'managed_state.monitors[2]', 'managed_state.slos[1]'],
+                 orphan_findings.map { |finding| finding[:source] }.sort
+  end
+
   def test_datadog_applier_prune_returns_empty_plan_when_no_orphans_exist
     slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
