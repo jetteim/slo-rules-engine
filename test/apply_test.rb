@@ -72,6 +72,40 @@ class ApplyTest < Minitest::Test
     end
   end
 
+  def test_manifest_bundle_plan_reports_noop_when_existing_manifest_matches
+    manifest = valid_prometheus_manifest
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-api', 'prometheus_stack', 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, JSON.pretty_generate(manifest))
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      plan = applier.plan(manifest)
+
+      assert_equal 'dry_run', plan.mode
+      assert_equal 'noop', plan.operations.fetch(0).action
+      assert_equal path, plan.operations.fetch(0).payload.fetch(:path)
+    end
+  end
+
+  def test_manifest_bundle_apply_skips_manifest_write_when_existing_manifest_matches
+    manifest = valid_prometheus_manifest
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-api', 'prometheus_stack', 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, JSON.pretty_generate(manifest))
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      plan = applier.apply(manifest)
+
+      assert_equal 'live', plan.mode
+      assert_equal 'noop', plan.operations.fetch(0).action
+      assert_equal manifest, JSON.parse(File.read(path), symbolize_names: true)
+    end
+  end
+
   def test_external_generator_plan_records_sloth_handoff
     manifest = valid_sloth_manifest
     applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: '/tmp/generated')
@@ -82,6 +116,22 @@ class ApplyTest < Minitest::Test
     assert_equal 'external_generator', plan.operations.fetch(1).target
     assert_includes plan.operations.fetch(1).payload.fetch(:command), 'sloth generate'
     assert_equal '/tmp/generated/checkout-api/sloth/manifest.json', plan.operations.fetch(1).payload.fetch(:input_manifest)
+  end
+
+  def test_external_generator_plan_keeps_handoff_when_manifest_file_is_noop
+    manifest = valid_sloth_manifest
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, JSON.pretty_generate(manifest))
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      plan = applier.plan(manifest)
+
+      assert_equal %w[noop handoff], plan.operations.map(&:action)
+      assert_equal path, plan.operations.fetch(1).payload.fetch(:input_manifest)
+    end
   end
 
   private

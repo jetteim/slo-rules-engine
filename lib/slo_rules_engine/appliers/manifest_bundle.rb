@@ -11,13 +11,19 @@ module SloRulesEngine
 
       def plan(manifest, mode: 'dry_run')
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
+        path = manifest_path(manifest)
+        actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
+        changes = actual ? SloRulesEngine::StateDiff.changed_paths(manifest, actual) : ['manifest']
+        action = actual && changes.empty? ? 'noop' : 'write'
         operations = [
           ApplyOperation.new(
-            action: 'write',
+            action: action,
             target: 'manifest_file',
             name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
             source: 'manifest',
-            payload: { path: manifest_path(manifest), manifest: manifest }
+            payload: { path: path, manifest: manifest },
+            actual: actual,
+            changes: changes
           )
         ]
         operations << handoff_operation(manifest) if manifest.fetch(:provider) == 'sloth'
