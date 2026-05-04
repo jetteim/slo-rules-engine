@@ -72,6 +72,7 @@ module SloRulesEngine
         compact_hash(
           title: fetch_value(payload, :title),
           description: fetch_value(payload, :description),
+          tags: Array(fetch_value(payload, :tags, [])).map(&:to_s).sort,
           layout_type: fetch_value(payload, :layout_type),
           template_variables: Array(fetch_value(payload, :template_variables, [])).map do |entry|
             compact_hash(

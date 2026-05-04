@@ -6,7 +6,6 @@ This is the running plan for the long refactor.
 
 - [x] Create public-safe repository scaffold.
 - [x] Document feature inventory and provider contract.
-- [x] Document migration map.
 - [x] Add minimal executable Ruby DSL.
 - [x] Add neutral model objects.
 - [x] Add validation result model.
@@ -20,9 +19,8 @@ This is the running plan for the long refactor.
 - [x] Push public repository.
 - [x] Add CI verification workflow.
 
-## Phase 2: DSL Compatibility
+## Phase 2: Onboarding And Reliability Modeling
 
-- [ ] Expand DSL methods to match existing service definition shape.
 - [x] Add provider-specific query bindings while preserving neutral metric intent.
 - [x] Add provider capability validation before generation.
 - [x] Add line references for validation messages.
@@ -51,18 +49,23 @@ This is the running plan for the long refactor.
 - [x] Expand calculation-basis findings across every SLI instance and SLO.
 - [x] Record Sloth external-generator handoff details in apply plans.
 
-## Phase 4: Migration Tooling
+## Phase 4: Provider State Management
 
-- [x] Add old-DSL compatibility report.
 - [ ] Add anonymization helper for examples.
 - [x] Add reviewed manifest input path for apply workflows.
 - [x] Add explicit diff command.
 - [x] Add explicit import command.
 - [x] Add explicit prune command.
 - [x] Add generated artifact diff harness.
-- [ ] Add import guidance for existing service files.
 
-## Phase 5: Contract Hardening
+## Phase 5: Telemetry-First Adoption
+
+- [ ] Add batch telemetry discovery across service portfolios and selector inputs.
+- [ ] Add service onboarding summary that ranks discovered services and signals by review readiness.
+- [ ] Add candidate confidence and explanation output for telemetry-derived drafts.
+- [ ] Add saved evidence packets that preserve discovery findings, candidate reasoning, and review handoff state.
+
+## Phase 6: Contract Hardening
 
 - [x] Enforce provider capability metadata against the documented provider contract.
 - [x] Separate reviewed manifest input from in-process regeneration during backend mutation workflows.

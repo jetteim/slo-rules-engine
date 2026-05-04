@@ -1,6 +1,6 @@
 # Feature Inventory
 
-This file tracks the long-running migration scope.
+This file tracks the long-running feature baseline.
 
 See [Evolution Plan](evolution-plan.md) for value streams, capability mapping, contribution streams, and delivery order.
 
@@ -13,7 +13,7 @@ See [Evolution Plan](evolution-plan.md) for value streams, capability mapping, c
 - Reality checks against historical telemetry and measured metric inventories.
 - SLI/SLO candidate generation from measured telemetry with findings for rejected or incomplete signals.
 - Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and notification routing.
-- Compatibility reports for legacy DSL and implementation-coupled definitions.
+- Coupling reports for unsupported or implementation-coupled definitions.
 - Golden-style tests for generated artifacts.
 
 ## Onboarding Capability: Generate SLIs And SLOs From Telemetry
@@ -24,9 +24,12 @@ Explicit features:
 
 - **Telemetry inventory ingestion:** accept measured telemetry inventory JSON as the starting input.
 - **Telemetry discovery baseline:** discover active metrics by service or selector scope before candidate review.
+- **Portfolio discovery:** discover telemetry for multiple services and preserve service-scoped evidence packets for review.
 - **Signal eligibility review:** reject unsupported, non-user-visible, or metric-less signals with machine-readable findings.
 - **SLI/SLO candidate inference:** map eligible signals to SLI identifiers, SLO identifiers, objectives, success conditions, and calculation-basis recommendations.
+- **Candidate confidence and explanation:** explain why a signal became a candidate and how strong the evidence is before review.
 - **Draft definition generation:** emit a public-safe Ruby DSL draft with candidate SLIs, metric bindings, instances, and proposed SLOs.
+- **Saved evidence packets:** preserve discovery findings, candidate reasoning, and accepted review notes for later validation and provider handoff.
 - **Generated draft validation:** ensure emitted drafts can be loaded by the DSL and validated before provider generation.
 - **Review handoff:** preserve findings and conservative review wording so generated SLOs remain proposals until a maintainer accepts them.
 - **Provider handoff:** keep backend-specific generation downstream of accepted definitions; providers translate accepted intent and do not invent SLO policy.
@@ -85,7 +88,7 @@ Explicit features:
 - Platform-specific deployment writers.
 - Secret formats tied to one organization.
 
-## Preserve As Migration Knowledge
+## Preserve As Generalized Reliability Knowledge
 
 - Error-budget burn-rate thresholds.
 - Observation-based and time-slice-based SLO calculation.

@@ -328,6 +328,8 @@ class DatadogApplyTest < Minitest::Test
     dashboard_payload = client.requests.fetch(3).fetch(:payload)
     assert_equal 'ordered', dashboard_payload.fetch(:layout_type)
     assert_equal 'checkout-api SLO decision dashboard', dashboard_payload.fetch(:title)
+    assert_includes dashboard_payload.fetch(:tags), 'managed_by:slo-rules-engine'
+    assert_includes dashboard_payload.fetch(:tags), 'service:checkout-api'
     assert_equal %w[service sli sli_instance slo],
                  dashboard_payload.fetch(:template_variables).map { |variable| variable.fetch(:name) }
   end
@@ -445,7 +447,7 @@ class DatadogApplyTest < Minitest::Test
       ),
       '/api/v1/dashboard/abc123' => FakeResponse.new(
         '200',
-        '{"id":"abc123","title":"checkout-api SLO decision dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[0]","layout_type":"ordered","template_variables":[{"name":"service","prefix":"service","default":"checkout-api"}],"widgets":[{"definition":{"type":"note","content":"Investigate request latency, traffic, and burn rate before paging."}}]}'
+        '{"id":"abc123","title":"checkout-api SLO decision dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[0]","layout_type":"ordered","tags":["managed_by:slo-rules-engine","service:checkout-api"],"template_variables":[{"name":"service","prefix":"service","default":"checkout-api"}],"widgets":[{"definition":{"type":"note","content":"Investigate request latency, traffic, and burn rate before paging."}}]}'
       )
     )
     client = SloRulesEngine::Datadog::Client.new(
@@ -472,6 +474,8 @@ class DatadogApplyTest < Minitest::Test
                  state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:payload).fetch(:type)
     assert_equal 'ordered',
                  state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:payload).fetch(:layout_type)
+    assert_includes state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:payload).fetch(:tags),
+                    'managed_by:slo-rules-engine'
   end
 
   def test_datadog_client_lists_managed_resources_for_service
@@ -494,15 +498,15 @@ class DatadogApplyTest < Minitest::Test
       ),
       '/api/v1/dashboard/abc123' => FakeResponse.new(
         '200',
-        '{"id":"abc123","title":"checkout-api SLO decision dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[0]","layout_type":"ordered"}'
+        '{"id":"abc123","title":"checkout-api SLO decision dashboard","layout_type":"ordered","tags":["managed_by:slo-rules-engine","service:checkout-api"]}'
       ),
       '/api/v1/dashboard/def456' => FakeResponse.new(
         '200',
-        '{"id":"def456","title":"checkout-api orphan dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[1]","layout_type":"ordered"}'
+        '{"id":"def456","title":"checkout-api orphan dashboard","layout_type":"ordered","tags":["managed_by:slo-rules-engine","service:checkout-api"]}'
       ),
       '/api/v1/dashboard/zzz999' => FakeResponse.new(
         '200',
-        '{"id":"zzz999","title":"other-service SLO decision dashboard","description":"Generated dashboard for other-service from artifacts.dashboards[0]","layout_type":"ordered"}'
+        '{"id":"zzz999","title":"other-service SLO decision dashboard","layout_type":"ordered","tags":["managed_by:slo-rules-engine","service:other-service"]}'
       )
     )
     client = SloRulesEngine::Datadog::Client.new(

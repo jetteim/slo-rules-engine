@@ -221,7 +221,6 @@ module SloRulesEngine
       end
 
       def load_managed_dashboards(service)
-        prefix = "Generated dashboard for #{service} "
         dashboards = []
         lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
         lists.each do |list|
@@ -232,7 +231,9 @@ module SloRulesEngine
           entries = Array(fetch_value(request('GET', path), :dashboards, []))
           entries.each do |entry|
             detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
-            next unless fetch_value(detail, :description).to_s.start_with?(prefix)
+            tags = Array(fetch_value(detail, :tags, [])).map(&:to_s)
+            next unless tags.include?(MANAGED_MONITOR_TAG)
+            next unless tags.include?("service:#{service}")
 
             dashboards << {
               id: fetch_value(entry, :id),

@@ -6,7 +6,7 @@ This document describes how the engine should evolve from a public-safe DSL skel
 
 The engine keeps service reliability intent independent from observability backends. A service definition should describe what reliability means for a service; providers then translate that intent into backend artifacts.
 
-Existing telemetry and legacy rule behavior are evidence for better modeling, not authority. They can suggest candidates, gaps, and compatibility work, but accepted SLO policy remains in the neutral model.
+Existing telemetry and prior implementation behavior are evidence for better modeling, not authority. They can suggest candidates, gaps, and compatibility work, but accepted SLO policy remains in the neutral model.
 
 ## Value Streams
 
@@ -83,29 +83,29 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 - Telemetry-gap signals classified as notifications unless impact requires action.
 - Route availability failures found before incident response depends on them.
 
-### 4. Legacy Or Private Rule Evidence To OSS-Safe Engine Capability
+### 4. Service Telemetry Discovery To Reviewed Onboarding Queue
 
-**Customer / beneficiary:** maintainers evolving the OSS engine from proven behavior without exposing non-public details.
+**Customer / beneficiary:** platform and SRE teams onboarding multiple services that already emit telemetry.
 
-**Trigger:** existing rule behavior reveals a capability gap or migration concern.
+**Trigger:** many services expose telemetry, but there is no reviewed SLO definition backlog or prioritization.
 
-**Outcome:** generalized OSS-safe capability, synthetic fixture, test, doc, or compatibility report.
+**Outcome:** prioritized onboarding queue with discovery evidence, candidate packs, and reviewable draft definitions.
 
 **Flow:**
 
-1. Inspect legacy or private behavior outside this repository.
-2. Extract generalized behavior and risk.
-3. Define public-safe target model behavior.
-4. Add synthetic fixtures.
-5. Add tests and compatibility reporting.
-6. Implement neutral engine capability.
-7. Verify forbidden-term and public-safety guards.
+1. Discover telemetry across service or selector scopes.
+2. Group signals into service-level evidence packets.
+3. Score signal eligibility, coverage, and review readiness.
+4. Emit candidate packs and reviewable draft definitions.
+5. Preserve findings and candidate reasoning as review evidence.
+6. Prioritize services for maintainer review.
+7. Feed accepted drafts into the provider-independent SLO stream.
 
 **Measures:**
 
-- Capability gaps closed with synthetic evidence.
-- Migration findings produced without private identifiers.
-- Public-safety scans remain clean.
+- Services discovered per run.
+- Review-ready service ratio.
+- Time from discovery to accepted draft.
 
 ### 5. Provider Contribution To Supported Backend Bundle
 
@@ -189,7 +189,7 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 | Telemetry-derived draft generation | 2 | telemetry discovery, inventory ingestion, lookup-envelope reuse, findings, candidate inference, `draft-definition` |
 | Operational alert context | 3 | burn-rate alerts, telemetry-gap notifications, contextual annotations, dashboard variables |
 | Delivery integration routing | 3 | route catalogs, route availability checks, notification router integration |
-| OSS-safe migration | 4 | migration reports, forbidden-term scan, synthetic fixtures, anonymization helpers |
+| Portfolio telemetry onboarding | 4 | batch discovery, onboarding queue, candidate scoring, evidence packets |
 | Provider contribution safety | 5 | provider contract, provider guide, deterministic tests, unsupported-field warnings |
 | Backend state management | 6 | automation modes, artifact schemas, dry-run apply plans, diff harness, apply/prune commands, import existing resources |
 | Reality checking | 7 | provider binding checks, missing metric checks, backend telemetry lookup and discovery adapters |
@@ -197,12 +197,12 @@ Existing telemetry and legacy rule behavior are evidence for better modeling, no
 ## Delivery Order
 
 1. Keep the provider-independent DSL and provider generation path stable.
-2. Make telemetry-derived draft generation a first-class onboarding path.
-3. Enrich the neutral model with reliability review fields.
-4. Strengthen validation and model reporting.
-5. Add provider contribution guide and guardrails.
-6. Add low-volume and reality-check examples with synthetic telemetry.
-7. Add apply-ready artifact schemas, diffing, and backend API adapters after generated manifests are reviewable.
+2. Strengthen provider-state management until Datadog is a credible `live_api` baseline.
+3. Make telemetry-derived draft generation and portfolio discovery a first-class onboarding path.
+4. Enrich the neutral model with reliability review fields.
+5. Strengthen validation and model reporting.
+6. Add provider contribution guide and guardrails.
+7. Add low-volume and reality-check examples with synthetic telemetry.
 8. Keep provider apply behavior explicit for each provider: Datadog as live API, Prometheus-compatible bundles as manifest bundles, and Sloth as external-generator handoff.
 
 ## Guardrails
