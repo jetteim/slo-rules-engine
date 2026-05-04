@@ -94,13 +94,15 @@ module SloRulesEngine
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
         state = @client.existing_state(desired: desired_state(manifest))
+        managed_state = @client.managed_state(service: manifest.fetch(:service))
 
         ImportedState.new(
           provider: 'datadog',
           service: manifest.fetch(:service),
           source: 'backend_api',
           state: state,
-          findings: missing_backend_resource_findings(manifest, state)
+          findings: missing_backend_resource_findings(manifest, state) +
+            orphan_backend_resource_findings(manifest, managed_state)
         )
       end
 
@@ -358,6 +360,19 @@ module SloRulesEngine
               message: "managed backend resource #{name.inspect} is missing for #{spec.fetch(:target)}"
             }
           end.compact
+        end
+      end
+
+      def orphan_backend_resource_findings(manifest, managed_state)
+        prune_operations(manifest, managed_state).each_with_index.map do |operation, index|
+          {
+            code: 'orphan_backend_resource',
+            target: operation.target,
+            name: operation.name,
+            source: operation.source,
+            backend_id: operation.backend_id,
+            message: "managed backend resource #{operation.name.inspect} is not present in the reviewed manifest"
+          }
         end
       end
 
