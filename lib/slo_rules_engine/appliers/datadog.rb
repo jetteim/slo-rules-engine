@@ -51,6 +51,11 @@ module SloRulesEngine
       ].freeze
 
       PRUNE_ORDER = %i[monitors telemetry_gap_monitors dashboards slos].freeze
+      PRUNE_TARGETS = [
+        { bucket: :monitors, target: 'datadog.monitor' },
+        { bucket: :dashboards, target: 'datadog.dashboard' },
+        { bucket: :slos, target: 'datadog.slo' }
+      ].freeze
 
       def initialize(client: SloRulesEngine::Datadog::Client.new)
         @client = client
@@ -102,12 +107,8 @@ module SloRulesEngine
       def prune(manifest, mode: 'dry_run')
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
-        state = @client.existing_state(desired: desired_state(manifest))
-        operations = prune_specs.flat_map do |spec|
-          collection(manifest, spec.fetch(:collection)).each_with_index.map do |artifact, index|
-            prune_operation_for(artifact, index, spec, state)
-          end.compact
-        end
+        managed_state = @client.managed_state(service: manifest.fetch(:service))
+        operations = prune_operations(manifest, managed_state)
 
         ApplyPlan.new(provider: 'datadog', mode: mode, operations: operations).tap do |plan|
           next unless mode == 'live'
@@ -288,12 +289,6 @@ module SloRulesEngine
         end
       end
 
-      def prune_specs
-        PRUNE_ORDER.map do |collection_key|
-          ARTIFACTS.find { |spec| spec.fetch(:collection) == collection_key }
-        end
-      end
-
       def resolved_slo_ids_from_state(state)
         fetch_value(state, :slos, {}).each_with_object({}) do |(name, entry), resolved|
           backend_id = fetch_value(entry, :id)
@@ -301,19 +296,29 @@ module SloRulesEngine
         end
       end
 
-      def prune_operation_for(artifact, index, spec, state)
-        source = "#{spec.fetch(:source_prefix)}[#{index}]"
-        name = artifact_name(artifact, spec.fetch(:target), index)
-        backend_id = backend_id_for(state, spec.fetch(:state), name)
-        return unless backend_id
+      def prune_operations(manifest, managed_state)
+        desired = desired_state(manifest)
+        PRUNE_TARGETS.flat_map do |spec|
+          desired_counts = Array(fetch_value(desired, spec.fetch(:bucket), [])).each_with_object(Hash.new(0)) do |name, counts|
+            counts[name] += 1
+          end
 
-        ApplyOperation.new(
-          action: 'delete',
-          target: spec.fetch(:target),
-          name: name,
-          source: source,
-          backend_id: backend_id
-        )
+          Array(fetch_value(managed_state, spec.fetch(:bucket), [])).each_with_index.map do |entry, index|
+            entry_name = fetch_value(entry, :name) || fetch_value(entry, :title)
+            if desired_counts[entry_name].positive?
+              desired_counts[entry_name] -= 1
+              next
+            end
+
+            ApplyOperation.new(
+              action: 'delete',
+              target: spec.fetch(:target),
+              name: entry_name,
+              source: "managed_state.#{spec.fetch(:bucket)}[#{index}]",
+              backend_id: fetch_value(entry, :id)
+            )
+          end.compact
+        end
       end
 
       def prune_operation(operation)

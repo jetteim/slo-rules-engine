@@ -52,6 +52,16 @@ module SloRulesEngine
         }
       end
 
+      def managed_state(service:)
+        validate_credentials!
+
+        {
+          slos: load_managed_slos(service),
+          monitors: load_managed_monitors(service),
+          dashboards: load_managed_dashboards(service)
+        }
+      end
+
       def request(method, path, payload: nil, retries: 3, not_found_ok: false)
         validate_credentials!
         uri = uri_for(path)
@@ -176,6 +186,57 @@ module SloRulesEngine
               id: fetch_value(entry, :id),
               title: title,
               payload: normalize_dashboard_payload(detail)
+            }.compact
+          end
+        end
+        dashboards
+      end
+
+      def load_managed_slos(service)
+        query = "managed_by:slo-rules-engine AND service:#{service}"
+        path = "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 100, query: query)}"
+        response = request('GET', path)
+        entries = Array(response.dig('data', 'attributes', 'slos'))
+
+        entries.map do |entry|
+          data = fetch_value(entry, :data, {})
+          attributes = fetch_value(data, :attributes, {})
+          {
+            id: fetch_value(data, :id),
+            name: fetch_value(attributes, :name)
+          }.compact
+        end
+      end
+
+      def load_managed_monitors(service)
+        path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: "#{MANAGED_MONITOR_TAG},service:#{service}")}"
+        entries = Array(request('GET', path))
+
+        entries.map do |entry|
+          {
+            id: fetch_value(entry, :id),
+            name: fetch_value(entry, :name)
+          }.compact
+        end
+      end
+
+      def load_managed_dashboards(service)
+        prefix = "Generated dashboard for #{service} "
+        dashboards = []
+        lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
+        lists.each do |list|
+          list_id = fetch_value(list, :id)
+          next unless list_id
+
+          path = "/api/v1/dashboard/lists/manual/#{list_id}/dashboards"
+          entries = Array(fetch_value(request('GET', path), :dashboards, []))
+          entries.each do |entry|
+            detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
+            next unless fetch_value(detail, :description).to_s.start_with?(prefix)
+
+            dashboards << {
+              id: fetch_value(entry, :id),
+              title: fetch_value(entry, :title)
             }.compact
           end
         end

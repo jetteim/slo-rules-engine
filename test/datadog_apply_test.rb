@@ -161,7 +161,7 @@ class DatadogApplyTest < Minitest::Test
                  imported.findings.map { |finding| finding[:source] }.sort
   end
 
-  def test_datadog_applier_prune_plans_delete_operations_for_existing_state
+  def test_datadog_applier_prune_returns_empty_plan_when_no_orphans_exist
     slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
     gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
@@ -176,12 +176,11 @@ class DatadogApplyTest < Minitest::Test
     plan = applier.prune(@manifest)
 
     assert_equal 'dry_run', plan.mode
-    assert_equal %w[delete delete delete delete], plan.operations.map(&:action)
-    assert_equal ['datadog.monitor', 'datadog.monitor', 'datadog.dashboard', 'datadog.slo'], plan.operations.map(&:target)
-    assert_equal [456, 789, 'dashboard-123', 'slo-123'], plan.operations.map(&:backend_id)
+    assert plan.empty?
+    assert_equal [], plan.operations
   end
 
-  def test_datadog_applier_prune_deletes_existing_resources
+  def test_datadog_applier_prune_plans_delete_operations_for_orphan_managed_resources
     slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
     gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
@@ -189,7 +188,56 @@ class DatadogApplyTest < Minitest::Test
     client = FakeDatadogClient.new(
       slos: { slo_name => { id: 'slo-123' } },
       monitors: { monitor_name => { id: 456 }, gap_monitor_name => { id: 789 } },
-      dashboards: { dashboard_name => { id: 'dashboard-123' } }
+      dashboards: { dashboard_name => { id: 'dashboard-123' } },
+      managed_state: {
+        slos: [
+          { id: 'slo-123', name: slo_name },
+          { id: 'slo-orphan', name: 'checkout-api orphan slo' }
+        ],
+        monitors: [
+          { id: 456, name: monitor_name },
+          { id: 789, name: gap_monitor_name },
+          { id: 999, name: 'SLO burn rate: checkout-api/orphan-sli/orphan-instance/orphan-slo' }
+        ],
+        dashboards: [
+          { id: 'dashboard-123', title: dashboard_name },
+          { id: 'dashboard-orphan', title: 'checkout-api orphan dashboard' }
+        ]
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.prune(@manifest)
+
+    assert_equal 'dry_run', plan.mode
+    assert_equal [
+      ['datadog.monitor', 999],
+      ['datadog.dashboard', 'dashboard-orphan'],
+      ['datadog.slo', 'slo-orphan']
+    ], plan.operations.map { |operation| [operation.target, operation.backend_id] }
+  end
+
+  def test_datadog_applier_prune_deletes_orphan_managed_resources
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_name = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      managed_state: {
+        slos: [
+          { id: 'slo-123', name: slo_name },
+          { id: 'slo-orphan', name: 'checkout-api orphan slo' }
+        ],
+        monitors: [
+          { id: 456, name: monitor_name },
+          { id: 789, name: gap_monitor_name },
+          { id: 999, name: 'SLO burn rate: checkout-api/orphan-sli/orphan-instance/orphan-slo' }
+        ],
+        dashboards: [
+          { id: 'dashboard-123', title: dashboard_name },
+          { id: 'dashboard-orphan', title: 'checkout-api orphan dashboard' }
+        ]
+      }
     )
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)
 
@@ -197,10 +245,9 @@ class DatadogApplyTest < Minitest::Test
 
     assert_equal 'live', plan.mode
     assert_equal [
-      ['DELETE', '/api/v1/monitor/456'],
-      ['DELETE', '/api/v1/monitor/789'],
-      ['DELETE', '/api/v1/dashboard/dashboard-123'],
-      ['DELETE', '/api/v1/slo/slo-123?force=true']
+      ['DELETE', '/api/v1/monitor/999'],
+      ['DELETE', '/api/v1/dashboard/dashboard-orphan'],
+      ['DELETE', '/api/v1/slo/slo-orphan?force=true']
     ], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
   end
 
@@ -386,6 +433,53 @@ class DatadogApplyTest < Minitest::Test
                  state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:payload).fetch(:type)
     assert_equal 'ordered',
                  state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:payload).fetch(:layout_type)
+  end
+
+  def test_datadog_client_lists_managed_resources_for_service
+    http = RoutingHttp.new(
+      '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=100&query=managed_by%3Aslo-rules-engine+AND+service%3Acheckout-api' => FakeResponse.new(
+        '200',
+        '{"data":{"attributes":{"slos":[{"data":{"id":"slo-123","attributes":{"name":"checkout-api http-requests public-api successful-requests","all_tags":["managed_by:slo-rules-engine","service:checkout-api"]}}},{"data":{"id":"slo-999","attributes":{"name":"checkout-api orphan slo","all_tags":["managed_by:slo-rules-engine","service:checkout-api"]}}}]}},"meta":{"pagination":{"total":2,"number":0,"last_number":0}}}'
+      ),
+      '/api/v1/monitor?monitor_tags=managed_by%3Aslo-rules-engine%2Cservice%3Acheckout-api' => FakeResponse.new(
+        '200',
+        '[{"id":456,"name":"SLO burn rate: checkout-api/http-requests/public-api/successful-requests","tags":["managed_by:slo-rules-engine","service:checkout-api"]},{"id":999,"name":"SLO burn rate: checkout-api/orphan-sli/orphan-instance/orphan-slo","tags":["managed_by:slo-rules-engine","service:checkout-api"]}]'
+      ),
+      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
+        '200',
+        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
+      ),
+      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+        '200',
+        '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"},{"id":"def456","title":"checkout-api orphan dashboard","url":"/dashboard/def456"},{"id":"zzz999","title":"other-service SLO decision dashboard","url":"/dashboard/zzz999"}]}'
+      ),
+      '/api/v1/dashboard/abc123' => FakeResponse.new(
+        '200',
+        '{"id":"abc123","title":"checkout-api SLO decision dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[0]","layout_type":"ordered"}'
+      ),
+      '/api/v1/dashboard/def456' => FakeResponse.new(
+        '200',
+        '{"id":"def456","title":"checkout-api orphan dashboard","description":"Generated dashboard for checkout-api from artifacts.dashboards[1]","layout_type":"ordered"}'
+      ),
+      '/api/v1/dashboard/zzz999' => FakeResponse.new(
+        '200',
+        '{"id":"zzz999","title":"other-service SLO decision dashboard","description":"Generated dashboard for other-service from artifacts.dashboards[0]","layout_type":"ordered"}'
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.managed_state(service: 'checkout-api')
+
+    assert_equal ['checkout-api http-requests public-api successful-requests', 'checkout-api orphan slo'],
+                 state.fetch(:slos).map { |entry| entry.fetch(:name) }
+    assert_equal [456, 999], state.fetch(:monitors).map { |entry| entry.fetch(:id) }
+    assert_equal %w[checkout-api\ SLO\ decision\ dashboard checkout-api\ orphan\ dashboard],
+                 state.fetch(:dashboards).map { |entry| entry.fetch(:title) }
   end
 
   def test_datadog_diff_ignores_backend_only_fields_from_live_imported_state
@@ -688,8 +782,9 @@ class DatadogApplyTest < Minitest::Test
   class FakeDatadogClient
     attr_reader :requests, :existing_state_requests, :created_and_waited_slos, :created_and_waited_monitors
 
-    def initialize(slos: {}, monitors: {}, dashboards: {}, slo_create_response: nil)
+    def initialize(slos: {}, monitors: {}, dashboards: {}, managed_state: nil, slo_create_response: nil)
       @state = { slos: slos, monitors: monitors, dashboards: dashboards }
+      @managed_state = managed_state
       @requests = []
       @existing_state_requests = []
       @created_and_waited_slos = []
@@ -704,6 +799,14 @@ class DatadogApplyTest < Minitest::Test
 
     def validate_credentials!
       true
+    end
+
+    def managed_state(service:)
+      @managed_state || {
+        slos: @state.fetch(:slos).map { |name, entry| { id: entry.fetch(:id), name: name } },
+        monitors: @state.fetch(:monitors).map { |name, entry| { id: entry.fetch(:id), name: name } },
+        dashboards: @state.fetch(:dashboards).map { |title, entry| { id: entry.fetch(:id), title: title } }
+      }
     end
 
     def request(method, path, payload: nil)
