@@ -10,7 +10,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 1. Provider-state deepening
 2. Telemetry-first onboarding path
-3. Remaining DSL compatibility and migration helpers
+3. Provider breadth and telemetry-first scale after the baseline is solid
 
 The current stream is provider-state deepening. Do not switch to telemetry-first work until the current provider-state checkpoint is at a safe commit/push boundary.
 
@@ -21,14 +21,6 @@ The current stream is provider-state deepening. Do not switch to telemetry-first
 - Commit and push often.
 - Add verification evidence before claiming a checkpoint is complete.
 - Update this file when a checkpoint materially changes current priorities, recent checkpoints, or the next recommended slice.
-
-## Trusted External Reference
-
-Use this private repo as the authoritative behavioral reference for Datadog state-management semantics:
-
-- `~/OneDrive/NEW_WORK/sre-rules`
-
-Treat it as evidence for generalized OSS-safe behavior, not as source text to copy directly.
 
 ## Current State Summary
 
@@ -47,6 +39,7 @@ Implemented and already pushed:
 - Datadog import findings for missing expected resources
 - Datadog prune based on service-scoped managed orphan discovery
 - Datadog import findings for orphan managed resources
+- Datadog dashboard ownership tags and tag-based managed-state discovery
 
 ## Most Recent Checkpoints
 
@@ -61,26 +54,26 @@ Implemented and already pushed:
 
 Highest-value remaining provider-state gaps:
 
-1. Datadog ownership/identity fidelity, especially dashboards
-2. Datadog provider-schema payload translation and backend-state reconciliation beyond the current heuristic baseline
+1. Datadog provider-schema payload translation and backend-state reconciliation beyond the current heuristic baseline
+2. Stronger Datadog resource identity fidelity where ownership still depends on generated names
 3. Broader state-management parity for future providers after the Datadog baseline is stronger
 
 Secondary gaps:
 
-1. Expand DSL compatibility to match more of the legacy definition shape
-2. Add anonymization helper for examples
-3. Add import guidance for existing service files
+1. Batch telemetry discovery across service portfolios and selector inputs
+2. Candidate confidence and saved evidence packets for telemetry-derived drafts
+3. Add anonymization helper for examples
 
 ## Recommended Next Slice
 
 Next recommended provider-state slice:
 
-- replace dashboard ownership heuristics based on generated description text with explicit dashboard ownership metadata and matching discovery logic
+- tighten Datadog provider payload/state reconciliation so imported backend resources compare by managed semantics, not only by generated shape
 
 Rationale:
 
-- current Datadog dashboard managed-state discovery works, but its ownership signal is weaker than the SLO/monitor tag-based model
-- this is the next smallest step that materially improves reconciliation fidelity
+- dashboard ownership now matches the tag-based model used for SLOs and monitors
+- the next meaningful gap is translating generated resources into a stricter provider-state contract for import, diff, apply, and prune
 
 ## Verification Commands
 

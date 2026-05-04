@@ -463,6 +463,7 @@ module SloRulesEngine
         {
           title: fetch_value(artifact, :title),
           description: "Generated dashboard for #{fetch_value(manifest, :service)} from #{source}",
+          tags: datadog_tags(manifest, artifact),
           layout_type: 'ordered',
           template_variables: fetch_value(artifact, :variables, {}).map do |name, default|
             {

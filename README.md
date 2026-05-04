@@ -89,7 +89,6 @@ bin/rules-ctl apply --provider sloth --confirm --output-dir ./managed --manifest
 bin/rules-ctl diff --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl import --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl prune --provider sloth --confirm --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
-bin/rules-ctl migration-report path/to/legacy/service-definition.rb
 bin/rules-ctl model-report examples/services/checkout.rb
 bin/rules-ctl providers list
 bin/rules-ctl integrations list
