@@ -232,6 +232,50 @@ class DatadogApplyTest < Minitest::Test
                  dashboard_payload.fetch(:template_variables).map { |variable| variable.fetch(:name) }
   end
 
+  def test_datadog_apply_skips_noop_operations_when_backend_payloads_match
+    seed_applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new)
+    desired_operations = seed_applier.plan(@manifest).operations
+    burn_rate_payload = Marshal.load(Marshal.dump(desired_operations.fetch(1).payload))
+    burn_rate_payload[:query] = burn_rate_payload.fetch(:query).gsub(
+      '__SLO_REF__[checkout-api http-requests public-api successful-requests]',
+      'slo-123'
+    )
+    state = {
+      slos: {
+        desired_operations.fetch(0).name => {
+          id: 'slo-123',
+          payload: desired_operations.fetch(0).payload
+        }
+      },
+      monitors: {
+        desired_operations.fetch(1).name => {
+          id: 456,
+          payload: burn_rate_payload
+        },
+        desired_operations.fetch(2).name => {
+          id: 789,
+          payload: desired_operations.fetch(2).payload
+        }
+      },
+      dashboards: {
+        desired_operations.fetch(3).name => {
+          id: 'dashboard-123',
+          payload: desired_operations.fetch(3).payload
+        }
+      }
+    }
+    client = FakeDatadogClient.new(**state)
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.apply(@manifest)
+
+    assert_equal 'live', plan.mode
+    assert_equal %w[noop noop noop noop], plan.operations.map(&:action)
+    assert_equal [], client.requests
+    assert_equal [], client.created_and_waited_slos
+    assert_equal [], client.created_and_waited_monitors
+  end
+
   def test_datadog_apply_recreates_stale_monitors_with_current_slo_ids
     slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
