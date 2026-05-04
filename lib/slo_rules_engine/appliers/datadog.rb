@@ -88,12 +88,14 @@ module SloRulesEngine
       def import(manifest)
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
+        state = @client.existing_state(desired: desired_state(manifest))
 
         ImportedState.new(
           provider: 'datadog',
           service: manifest.fetch(:service),
           source: 'backend_api',
-          state: @client.existing_state(desired: desired_state(manifest))
+          state: state,
+          findings: missing_backend_resource_findings(manifest, state)
         )
       end
 
@@ -335,6 +337,23 @@ module SloRulesEngine
             collection(manifest, :telemetry_gap_monitors).each_with_index.map { |artifact, index| artifact_name(artifact, 'datadog.monitor', index) },
           dashboards: collection(manifest, :dashboards).map { |artifact| fetch_value(artifact, :title) }.compact
         }
+      end
+
+      def missing_backend_resource_findings(manifest, state)
+        ARTIFACTS.flat_map do |spec|
+          collection(manifest, spec.fetch(:collection)).each_with_index.map do |artifact, index|
+            name = artifact_name(artifact, spec.fetch(:target), index)
+            next if fetch_value(fetch_value(state, spec.fetch(:state), {}), name)
+
+            {
+              code: 'missing_backend_resource',
+              target: spec.fetch(:target),
+              name: name,
+              source: "#{spec.fetch(:source_prefix)}[#{index}]",
+              message: "managed backend resource #{name.inspect} is missing for #{spec.fetch(:target)}"
+            }
+          end.compact
+        end
       end
 
       def slo_payload(manifest, artifact, source)
