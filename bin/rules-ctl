@@ -140,6 +140,8 @@ module RulesCtl
       }
     )
     exit 1
+  rescue SloRulesEngine::Datadog::PayloadError => error
+    render_provider_payload_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
   rescue SloRulesEngine::ManifestSchemaError => error
     render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
   rescue SloRulesEngine::UnsupportedApplyAction => error
@@ -728,6 +730,23 @@ module RulesCtl
     exit 1
   end
 
+  def render_provider_payload_error(provider:, provider_key:, mode:, error:)
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'invalid_provider_payload',
+        message: error.message
+      },
+      errors: error.result.errors.map(&:to_h),
+      warnings: error.result.warnings.map(&:to_h)
+    )
+    exit 1
+  end
+
   def abort_usage(message = nil)
     warn "Error: #{message}" if message
     warn <<~USAGE
@@ -753,4 +772,4 @@ module RulesCtl
   end
 end
 
-RulesCtl.run(ARGV)
+RulesCtl.run(ARGV) if __FILE__ == $PROGRAM_NAME

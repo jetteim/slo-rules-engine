@@ -259,6 +259,20 @@ class DatadogApplyTest < Minitest::Test
     assert_includes client.requests.fetch(2).fetch(:payload).fetch(:query), 'burn_rate("slo-123")'
   end
 
+  def test_datadog_apply_rejects_unresolved_monitor_payload_references
+    client = FakeDatadogClient.new(slo_create_response: { 'data' => [{}] })
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      applier.apply(@manifest)
+    end
+
+    assert_equal [['POST', '/api/v1/slo']], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
+    assert error.result.errors.any? do |entry|
+      entry.path == 'query' && entry.message.include?('unresolved SLO reference')
+    end
+  end
+
   def test_datadog_client_imports_existing_state_for_desired_resource_names
     http = RoutingHttp.new(
       '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=20&query=checkout-api+http-requests+public-api+successful-requests' => FakeResponse.new(
@@ -616,12 +630,13 @@ class DatadogApplyTest < Minitest::Test
   class FakeDatadogClient
     attr_reader :requests, :existing_state_requests, :created_and_waited_slos, :created_and_waited_monitors
 
-    def initialize(slos: {}, monitors: {}, dashboards: {})
+    def initialize(slos: {}, monitors: {}, dashboards: {}, slo_create_response: nil)
       @state = { slos: slos, monitors: monitors, dashboards: dashboards }
       @requests = []
       @existing_state_requests = []
       @created_and_waited_slos = []
       @created_and_waited_monitors = []
+      @slo_create_response = slo_create_response
     end
 
     def existing_state(desired: nil)
@@ -637,7 +652,7 @@ class DatadogApplyTest < Minitest::Test
       @requests << { method: method, path: path, payload: payload }
       case path
       when '/api/v1/slo'
-        { 'data' => [{ 'id' => 'generated-slo-1' }] }
+        @slo_create_response || { 'data' => [{ 'id' => 'generated-slo-1' }] }
       when '/api/v1/monitor'
         { 'id' => "monitor-#{@requests.length}" }
       when '/api/v1/dashboard'
