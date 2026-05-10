@@ -393,6 +393,10 @@ module SloRulesEngine
       end
 
       def slo_payload(manifest, artifact, source)
+        if fetch_value(artifact, :calculation_basis) == 'time_slice'
+          return time_slice_slo_payload(manifest, artifact, source)
+        end
+
         query = fetch_value(artifact, :query, {})
         success_selector = fetch_value(query, :success_selector, {})
         if success_selector.nil? || success_selector.empty?
@@ -407,6 +411,59 @@ module SloRulesEngine
           query: {
             numerator: metric_count_query(query_scope(query, include_success: true), fetch_value(query, :metric)),
             denominator: metric_count_query(query_scope(query, include_success: false), fetch_value(query, :metric))
+          },
+          tags: datadog_tags(manifest, artifact, source),
+          thresholds: [
+            {
+              timeframe: DEFAULT_SLO_TIMEFRAME,
+              target: objective_percent(fetch_value(artifact, :objective_ratio))
+            }
+          ],
+          timeframe: DEFAULT_SLO_TIMEFRAME,
+          target_threshold: objective_percent(fetch_value(artifact, :objective_ratio))
+        }
+      end
+
+      def time_slice_slo_payload(manifest, artifact, source)
+        query = fetch_value(artifact, :query, {})
+        if fetch_value(query, :type) != 'counter'
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "Datadog time-slice apply currently supports counter bindings only for #{fetch_value(artifact, :name).inspect}"
+        end
+
+        success_selector = fetch_value(query, :success_selector, {})
+        if success_selector.nil? || success_selector.empty?
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "Datadog time-slice apply requires a success_selector for #{fetch_value(artifact, :name).inspect}"
+        end
+
+        {
+          name: fetch_value(artifact, :name),
+          type: 'time_slice',
+          description: generated_description(manifest, artifact, source),
+          sli_specification: {
+            time_slice: {
+              comparator: '>=',
+              query_interval_seconds: query_interval_seconds(fetch_value(query, :range)),
+              threshold: fetch_value(artifact, :objective_ratio).to_f,
+              query: {
+                formulas: [
+                  { formula: 'success / total' }
+                ],
+                queries: [
+                  {
+                    data_source: 'metrics',
+                    name: 'total',
+                    query: metric_sum_query(query_scope(query, include_success: false), fetch_value(query, :metric))
+                  },
+                  {
+                    data_source: 'metrics',
+                    name: 'success',
+                    query: metric_sum_query(query_scope(query, include_success: true), fetch_value(query, :metric))
+                  }
+                ]
+              }
+            }
           },
           tags: datadog_tags(manifest, artifact, source),
           thresholds: [
@@ -534,6 +591,11 @@ module SloRulesEngine
         %(count:#{metric}{#{tags.empty? ? '*' : tags.join(',')}}.as_count())
       end
 
+      def metric_sum_query(scope, metric)
+        tags = scope.sort_by { |key, _value| key.to_s }.map { |key, value| "#{key}:#{value}" }
+        %(sum:#{metric}{#{tags.empty? ? '*' : tags.join(',')}}.as_count())
+      end
+
       def datadog_tags(manifest, artifact, source)
         [
           MANAGED_TAG,
@@ -571,6 +633,21 @@ module SloRulesEngine
 
       def objective_percent(value)
         (value.to_f * 100).round(3)
+      end
+
+      def query_interval_seconds(range)
+        match = range.to_s.match(/\A(\d+)([smhd])\z/)
+        return 300 unless match
+
+        value = match[1].to_i
+        multiplier = case match[2]
+                     when 's' then 1
+                     when 'm' then 60
+                     when 'h' then 3600
+                     when 'd' then 86_400
+                     else 300
+                     end
+        value * multiplier
       end
 
       def slo_reference_name_from_context(artifact)

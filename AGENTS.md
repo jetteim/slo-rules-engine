@@ -43,6 +43,7 @@ Implemented and already pushed:
 - Datadog source-tag reconciliation for `existing_state`, `import`, and `prune` when backend names drift
 - Datadog managed-tag validation and unmanaged-tag canonicalization during reconciliation
 - Datadog SLO and monitor field-contract validation before live mutation
+- Datadog counter-ratio `time_slice` SLO translation, validation, and diff reconciliation
 
 ## Most Recent Checkpoints
 
@@ -57,7 +58,7 @@ Implemented and already pushed:
 
 Highest-value remaining provider-state gaps:
 
-1. Datadog provider-schema payload translation and backend-state reconciliation beyond the current heuristic baseline
+1. Broaden Datadog `time_slice` translation beyond counter-ratio success-selector inputs to the remaining reviewed intent shapes
 2. Remaining Datadog resource semantics not yet validated against the real backend contract, especially dashboard structure and any provider-owned fields still treated heuristically
 3. Broader state-management parity for future providers after the Datadog baseline is stronger
 
@@ -71,12 +72,13 @@ Secondary gaps:
 
 Next recommended provider-state slice:
 
-- tighten real Datadog payload translation and backend-state reconciliation beyond the current generated-contract baseline
+- broaden real Datadog payload translation coverage beyond counter-ratio `time_slice` SLOs while keeping backend-state reconciliation strict
 
 Rationale:
 
 - managed identity tags and core SLO/monitor semantics are now validated before live apply
-- the next meaningful gap is closing the distance between generated payloads and actual Datadog backend semantics during import, diff, and apply
+- counter-ratio `time_slice` SLOs now translate and reconcile cleanly
+- the next meaningful gap is closing the remaining distance between reviewed intent and actual Datadog backend semantics for the other `time_slice` and provider-owned payload shapes
 
 ## Verification Commands
 

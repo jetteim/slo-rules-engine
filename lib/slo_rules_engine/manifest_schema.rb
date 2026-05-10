@@ -189,7 +189,6 @@ module SloRulesEngine
       validate_presence(result, "#{path}.data_source", fetch_value(query, :data_source))
       validate_presence(result, "#{path}.type", fetch_value(query, :type))
       validate_hash(result, "#{path}.selector", fetch_value(query, :selector))
-      validate_presence(result, "#{path}.query", fetch_value(query, :query))
       return unless require_success_selector
 
       validate_hash(result, "#{path}.success_selector", fetch_value(query, :success_selector))

@@ -23,15 +23,38 @@ module SloRulesEngine
       end
 
       def canonicalize_slo(payload)
+        type = fetch_value(payload, :type)
         query = fetch_value(payload, :query, {})
+        specification = fetch_value(payload, :sli_specification, {})
+        time_slice = fetch_value(specification, :time_slice, {})
+        time_slice_query = fetch_value(time_slice, :query, {})
         compact_hash(
           name: fetch_value(payload, :name),
-          type: fetch_value(payload, :type),
+          type: type,
           description: fetch_value(payload, :description),
-          query: compact_hash(
+          query: (compact_hash(
             numerator: fetch_value(query, :numerator),
             denominator: fetch_value(query, :denominator)
-          ),
+          ) if type == 'metric'),
+          sli_specification: (compact_hash(
+            time_slice: compact_hash(
+              comparator: fetch_value(time_slice, :comparator),
+              query_interval_seconds: fetch_value(time_slice, :query_interval_seconds),
+              threshold: fetch_value(time_slice, :threshold),
+              query: compact_hash(
+                formulas: Array(fetch_value(time_slice_query, :formulas, [])).map do |entry|
+                  compact_hash(formula: fetch_value(entry, :formula))
+                end,
+                queries: Array(fetch_value(time_slice_query, :queries, [])).map do |entry|
+                  compact_hash(
+                    data_source: fetch_value(entry, :data_source),
+                    name: fetch_value(entry, :name),
+                    query: fetch_value(entry, :query)
+                  )
+                end
+              )
+            )
+          ) if type == 'time_slice'),
           tags: canonicalize_tags(fetch_value(payload, :tags, [])),
           thresholds: Array(fetch_value(payload, :thresholds, [])).map do |entry|
             compact_hash(

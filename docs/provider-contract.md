@@ -111,6 +111,7 @@ Expected state behavior:
 - managed identity tags required on apply-ready payloads: `managed_by:slo-rules-engine`, `service:*`, and `source_ref:*`
 - monitor payloads also require `route_key:*` tags for alert-routing context
 - SLO payloads require `30d` timeframe consistency between `timeframe`, `thresholds[0].timeframe`, and `target_threshold`
+- reviewed counter-ratio `time_slice` SLOs must translate to Datadog `sli_specification.time_slice` payloads with explicit comparator, query interval, threshold, and formula/query structure
 - burn-rate monitor payloads require the Datadog `burn_rate(...).over("30d")...` query shape and `options.thresholds.critical` must match the query threshold
 - telemetry-gap monitor payloads require the `avg(last_10m):... < 0` no-data query shape with `notify_no_data: true`, `no_data_timeframe: 10`, and `critical: 0`
 - reconciliation compares provider-owned tags and ignores unmanaged backend tags; provider-schema conformance must still be verified before production use

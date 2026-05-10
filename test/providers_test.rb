@@ -77,6 +77,7 @@ class ProvidersTest < Minitest::Test
 
     assert_equal 'datadog', manifest[:provider]
     assert_equal 1, manifest[:artifacts][:slos].length
+    assert_equal '5m', manifest[:artifacts][:slos].fetch(0).fetch(:query).fetch(:range)
     assert_equal 1, manifest[:artifacts][:monitors].length
     assert_equal [14.4, 6.0], manifest[:artifacts][:monitors].fetch(0)[:burn_rate_windows].map { |window| window[:threshold] }
     assert_equal 1, manifest[:artifacts][:telemetry_gap_monitors].length

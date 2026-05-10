@@ -41,22 +41,70 @@ module SloRulesEngine
       end
 
       def validate_slo(result, payload)
-        query = fetch_value(payload, :query, {})
+        type = fetch_value(payload, :type)
         timeframe = fetch_value(payload, :timeframe)
         thresholds = fetch_value(payload, :thresholds)
         target_threshold = fetch_value(payload, :target_threshold)
         validate_presence(result, 'name', fetch_value(payload, :name))
-        validate_exact(result, 'type', fetch_value(payload, :type), 'metric')
-        validate_hash(result, 'query', query)
         validate_identity_tags(result, payload, source_prefixes: ['artifacts.slos.'])
         validate_exact(result, 'timeframe', timeframe, '30d')
         validate_array(result, 'thresholds', thresholds)
         validate_numeric(result, 'target_threshold', target_threshold)
+        validate_slo_threshold_contract(result, thresholds, timeframe, target_threshold)
+        case type
+        when 'metric'
+          validate_metric_slo(result, payload)
+        when 'time_slice'
+          validate_time_slice_slo(result, payload)
+        else
+          result.error('type', 'must equal "metric" or "time_slice"')
+        end
+      end
+
+      def validate_metric_slo(result, payload)
+        query = fetch_value(payload, :query, {})
+        validate_hash(result, 'query', query)
         return unless query.is_a?(Hash)
 
         validate_presence(result, 'query.numerator', fetch_value(query, :numerator))
         validate_presence(result, 'query.denominator', fetch_value(query, :denominator))
-        validate_slo_threshold_contract(result, thresholds, timeframe, target_threshold)
+      end
+
+      def validate_time_slice_slo(result, payload)
+        specification = fetch_value(payload, :sli_specification, {})
+        validate_hash(result, 'sli_specification', specification)
+        return unless specification.is_a?(Hash)
+
+        time_slice = fetch_value(specification, :time_slice, {})
+        validate_hash(result, 'sli_specification.time_slice', time_slice)
+        return unless time_slice.is_a?(Hash)
+
+        validate_exact(result, 'sli_specification.time_slice.comparator', fetch_value(time_slice, :comparator), '>=')
+        validate_numeric(result, 'sli_specification.time_slice.query_interval_seconds', fetch_value(time_slice, :query_interval_seconds))
+        validate_numeric(result, 'sli_specification.time_slice.threshold', fetch_value(time_slice, :threshold))
+
+        query = fetch_value(time_slice, :query, {})
+        validate_hash(result, 'sli_specification.time_slice.query', query)
+        return unless query.is_a?(Hash)
+
+        formulas = fetch_value(query, :formulas)
+        queries = fetch_value(query, :queries)
+        validate_array(result, 'sli_specification.time_slice.query.formulas', formulas)
+        validate_array(result, 'sli_specification.time_slice.query.queries', queries)
+        Array(formulas).each_with_index do |entry, index|
+          validate_hash(result, "sli_specification.time_slice.query.formulas[#{index}]", entry)
+          next unless entry.is_a?(Hash)
+
+          validate_presence(result, "sli_specification.time_slice.query.formulas[#{index}].formula", fetch_value(entry, :formula))
+        end
+        Array(queries).each_with_index do |entry, index|
+          validate_hash(result, "sli_specification.time_slice.query.queries[#{index}]", entry)
+          next unless entry.is_a?(Hash)
+
+          validate_exact(result, "sli_specification.time_slice.query.queries[#{index}].data_source", fetch_value(entry, :data_source), 'metrics')
+          validate_presence(result, "sli_specification.time_slice.query.queries[#{index}].name", fetch_value(entry, :name))
+          validate_presence(result, "sli_specification.time_slice.query.queries[#{index}].query", fetch_value(entry, :query))
+        end
       end
 
       def validate_monitor(result, payload)

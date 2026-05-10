@@ -75,6 +75,7 @@ module SloRulesEngine
           data_source: binding.data_source,
           metric: binding.metric,
           type: binding.type,
+          range: binding.range || metric.range,
           selector: selector,
           query: binding.query,
           success_selector: slo.success_selector,
