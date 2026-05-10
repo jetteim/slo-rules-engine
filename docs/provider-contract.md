@@ -107,7 +107,10 @@ Expected state behavior:
 - live API apply when confirmed
 - credential validation through environment or explicit runtime configuration
 - retry handling for rate limiting and transient server errors, including Datadog `X-RateLimit-Reset` and `X-RateLimit-Period` headers
-- source-artifact provenance through managed `source_ref` tags used during import, diff, apply, and prune; provider-schema conformance must be verified before production use
+- source-artifact provenance through managed `source_ref` tags used during import, diff, apply, and prune
+- managed identity tags required on apply-ready payloads: `managed_by:slo-rules-engine`, `service:*`, and `source_ref:*`
+- monitor payloads also require `route_key:*` tags for alert-routing context
+- reconciliation compares provider-owned tags and ignores unmanaged backend tags; provider-schema conformance must still be verified before production use
 
 Expected telemetry behavior:
 

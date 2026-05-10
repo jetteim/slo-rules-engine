@@ -64,7 +64,8 @@ Explicit features:
 - **Apply planning:** dry-run apply emits planned create, update, write, or handoff operations.
 - **Explicit live mutation:** live backend changes require a separate command, confirmation, and credentials when the provider needs them.
 - **Datadog live API support:** Datadog can apply SLOs, monitors, telemetry-gap monitors, and dashboards through API calls.
-- **Payload provenance:** Datadog apply operations preserve the source artifact path through managed `source_ref` tags and use that identity during import, diff, apply, and prune; provider-schema conformance and live account validation remain required before production use.
+- **Payload provenance:** Datadog apply operations preserve the source artifact path through managed `source_ref` tags and use that identity during import, diff, apply, and prune.
+- **Managed tag contract:** Datadog apply-ready payloads require managed identity tags such as `managed_by`, `service`, and `source_ref`, while reconciliation ignores unmanaged backend tags so provider-owned semantics drive drift detection.
 - **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but initially manage files and handoff plans rather than mutating live backends.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

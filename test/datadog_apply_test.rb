@@ -453,6 +453,35 @@ class DatadogApplyTest < Minitest::Test
     end
   end
 
+  def test_datadog_payload_validator_requires_managed_identity_tags
+    operations = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations
+
+    slo_payload = Marshal.load(Marshal.dump(operations.fetch(0).payload))
+    slo_payload[:tags].reject! { |tag| tag.start_with?('source_ref:') }
+    slo_error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.slo', slo_payload)
+    end
+    assert slo_error.result.errors.any? { |entry| entry.path == 'tags.source_ref' && entry.message == 'is required' }
+
+    monitor_payload = Marshal.load(Marshal.dump(operations.fetch(1).payload))
+    monitor_payload[:tags].reject! { |tag| tag.start_with?('route_key:') }
+    monitor_error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.monitor', monitor_payload)
+    end
+    assert monitor_error.result.errors.any? { |entry| entry.path == 'tags.route_key' && entry.message == 'is required' }
+
+    dashboard_payload = Marshal.load(Marshal.dump(operations.fetch(3).payload))
+    dashboard_payload[:tags].map! do |tag|
+      tag.start_with?('source_ref:') ? 'source_ref:artifacts.monitors.0' : tag
+    end
+    dashboard_error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.dashboard', dashboard_payload)
+    end
+    assert dashboard_error.result.errors.any? do |entry|
+      entry.path == 'tags.source_ref' && entry.message.include?('artifacts.dashboards.')
+    end
+  end
+
   def test_datadog_client_imports_existing_state_for_desired_resource_names
     http = RoutingHttp.new(
       '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=20&query=checkout-api+http-requests+public-api+successful-requests' => FakeResponse.new(
@@ -695,7 +724,8 @@ class DatadogApplyTest < Minitest::Test
               id: 'slo-123',
               modified_at: '2026-05-03T10:00:00Z',
               monitor_ids: [456],
-              creator: { email: 'bot@example.com' }
+              creator: { email: 'bot@example.com' },
+              tags: slo_payload.fetch(:tags) + ['env:prod']
             )
           ]
         )
@@ -715,6 +745,7 @@ class DatadogApplyTest < Minitest::Test
             id: 456,
             overall_state: 'OK',
             creator: { email: 'bot@example.com' },
+            tags: burn_payload.fetch(:tags) + ['env:prod'],
             options: burn_payload.fetch(:options).merge(evaluation_delay: 300)
           )
         )
@@ -734,6 +765,7 @@ class DatadogApplyTest < Minitest::Test
             id: 789,
             overall_state: 'OK',
             creator: { email: 'bot@example.com' },
+            tags: gap_payload.fetch(:tags) + ['env:prod'],
             options: gap_payload.fetch(:options).merge(groupby_simple_monitor: false)
           )
         )
@@ -752,6 +784,7 @@ class DatadogApplyTest < Minitest::Test
           dashboard_payload.merge(
             id: 'abc123',
             author_handle: 'bot@datadog',
+            tags: dashboard_payload.fetch(:tags) + ['env:prod'],
             notify_list: [],
             widgets: dashboard_payload.fetch(:widgets).each_with_index.map do |widget, index|
               widget.merge(id: index + 1, layout: { x: 0, y: index * 2, width: 47, height: 6 })

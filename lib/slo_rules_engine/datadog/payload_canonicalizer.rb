@@ -3,6 +3,9 @@
 module SloRulesEngine
   module Datadog
     module PayloadCanonicalizer
+      MANAGED_TAG = 'managed_by:slo-rules-engine'
+      MANAGED_TAG_PREFIXES = %w[service: owner: sli: sli_instance: slo: route_key: source_ref:].freeze
+
       module_function
 
       def canonicalize(target, payload)
@@ -29,7 +32,7 @@ module SloRulesEngine
             numerator: fetch_value(query, :numerator),
             denominator: fetch_value(query, :denominator)
           ),
-          tags: Array(fetch_value(payload, :tags, [])).map(&:to_s).sort,
+          tags: canonicalize_tags(fetch_value(payload, :tags, [])),
           thresholds: Array(fetch_value(payload, :thresholds, [])).map do |entry|
             compact_hash(
               timeframe: fetch_value(entry, :timeframe),
@@ -50,7 +53,7 @@ module SloRulesEngine
           type: fetch_value(payload, :type),
           query: fetch_value(payload, :query),
           message: fetch_value(payload, :message),
-          tags: Array(fetch_value(payload, :tags, [])).map(&:to_s).sort,
+          tags: canonicalize_tags(fetch_value(payload, :tags, [])),
           options: compact_hash(
             include_tags: fetch_value(options, :include_tags),
             notify_no_data: fetch_value(options, :notify_no_data),
@@ -72,7 +75,7 @@ module SloRulesEngine
         compact_hash(
           title: fetch_value(payload, :title),
           description: fetch_value(payload, :description),
-          tags: Array(fetch_value(payload, :tags, [])).map(&:to_s).sort,
+          tags: canonicalize_tags(fetch_value(payload, :tags, [])),
           layout_type: fetch_value(payload, :layout_type),
           template_variables: Array(fetch_value(payload, :template_variables, [])).map do |entry|
             compact_hash(
@@ -116,6 +119,18 @@ module SloRulesEngine
 
           compacted[key] = value
         end
+      end
+
+      def canonicalize_tags(tags)
+        Array(tags)
+          .map(&:to_s)
+          .select { |tag| managed_tag?(tag) }
+          .uniq
+          .sort
+      end
+
+      def managed_tag?(tag)
+        tag == MANAGED_TAG || MANAGED_TAG_PREFIXES.any? { |prefix| tag.start_with?(prefix) }
       end
 
       def normalize_hash(value)

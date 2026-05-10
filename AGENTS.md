@@ -41,6 +41,7 @@ Implemented and already pushed:
 - Datadog import findings for orphan managed resources
 - Datadog dashboard ownership tags and tag-based managed-state discovery
 - Datadog source-tag reconciliation for `existing_state`, `import`, and `prune` when backend names drift
+- Datadog managed-tag validation and unmanaged-tag canonicalization during reconciliation
 
 ## Most Recent Checkpoints
 
@@ -56,7 +57,7 @@ Implemented and already pushed:
 Highest-value remaining provider-state gaps:
 
 1. Datadog provider-schema payload translation and backend-state reconciliation beyond the current heuristic baseline
-2. Stronger Datadog payload validation for managed identity and provider-specific field contracts
+2. Stronger Datadog provider-specific field validation beyond managed identity tags
 3. Broader state-management parity for future providers after the Datadog baseline is stronger
 
 Secondary gaps:
@@ -69,12 +70,12 @@ Secondary gaps:
 
 Next recommended provider-state slice:
 
-- tighten Datadog payload validation and canonicalization around managed identity tags and provider-specific field contracts
+- tighten Datadog provider-specific field semantics beyond managed identity tags, especially monitor/SLO contract details that should fail before live apply
 
 Rationale:
 
-- backend resource identity is now stable across name drift through `source_ref` tags
-- the next meaningful gap is making the Datadog payload contract itself stricter before and after live reconciliation
+- managed identity tags are now validated and reconciled explicitly
+- the next meaningful gap is enforcing more of the Datadog resource contract before and after live reconciliation
 
 ## Verification Commands
 

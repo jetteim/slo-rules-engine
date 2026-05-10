@@ -14,6 +14,8 @@ module SloRulesEngine
     end
 
     module PayloadValidator
+      MANAGED_TAG = 'managed_by:slo-rules-engine'
+
       module_function
 
       def validate!(target, payload)
@@ -43,6 +45,7 @@ module SloRulesEngine
         validate_presence(result, 'name', fetch_value(payload, :name))
         validate_exact(result, 'type', fetch_value(payload, :type), 'metric')
         validate_hash(result, 'query', query)
+        validate_identity_tags(result, payload, source_prefixes: ['artifacts.slos.'])
         return unless query.is_a?(Hash)
 
         validate_presence(result, 'query.numerator', fetch_value(query, :numerator))
@@ -54,6 +57,12 @@ module SloRulesEngine
         validate_inclusion(result, 'type', fetch_value(payload, :type), ['slo alert', 'query alert'])
         query = fetch_value(payload, :query)
         validate_presence(result, 'query', query)
+        validate_identity_tags(
+          result,
+          payload,
+          source_prefixes: ['artifacts.monitors.', 'artifacts.telemetry_gap_monitors.'],
+          route_key_required: true
+        )
         if query.to_s.include?('__SLO_REF__[')
           result.error('query', 'contains unresolved SLO reference')
         end
@@ -66,6 +75,7 @@ module SloRulesEngine
       def validate_dashboard(result, payload)
         validate_presence(result, 'title', fetch_value(payload, :title))
         validate_exact(result, 'layout_type', fetch_value(payload, :layout_type), 'ordered')
+        validate_identity_tags(result, payload, source_prefixes: ['artifacts.dashboards.'])
         widgets = fetch_value(payload, :widgets)
         validate_array(result, 'widgets', widgets)
         Array(widgets).each_with_index do |widget, index|
@@ -76,6 +86,35 @@ module SloRulesEngine
 
           validate_presence(result, "#{path}.type", fetch_value(definition, :type))
         end
+      end
+
+      def validate_identity_tags(result, payload, source_prefixes:, route_key_required: false)
+        tags = fetch_value(payload, :tags)
+        validate_array(result, 'tags', tags)
+        return unless tags.is_a?(Array)
+
+        normalized_tags = tags.map(&:to_s)
+        validate_tag_presence(result, normalized_tags, 'tags.managed_by', exact: MANAGED_TAG)
+        validate_tag_presence(result, normalized_tags, 'tags.service', prefix: 'service:')
+        validate_tag_presence(result, normalized_tags, 'tags.source_ref', prefix: 'source_ref:')
+        validate_tag_presence(result, normalized_tags, 'tags.route_key', prefix: 'route_key:') if route_key_required
+
+        source_ref = normalized_tags.find { |tag| tag.start_with?('source_ref:') }
+        return unless source_ref
+
+        source_value = source_ref.sub('source_ref:', '')
+        return if source_prefixes.any? { |prefix| source_value.start_with?(prefix) }
+
+        result.error('tags.source_ref', "must start with one of #{source_prefixes.inspect}")
+      end
+
+      def validate_tag_presence(result, tags, path, exact: nil, prefix: nil)
+        present = if exact
+                    tags.include?(exact)
+                  else
+                    tags.any? { |tag| tag.start_with?(prefix) }
+                  end
+        result.error(path, 'is required') unless present
       end
 
       def validate_presence(result, path, value)
