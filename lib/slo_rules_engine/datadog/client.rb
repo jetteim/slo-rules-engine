@@ -130,19 +130,15 @@ module SloRulesEngine
       end
 
       def load_slos(names)
-        names.each_with_object({}) do |name, slos|
-          path = "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: name)}"
-          response = request('GET', path)
-          entries = Array(response.dig('data', 'attributes', 'slos'))
-          match = entries.find do |entry|
-            fetch_value(fetch_value(entry, :data, {}), :attributes, {}).fetch('name', nil) == name
-          end
+        names.each_with_object({}) do |entry, slos|
+          desired_name = desired_name(entry, :name)
+          match = find_slo_match(desired_name, desired_source(entry))
           next unless match
 
           data = fetch_value(match, :data, {})
           detail = request('GET', "/api/v1/slo/#{fetch_value(data, :id)}?with_configured_alert_ids=true")
           payload = normalize_slo_payload(first_resource(detail))
-          slos[name] = {
+          slos[desired_name] = {
             id: fetch_value(data, :id),
             name: fetch_value(fetch_value(data, :attributes, {}), :name),
             payload: payload
@@ -151,14 +147,13 @@ module SloRulesEngine
       end
 
       def load_monitors(names)
-        names.each_with_object({}) do |name, monitors|
-          path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: MANAGED_MONITOR_TAG, name: name)}"
-          entries = Array(request('GET', path))
-          match = entries.find { |entry| fetch_value(entry, :name) == name }
+        names.each_with_object({}) do |entry, monitors|
+          desired_name = desired_name(entry, :name)
+          match = find_monitor_match(desired_name, desired_source(entry))
           next unless match
 
           detail = request('GET', "/api/v1/monitor/#{fetch_value(match, :id)}")
-          monitors[name] = {
+          monitors[desired_name] = {
             id: fetch_value(match, :id),
             name: fetch_value(match, :name),
             payload: normalize_monitor_payload(detail)
@@ -167,8 +162,21 @@ module SloRulesEngine
       end
 
       def load_dashboards(titles)
-        return {} if titles.empty?
+        desired_titles = Array(titles).map do |entry|
+          {
+            title: desired_name(entry, :title),
+            source: desired_source(entry)
+          }
+        end
+        return {} if desired_titles.empty?
 
+        desired_by_source = desired_titles.each_with_object({}) do |entry, hash|
+          source = entry.fetch(:source)
+          hash[normalize_source_ref(source)] = entry.fetch(:title) if source
+        end
+        desired_by_title = desired_titles.each_with_object({}) do |entry, hash|
+          hash[entry.fetch(:title)] = entry.fetch(:title)
+        end
         dashboards = {}
         lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
         lists.each do |list|
@@ -179,10 +187,16 @@ module SloRulesEngine
           entries = Array(fetch_value(request('GET', path), :dashboards, []))
           entries.each do |entry|
             title = fetch_value(entry, :title)
-            next unless titles.include?(title)
-
             detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
-            dashboards[title] ||= {
+            source = extract_source_ref(Array(fetch_value(detail, :tags, [])).map(&:to_s))
+            desired_title = if source && desired_by_source.key?(source)
+                              desired_by_source.fetch(source)
+                            else
+                              desired_by_title[title]
+                            end
+            next unless desired_title
+
+            dashboards[desired_title] ||= {
               id: fetch_value(entry, :id),
               title: title,
               payload: normalize_dashboard_payload(detail)
@@ -201,9 +215,11 @@ module SloRulesEngine
         entries.map do |entry|
           data = fetch_value(entry, :data, {})
           attributes = fetch_value(data, :attributes, {})
+          tags = Array(fetch_value(attributes, :all_tags, [])).map(&:to_s)
           {
             id: fetch_value(data, :id),
-            name: fetch_value(attributes, :name)
+            name: fetch_value(attributes, :name),
+            source: extract_source_ref(tags)
           }.compact
         end
       end
@@ -213,9 +229,11 @@ module SloRulesEngine
         entries = Array(request('GET', path))
 
         entries.map do |entry|
+          tags = Array(fetch_value(entry, :tags, [])).map(&:to_s)
           {
             id: fetch_value(entry, :id),
-            name: fetch_value(entry, :name)
+            name: fetch_value(entry, :name),
+            source: extract_source_ref(tags)
           }.compact
         end
       end
@@ -237,11 +255,100 @@ module SloRulesEngine
 
             dashboards << {
               id: fetch_value(entry, :id),
-              title: fetch_value(entry, :title)
+              title: fetch_value(entry, :title),
+              source: extract_source_ref(tags)
             }.compact
           end
         end
         dashboards
+      end
+
+      def find_slo_match(name, source)
+        source_match = find_slo_by_query(source_query(source))
+        return source_match if source_match
+
+        find_slo_by_query(name)
+      end
+
+      def find_slo_by_query(query)
+        return if query.to_s.empty?
+
+        path = "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: query)}"
+        response = request('GET', path)
+        entries = Array(response.dig('data', 'attributes', 'slos'))
+        if query.start_with?("#{MANAGED_MONITOR_TAG} AND source_ref:")
+          entries.find do |entry|
+            tags = Array(fetch_value(fetch_value(fetch_value(entry, :data, {}), :attributes, {}), :all_tags, [])).map(&:to_s)
+            tags.include?(query.sub("#{MANAGED_MONITOR_TAG} AND ", ''))
+          end
+        else
+          entries.find do |entry|
+            fetch_value(fetch_value(entry, :data, {}), :attributes, {}).fetch('name', nil) == query
+          end
+        end
+      end
+
+      def find_monitor_match(name, source)
+        source_match = find_monitor_by_tags(source_monitor_tags(source))
+        return source_match if source_match
+
+        path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: MANAGED_MONITOR_TAG, name: name)}"
+        entries = Array(request('GET', path))
+        entries.find { |entry| fetch_value(entry, :name) == name }
+      end
+
+      def find_monitor_by_tags(tags)
+        return if tags.to_s.empty?
+
+        path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: tags)}"
+        entries = Array(request('GET', path))
+        expected_tag = tags.split(',', 2).last
+        entries.find do |entry|
+          Array(fetch_value(entry, :tags, [])).map(&:to_s).include?(expected_tag)
+        end
+      end
+
+      def desired_name(entry, key)
+        return entry if entry.is_a?(String)
+
+        fetch_value(entry, key)
+      end
+
+      def desired_source(entry)
+        return unless entry.respond_to?(:fetch)
+
+        fetch_value(entry, :source)
+      end
+
+      def source_query(source)
+        tag = source_tag(source)
+        return if tag.nil?
+
+        "#{MANAGED_MONITOR_TAG} AND #{tag}"
+      end
+
+      def source_monitor_tags(source)
+        tag = source_tag(source)
+        return if tag.nil?
+
+        "#{MANAGED_MONITOR_TAG},#{tag}"
+      end
+
+      def source_tag(source)
+        return if source.to_s.empty?
+
+        "source_ref:#{normalize_source_ref(source)}"
+      end
+
+      def normalize_source_ref(source)
+        source.to_s
+          .gsub(/\[(\d+)\]/, '.\1')
+          .gsub(/[^a-zA-Z0-9_.:-]/, '_')
+          .gsub(/\.\.+/, '.')
+      end
+
+      def extract_source_ref(tags)
+        tags.find { |tag| tag.start_with?('source_ref:') }&.sub('source_ref:', '')
       end
 
       def uri_for(path)

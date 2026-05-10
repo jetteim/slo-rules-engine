@@ -301,14 +301,24 @@ module SloRulesEngine
       def prune_operations(manifest, managed_state)
         desired = desired_state(manifest)
         PRUNE_TARGETS.flat_map do |spec|
-          desired_counts = Array(fetch_value(desired, spec.fetch(:bucket), [])).each_with_object(Hash.new(0)) do |name, counts|
-            counts[name] += 1
+          desired_source_counts = Hash.new(0)
+          desired_name_counts = Hash.new(0)
+          Array(fetch_value(desired, spec.fetch(:bucket), [])).each do |entry|
+            source = normalized_source_identity(fetch_value(entry, :source))
+            entry_name = fetch_value(entry, :name) || fetch_value(entry, :title)
+            desired_source_counts[source] += 1 if source
+            desired_name_counts[entry_name] += 1 if entry_name
           end
 
           Array(fetch_value(managed_state, spec.fetch(:bucket), [])).each_with_index.map do |entry, index|
             entry_name = fetch_value(entry, :name) || fetch_value(entry, :title)
-            if desired_counts[entry_name].positive?
-              desired_counts[entry_name] -= 1
+            source = normalized_source_identity(fetch_value(entry, :source))
+            if source && desired_source_counts[source].positive?
+              desired_source_counts[source] -= 1
+              next
+            end
+            if desired_name_counts[entry_name].positive?
+              desired_name_counts[entry_name] -= 1
               next
             end
 
@@ -337,12 +347,18 @@ module SloRulesEngine
       end
 
       def desired_state(manifest)
-        artifacts = fetch_value(manifest, :artifacts, {})
         {
-          slos: collection(manifest, :slos).map { |artifact| artifact_name(artifact, 'datadog.slo', 0) },
-          monitors: collection(manifest, :monitors).each_with_index.map { |artifact, index| artifact_name(artifact, 'datadog.monitor', index) } +
-            collection(manifest, :telemetry_gap_monitors).each_with_index.map { |artifact, index| artifact_name(artifact, 'datadog.monitor', index) },
-          dashboards: collection(manifest, :dashboards).map { |artifact| fetch_value(artifact, :title) }.compact
+          slos: collection(manifest, :slos).each_with_index.map do |artifact, index|
+            { name: artifact_name(artifact, 'datadog.slo', index), source: "artifacts.slos[#{index}]" }
+          end,
+          monitors: collection(manifest, :monitors).each_with_index.map do |artifact, index|
+            { name: artifact_name(artifact, 'datadog.monitor', index), source: "artifacts.monitors[#{index}]" }
+          end + collection(manifest, :telemetry_gap_monitors).each_with_index.map do |artifact, index|
+            { name: artifact_name(artifact, 'datadog.monitor', index), source: "artifacts.telemetry_gap_monitors[#{index}]" }
+          end,
+          dashboards: collection(manifest, :dashboards).each_with_index.map do |artifact, index|
+            { title: fetch_value(artifact, :title), source: "artifacts.dashboards[#{index}]" }
+          end.compact
         }
       end
 
@@ -392,7 +408,7 @@ module SloRulesEngine
             numerator: metric_count_query(query_scope(query, include_success: true), fetch_value(query, :metric)),
             denominator: metric_count_query(query_scope(query, include_success: false), fetch_value(query, :metric))
           },
-          tags: datadog_tags(manifest, artifact),
+          tags: datadog_tags(manifest, artifact, source),
           thresholds: [
             {
               timeframe: DEFAULT_SLO_TIMEFRAME,
@@ -427,7 +443,7 @@ module SloRulesEngine
           type: 'slo alert',
           query: %(burn_rate("__SLO_REF__[#{slo_reference_name_from_context(artifact)}]").over("#{DEFAULT_SLO_TIMEFRAME}").long_window("#{long_window}").short_window("#{short_window}") > #{threshold}),
           message: burn_rate_message(artifact),
-          tags: datadog_tags(manifest, artifact).push("route_key:#{fetch_value(artifact, :route_key)}"),
+          tags: datadog_tags(manifest, artifact, source).push("route_key:#{fetch_value(artifact, :route_key)}"),
           options: {
             include_tags: true,
             thresholds: {
@@ -445,7 +461,7 @@ module SloRulesEngine
           type: 'query alert',
           query: "avg(last_10m):#{metric_count_query(query_scope(query, include_success: false), fetch_value(query, :metric))} < 0",
           message: telemetry_gap_message(artifact),
-          tags: datadog_tags(manifest, artifact).push("route_key:#{fetch_value(artifact, :route_key)}"),
+          tags: datadog_tags(manifest, artifact, source).push("route_key:#{fetch_value(artifact, :route_key)}"),
           options: {
             include_tags: true,
             notify_no_data: true,
@@ -463,7 +479,7 @@ module SloRulesEngine
         {
           title: fetch_value(artifact, :title),
           description: "Generated dashboard for #{fetch_value(manifest, :service)} from #{source}",
-          tags: datadog_tags(manifest, artifact),
+          tags: datadog_tags(manifest, artifact, source),
           layout_type: 'ordered',
           template_variables: fetch_value(artifact, :variables, {}).map do |name, default|
             {
@@ -518,15 +534,35 @@ module SloRulesEngine
         %(count:#{metric}{#{tags.empty? ? '*' : tags.join(',')}}.as_count())
       end
 
-      def datadog_tags(manifest, artifact)
+      def datadog_tags(manifest, artifact, source)
         [
           MANAGED_TAG,
           "service:#{fetch_value(manifest, :service)}",
           "owner:#{fetch_value(artifact, :owner)}",
           "sli:#{fetch_value(artifact, :sli)}",
           "sli_instance:#{fetch_value(artifact, :sli_instance)}",
-          "slo:#{fetch_value(artifact, :slo)}"
+          "slo:#{fetch_value(artifact, :slo)}",
+          source_tag(source)
         ].compact
+      end
+
+      def source_tag(source)
+        return if source.to_s.empty?
+
+        "source_ref:#{normalize_source_ref(source)}"
+      end
+
+      def normalize_source_ref(source)
+        source.to_s
+          .gsub(/\[(\d+)\]/, '.\1')
+          .gsub(/[^a-zA-Z0-9_.:-]/, '_')
+          .gsub(/\.\.+/, '.')
+      end
+
+      def normalized_source_identity(source)
+        return if source.to_s.empty?
+
+        normalize_source_ref(source.to_s.sub(/\Asource_ref:/, ''))
       end
 
       def generated_description(manifest, artifact, source)

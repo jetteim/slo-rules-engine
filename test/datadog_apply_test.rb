@@ -29,6 +29,7 @@ class DatadogApplyTest < Minitest::Test
   def test_datadog_applier_uses_backend_state_to_plan_updates
     slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
     client = FakeDatadogClient.new(
       slos: { slo_name => { id: 'slo-123' } },
       monitors: { monitor_name => { id: 456 } }
@@ -42,8 +43,11 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'update', plan.operations.fetch(1).action
     assert_equal 456, plan.operations.fetch(1).backend_id
     assert_equal 'create', plan.operations.fetch(2).action
-    assert_equal [slo_name], client.existing_state_requests.fetch(0).fetch(:slos)
-    assert_equal [monitor_name, @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)],
+    assert_equal [{ name: slo_name, source: 'artifacts.slos[0]' }], client.existing_state_requests.fetch(0).fetch(:slos)
+    assert_equal [
+      { name: monitor_name, source: 'artifacts.monitors[0]' },
+      { name: gap_monitor_name, source: 'artifacts.telemetry_gap_monitors[0]' }
+    ],
                  client.existing_state_requests.fetch(0).fetch(:monitors)
   end
 
@@ -142,8 +146,11 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'checkout-api', imported.service
     assert_equal 'backend_api', imported.source
     assert_equal 'slo-123', imported.state.fetch(:slos).fetch(slo_name).fetch(:id)
-    assert_equal [slo_name], client.existing_state_requests.fetch(0).fetch(:slos)
-    assert_equal [monitor_name, @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)],
+    assert_equal [{ name: slo_name, source: 'artifacts.slos[0]' }], client.existing_state_requests.fetch(0).fetch(:slos)
+    assert_equal [
+      { name: monitor_name, source: 'artifacts.monitors[0]' },
+      { name: @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name), source: 'artifacts.telemetry_gap_monitors[0]' }
+    ],
                  client.existing_state_requests.fetch(0).fetch(:monitors)
   end
 
@@ -215,6 +222,29 @@ class DatadogApplyTest < Minitest::Test
     plan = applier.prune(@manifest)
 
     assert_equal 'dry_run', plan.mode
+    assert plan.empty?
+    assert_equal [], plan.operations
+  end
+
+  def test_datadog_applier_prune_uses_source_identity_when_backend_names_drift
+    client = FakeDatadogClient.new(
+      managed_state: {
+        slos: [
+          { id: 'slo-123', name: 'legacy checkout slo', source: 'artifacts.slos[0]' }
+        ],
+        monitors: [
+          { id: 456, name: 'legacy burn monitor', source: 'artifacts.monitors[0]' },
+          { id: 789, name: 'legacy telemetry gap monitor', source: 'artifacts.telemetry_gap_monitors[0]' }
+        ],
+        dashboards: [
+          { id: 'dashboard-123', title: 'legacy dashboard title', source: 'artifacts.dashboards[0]' }
+        ]
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.prune(@manifest)
+
     assert plan.empty?
     assert_equal [], plan.operations
   end
@@ -314,22 +344,26 @@ class DatadogApplyTest < Minitest::Test
                  slo_payload.fetch(:query).fetch(:numerator)
     assert_equal 'count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count()',
                  slo_payload.fetch(:query).fetch(:denominator)
+    assert_includes slo_payload.fetch(:tags), 'source_ref:artifacts.slos.0'
 
     burn_rate_payload = client.requests.fetch(1).fetch(:payload)
     assert_equal 'slo alert', burn_rate_payload.fetch(:type)
     assert_includes burn_rate_payload.fetch(:query), 'burn_rate("generated-slo-1").over("30d").long_window("1h").short_window("5m") > 14.4'
     assert_equal 14.4, burn_rate_payload.fetch(:options).fetch(:thresholds).fetch(:critical)
+    assert_includes burn_rate_payload.fetch(:tags), 'source_ref:artifacts.monitors.0'
 
     telemetry_gap_payload = client.requests.fetch(2).fetch(:payload)
     assert_equal 'query alert', telemetry_gap_payload.fetch(:type)
     assert_equal true, telemetry_gap_payload.fetch(:options).fetch(:notify_no_data)
     assert_includes telemetry_gap_payload.fetch(:query), 'avg(last_10m):count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count() < 0'
+    assert_includes telemetry_gap_payload.fetch(:tags), 'source_ref:artifacts.telemetry_gap_monitors.0'
 
     dashboard_payload = client.requests.fetch(3).fetch(:payload)
     assert_equal 'ordered', dashboard_payload.fetch(:layout_type)
     assert_equal 'checkout-api SLO decision dashboard', dashboard_payload.fetch(:title)
     assert_includes dashboard_payload.fetch(:tags), 'managed_by:slo-rules-engine'
     assert_includes dashboard_payload.fetch(:tags), 'service:checkout-api'
+    assert_includes dashboard_payload.fetch(:tags), 'source_ref:artifacts.dashboards.0'
     assert_equal %w[service sli sli_instance slo],
                  dashboard_payload.fetch(:template_variables).map { |variable| variable.fetch(:name) }
   end
@@ -478,6 +512,79 @@ class DatadogApplyTest < Minitest::Test
                     'managed_by:slo-rules-engine'
   end
 
+  def test_datadog_client_matches_existing_state_by_source_tag_when_backend_names_drift
+    desired_slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    desired_monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    desired_gap_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    desired_dashboard_title = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    managed_tag = 'managed_by:slo-rules-engine'
+
+    http = RoutingHttp.new(
+      "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: "#{managed_tag} AND source_ref:artifacts.slos.0")}" => FakeResponse.new(
+        '200',
+        '{"data":{"attributes":{"slos":[{"data":{"id":"slo-123","attributes":{"name":"legacy checkout slo","all_tags":["managed_by:slo-rules-engine","service:checkout-api","source_ref:artifacts.slos.0"]}}}]}}}'
+      ),
+      '/api/v1/slo/slo-123?with_configured_alert_ids=true' => FakeResponse.new(
+        '200',
+        '{"data":[{"id":"slo-123","name":"legacy checkout slo","type":"metric","description":"Generated by slo-rules-engine for checkout-api from artifacts.slos[0]","query":{"numerator":"count:http.server.request.duration{route:/checkout,service:checkout-api,status:success}.as_count()","denominator":"count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count()"},"tags":["managed_by:slo-rules-engine","service:checkout-api","source_ref:artifacts.slos.0"],"thresholds":[{"timeframe":"30d","target":99.9}],"timeframe":"30d","target_threshold":99.9}]}'
+      ),
+      "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: "#{managed_tag},source_ref:artifacts.monitors.0")}" => FakeResponse.new(
+        '200',
+        '[{"id":456,"name":"legacy burn monitor","tags":["managed_by:slo-rules-engine","service:checkout-api","source_ref:artifacts.monitors.0"]}]'
+      ),
+      '/api/v1/monitor/456' => FakeResponse.new(
+        '200',
+        '{"id":456,"name":"legacy burn monitor","type":"slo alert","query":"burn_rate(\"slo-123\").over(\"30d\").long_window(\"1h\").short_window(\"5m\") > 14.4","message":"Error budget burn is elevated for checkout-api http-requests public-api successful-requests.","tags":["managed_by:slo-rules-engine","service:checkout-api","route_key:checkout-api","source_ref:artifacts.monitors.0"],"options":{"include_tags":true,"thresholds":{"critical":14.4}}}'
+      ),
+      "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: "#{managed_tag},source_ref:artifacts.telemetry_gap_monitors.0")}" => FakeResponse.new(
+        '200',
+        '[{"id":789,"name":"legacy telemetry gap monitor","tags":["managed_by:slo-rules-engine","service:checkout-api","source_ref:artifacts.telemetry_gap_monitors.0"]}]'
+      ),
+      '/api/v1/monitor/789' => FakeResponse.new(
+        '200',
+        '{"id":789,"name":"legacy telemetry gap monitor","type":"query alert","query":"avg(last_10m):count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count() < 0","message":"Telemetry is missing for checkout-api http-requests public-api successful-requests.","tags":["managed_by:slo-rules-engine","service:checkout-api","route_key:checkout-api","source_ref:artifacts.telemetry_gap_monitors.0"],"options":{"include_tags":true,"notify_no_data":true,"no_data_timeframe":10,"thresholds":{"critical":0}}}'
+      ),
+      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
+        '200',
+        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
+      ),
+      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+        '200',
+        '{"dashboards":[{"id":"abc123","title":"legacy dashboard title","url":"/dashboard/abc123"}]}'
+      ),
+      '/api/v1/dashboard/abc123' => FakeResponse.new(
+        '200',
+        '{"id":"abc123","title":"legacy dashboard title","description":"Generated dashboard for checkout-api from artifacts.dashboards[0]","layout_type":"ordered","tags":["managed_by:slo-rules-engine","service:checkout-api","source_ref:artifacts.dashboards.0"],"template_variables":[{"name":"service","prefix":"service","default":"checkout-api"}],"widgets":[{"definition":{"type":"note","content":"Investigate request latency, traffic, and burn rate before paging."}}]}'
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.existing_state(
+      desired: {
+        slos: [{ name: desired_slo_name, source: 'artifacts.slos[0]' }],
+        monitors: [
+          { name: desired_monitor_name, source: 'artifacts.monitors[0]' },
+          { name: desired_gap_name, source: 'artifacts.telemetry_gap_monitors[0]' }
+        ],
+        dashboards: [{ title: desired_dashboard_title, source: 'artifacts.dashboards[0]' }]
+      }
+    )
+
+    assert_equal 'slo-123', state.fetch(:slos).fetch(desired_slo_name).fetch(:id)
+    assert_equal 'legacy checkout slo', state.fetch(:slos).fetch(desired_slo_name).fetch(:payload).fetch(:name)
+    assert_equal 456, state.fetch(:monitors).fetch(desired_monitor_name).fetch(:id)
+    assert_equal 'legacy burn monitor', state.fetch(:monitors).fetch(desired_monitor_name).fetch(:payload).fetch(:name)
+    assert_equal 789, state.fetch(:monitors).fetch(desired_gap_name).fetch(:id)
+    assert_equal 'legacy telemetry gap monitor', state.fetch(:monitors).fetch(desired_gap_name).fetch(:payload).fetch(:name)
+    assert_equal 'abc123', state.fetch(:dashboards).fetch(desired_dashboard_title).fetch(:id)
+    assert_equal 'legacy dashboard title', state.fetch(:dashboards).fetch(desired_dashboard_title).fetch(:payload).fetch(:title)
+  end
+
   def test_datadog_client_lists_managed_resources_for_service
     http = RoutingHttp.new(
       '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=100&query=managed_by%3Aslo-rules-engine+AND+service%3Acheckout-api' => FakeResponse.new(
@@ -538,6 +645,27 @@ class DatadogApplyTest < Minitest::Test
     dashboard_payload = Marshal.load(Marshal.dump(desired_operations.fetch(3).payload))
 
     http = RoutingHttp.new(
+      "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: 'managed_by:slo-rules-engine AND source_ref:artifacts.slos.0')}" => FakeResponse.new(
+        '200',
+        JSON.generate(
+          data: {
+            attributes: {
+              slos: [
+                {
+                  data: {
+                    id: 'slo-123',
+                    attributes: {
+                      name: slo_name,
+                      all_tags: ['managed_by:slo-rules-engine', 'source_ref:artifacts.slos.0']
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          meta: { pagination: { total: 1, number: 0, last_number: 0 } }
+        )
+      ),
       "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: slo_name)}" => FakeResponse.new(
         '200',
         JSON.generate(
@@ -572,6 +700,10 @@ class DatadogApplyTest < Minitest::Test
           ]
         )
       ),
+      "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: 'managed_by:slo-rules-engine,source_ref:artifacts.monitors.0')}" => FakeResponse.new(
+        '200',
+        JSON.generate([{ id: 456, name: burn_monitor_name, tags: ['managed_by:slo-rules-engine', 'source_ref:artifacts.monitors.0'] }])
+      ),
       "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: 'managed_by:slo-rules-engine', name: burn_monitor_name)}" => FakeResponse.new(
         '200',
         JSON.generate([{ id: 456, name: burn_monitor_name, tags: ['managed_by:slo-rules-engine'] }])
@@ -586,6 +718,10 @@ class DatadogApplyTest < Minitest::Test
             options: burn_payload.fetch(:options).merge(evaluation_delay: 300)
           )
         )
+      ),
+      "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: 'managed_by:slo-rules-engine,source_ref:artifacts.telemetry_gap_monitors.0')}" => FakeResponse.new(
+        '200',
+        JSON.generate([{ id: 789, name: gap_monitor_name, tags: ['managed_by:slo-rules-engine', 'source_ref:artifacts.telemetry_gap_monitors.0'] }])
       ),
       "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: 'managed_by:slo-rules-engine', name: gap_monitor_name)}" => FakeResponse.new(
         '200',

@@ -107,7 +107,7 @@ Expected state behavior:
 - live API apply when confirmed
 - credential validation through environment or explicit runtime configuration
 - retry handling for rate limiting and transient server errors, including Datadog `X-RateLimit-Reset` and `X-RateLimit-Period` headers
-- source-artifact provenance in each apply operation; provider-schema conformance must be verified before production use
+- source-artifact provenance through managed `source_ref` tags used during import, diff, apply, and prune; provider-schema conformance must be verified before production use
 
 Expected telemetry behavior:
 
