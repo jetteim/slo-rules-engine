@@ -42,14 +42,21 @@ module SloRulesEngine
 
       def validate_slo(result, payload)
         query = fetch_value(payload, :query, {})
+        timeframe = fetch_value(payload, :timeframe)
+        thresholds = fetch_value(payload, :thresholds)
+        target_threshold = fetch_value(payload, :target_threshold)
         validate_presence(result, 'name', fetch_value(payload, :name))
         validate_exact(result, 'type', fetch_value(payload, :type), 'metric')
         validate_hash(result, 'query', query)
         validate_identity_tags(result, payload, source_prefixes: ['artifacts.slos.'])
+        validate_exact(result, 'timeframe', timeframe, '30d')
+        validate_array(result, 'thresholds', thresholds)
+        validate_numeric(result, 'target_threshold', target_threshold)
         return unless query.is_a?(Hash)
 
         validate_presence(result, 'query.numerator', fetch_value(query, :numerator))
         validate_presence(result, 'query.denominator', fetch_value(query, :denominator))
+        validate_slo_threshold_contract(result, thresholds, timeframe, target_threshold)
       end
 
       def validate_monitor(result, payload)
@@ -70,6 +77,14 @@ module SloRulesEngine
         validate_hash(result, 'options', fetch_value(payload, :options))
         validate_hash(result, 'options.thresholds', thresholds)
         validate_numeric(result, 'options.thresholds.critical', fetch_value(thresholds, :critical))
+        return unless fetch_value(payload, :options).is_a?(Hash) && thresholds.is_a?(Hash)
+
+        case fetch_value(payload, :type)
+        when 'slo alert'
+          validate_burn_rate_monitor_contract(result, payload, thresholds)
+        when 'query alert'
+          validate_telemetry_gap_monitor_contract(result, payload, thresholds)
+        end
       end
 
       def validate_dashboard(result, payload)
@@ -106,6 +121,52 @@ module SloRulesEngine
         return if source_prefixes.any? { |prefix| source_value.start_with?(prefix) }
 
         result.error('tags.source_ref', "must start with one of #{source_prefixes.inspect}")
+      end
+
+      def validate_slo_threshold_contract(result, thresholds, timeframe, target_threshold)
+        return unless thresholds.is_a?(Array)
+        return if thresholds.empty?
+
+        primary = thresholds.fetch(0)
+        unless primary.is_a?(Hash)
+          result.error('thresholds[0]', 'must be a hash')
+          return
+        end
+
+        threshold_timeframe = fetch_value(primary, :timeframe)
+        threshold_target = fetch_value(primary, :target)
+        validate_exact(result, 'thresholds[0].timeframe', threshold_timeframe, timeframe)
+        validate_numeric(result, 'thresholds[0].target', threshold_target)
+        return unless threshold_target.is_a?(Numeric) && target_threshold.is_a?(Numeric)
+
+        result.error('target_threshold', 'must match thresholds[0].target') unless threshold_target.to_f == target_threshold.to_f
+      end
+
+      def validate_burn_rate_monitor_contract(result, payload, thresholds)
+        options = fetch_value(payload, :options, {})
+        query = fetch_value(payload, :query).to_s
+        validate_exact(result, 'options.include_tags', fetch_value(options, :include_tags), true)
+        match = query.match(/\Aburn_rate\("([^"]+)"\)\.over\("30d"\)\.long_window\("([^"]+)"\)\.short_window\("([^"]+)"\) > ([0-9]+(?:\.[0-9]+)?)\z/)
+        unless match
+          result.error('query', 'must use Datadog burn_rate query shape over "30d"')
+          return
+        end
+
+        critical = fetch_value(thresholds, :critical)
+        return unless critical.is_a?(Numeric)
+
+        query_threshold = match[4].to_f
+        result.error('options.thresholds.critical', 'must match query threshold') unless critical.to_f == query_threshold
+      end
+
+      def validate_telemetry_gap_monitor_contract(result, payload, thresholds)
+        options = fetch_value(payload, :options, {})
+        query = fetch_value(payload, :query).to_s
+        validate_exact(result, 'options.include_tags', fetch_value(options, :include_tags), true)
+        validate_exact(result, 'options.notify_no_data', fetch_value(options, :notify_no_data), true)
+        validate_exact(result, 'options.no_data_timeframe', fetch_value(options, :no_data_timeframe), 10)
+        result.error('query', 'must use avg(last_10m) no-data query shape ending in < 0') unless query.match?(/\Aavg\(last_10m\):.+ < 0\z/)
+        validate_exact(result, 'options.thresholds.critical', fetch_value(thresholds, :critical), 0)
       end
 
       def validate_tag_presence(result, tags, path, exact: nil, prefix: nil)

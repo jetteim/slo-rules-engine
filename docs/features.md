@@ -66,6 +66,7 @@ Explicit features:
 - **Datadog live API support:** Datadog can apply SLOs, monitors, telemetry-gap monitors, and dashboards through API calls.
 - **Payload provenance:** Datadog apply operations preserve the source artifact path through managed `source_ref` tags and use that identity during import, diff, apply, and prune.
 - **Managed tag contract:** Datadog apply-ready payloads require managed identity tags such as `managed_by`, `service`, and `source_ref`, while reconciliation ignores unmanaged backend tags so provider-owned semantics drive drift detection.
+- **Provider field contract:** Datadog apply-ready payloads validate SLO timeframe/threshold consistency, burn-rate query and threshold consistency, and telemetry-gap no-data monitor semantics before live mutation.
 - **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but initially manage files and handoff plans rather than mutating live backends.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

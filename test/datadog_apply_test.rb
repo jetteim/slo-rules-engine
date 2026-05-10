@@ -482,6 +482,72 @@ class DatadogApplyTest < Minitest::Test
     end
   end
 
+  def test_datadog_payload_validator_rejects_inconsistent_slo_threshold_contract
+    slo_payload = Marshal.load(
+      Marshal.dump(SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(0).payload)
+    )
+    slo_payload[:target_threshold] = 95.0
+    slo_payload[:thresholds][0][:timeframe] = '7d'
+
+    error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.slo', slo_payload)
+    end
+
+    assert error.result.errors.any? do |entry|
+      entry.path == 'thresholds[0].timeframe' && entry.message.include?('30d')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'target_threshold' && entry.message.include?('thresholds[0].target')
+    end
+  end
+
+  def test_datadog_payload_validator_rejects_invalid_burn_rate_monitor_contract
+    monitor_payload = Marshal.load(
+      Marshal.dump(SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(1).payload)
+    )
+    monitor_payload[:query] = 'burn_rate("slo-123").over("30d").long_window("1h").short_window("5m") > 9.9'
+    monitor_payload[:options][:include_tags] = false
+    monitor_payload[:options][:thresholds][:critical] = 14.4
+
+    error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.monitor', monitor_payload)
+    end
+
+    assert error.result.errors.any? do |entry|
+      entry.path == 'options.include_tags' && entry.message.include?('true')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'options.thresholds.critical' && entry.message.include?('query threshold')
+    end
+  end
+
+  def test_datadog_payload_validator_rejects_invalid_telemetry_gap_monitor_contract
+    monitor_payload = Marshal.load(
+      Marshal.dump(SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(2).payload)
+    )
+    monitor_payload[:query] = 'avg(last_5m):count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count() < 1'
+    monitor_payload[:options][:notify_no_data] = false
+    monitor_payload[:options][:no_data_timeframe] = 5
+    monitor_payload[:options][:thresholds][:critical] = 1
+
+    error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.monitor', monitor_payload)
+    end
+
+    assert error.result.errors.any? do |entry|
+      entry.path == 'query' && entry.message.include?('avg(last_10m)')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'options.notify_no_data' && entry.message.include?('true')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'options.no_data_timeframe' && entry.message.include?('10')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'options.thresholds.critical' && entry.message.include?('0')
+    end
+  end
+
   def test_datadog_client_imports_existing_state_for_desired_resource_names
     http = RoutingHttp.new(
       '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=20&query=checkout-api+http-requests+public-api+successful-requests' => FakeResponse.new(
