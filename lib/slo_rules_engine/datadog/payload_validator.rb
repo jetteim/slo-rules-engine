@@ -79,7 +79,7 @@ module SloRulesEngine
         validate_hash(result, 'sli_specification.time_slice', time_slice)
         return unless time_slice.is_a?(Hash)
 
-        validate_exact(result, 'sli_specification.time_slice.comparator', fetch_value(time_slice, :comparator), '>=')
+        validate_inclusion(result, 'sli_specification.time_slice.comparator', fetch_value(time_slice, :comparator), %w[< <= > >= ==])
         validate_numeric(result, 'sli_specification.time_slice.query_interval_seconds', fetch_value(time_slice, :query_interval_seconds))
         validate_numeric(result, 'sli_specification.time_slice.threshold', fetch_value(time_slice, :threshold))
 

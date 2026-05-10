@@ -68,6 +68,7 @@ Explicit features:
 - **Managed tag contract:** Datadog apply-ready payloads require managed identity tags such as `managed_by`, `service`, and `source_ref`, while reconciliation ignores unmanaged backend tags so provider-owned semantics drive drift detection.
 - **Provider field contract:** Datadog apply-ready payloads validate SLO timeframe/threshold consistency, burn-rate query and threshold consistency, and telemetry-gap no-data monitor semantics before live mutation.
 - **Time-slice Datadog SLO baseline:** reviewed counter-ratio `time_slice` SLOs translate into Datadog `time_slice` payloads with explicit slice interval, comparator, threshold, and formula/query structure, and that payload shape participates in diff reconciliation.
+- **Threshold-based time-slice Datadog SLO baseline:** reviewed `success_threshold` SLOs backed by provider query expressions translate into Datadog `time_slice` payloads with operator-aware comparators, numeric thresholds, merged selector scope, and diff reconciliation support.
 - **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but initially manage files and handoff plans rather than mutating live backends.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

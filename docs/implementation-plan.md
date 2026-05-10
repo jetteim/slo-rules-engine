@@ -46,6 +46,7 @@ This is the running plan for the long refactor.
 - [x] Add provider query/reality-check adapters.
 - [ ] Add real Datadog provider-schema payload translation and backend state import for create/update reconciliation.
 - [x] Add Datadog counter-ratio `time_slice` payload translation and diff reconciliation.
+- [x] Add Datadog threshold-based `time_slice` payload translation for reviewed provider query expressions.
 - [x] Add Datadog create-and-wait SLO apply and stale monitor recreate strategy.
 - [x] Expand calculation-basis findings across every SLI instance and SLO.
 - [x] Record Sloth external-generator handoff details in apply plans.

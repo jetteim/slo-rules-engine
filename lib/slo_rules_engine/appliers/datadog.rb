@@ -426,45 +426,23 @@ module SloRulesEngine
 
       def time_slice_slo_payload(manifest, artifact, source)
         query = fetch_value(artifact, :query, {})
-        if fetch_value(query, :type) != 'counter'
-          raise SloRulesEngine::UnsupportedApplyAction,
-                "Datadog time-slice apply currently supports counter bindings only for #{fetch_value(artifact, :name).inspect}"
-        end
-
         success_selector = fetch_value(query, :success_selector, {})
-        if success_selector.nil? || success_selector.empty?
-          raise SloRulesEngine::UnsupportedApplyAction,
-                "Datadog time-slice apply requires a success_selector for #{fetch_value(artifact, :name).inspect}"
-        end
+        success_threshold = fetch_value(query, :success_threshold, {})
+        specification =
+          if success_selector && !success_selector.empty?
+            counter_ratio_time_slice_specification(artifact, query)
+          elsif success_threshold && !success_threshold.empty?
+            threshold_time_slice_specification(artifact, query, success_threshold)
+          else
+            raise SloRulesEngine::UnsupportedApplyAction,
+                  "Datadog time-slice apply requires a success_selector or success_threshold for #{fetch_value(artifact, :name).inspect}"
+          end
 
         {
           name: fetch_value(artifact, :name),
           type: 'time_slice',
           description: generated_description(manifest, artifact, source),
-          sli_specification: {
-            time_slice: {
-              comparator: '>=',
-              query_interval_seconds: query_interval_seconds(fetch_value(query, :range)),
-              threshold: fetch_value(artifact, :objective_ratio).to_f,
-              query: {
-                formulas: [
-                  { formula: 'success / total' }
-                ],
-                queries: [
-                  {
-                    data_source: 'metrics',
-                    name: 'total',
-                    query: metric_sum_query(query_scope(query, include_success: false), fetch_value(query, :metric))
-                  },
-                  {
-                    data_source: 'metrics',
-                    name: 'success',
-                    query: metric_sum_query(query_scope(query, include_success: true), fetch_value(query, :metric))
-                  }
-                ]
-              }
-            }
-          },
+          sli_specification: { time_slice: specification },
           tags: datadog_tags(manifest, artifact, source),
           thresholds: [
             {
@@ -475,6 +453,59 @@ module SloRulesEngine
           timeframe: DEFAULT_SLO_TIMEFRAME,
           target_threshold: objective_percent(fetch_value(artifact, :objective_ratio))
         }
+      end
+
+      def counter_ratio_time_slice_specification(artifact, query)
+        if fetch_value(query, :type) != 'counter'
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "Datadog counter-ratio time-slice apply requires a counter binding for #{fetch_value(artifact, :name).inspect}"
+        end
+
+        {
+          comparator: '>=',
+          query_interval_seconds: query_interval_seconds(fetch_value(query, :range)),
+          threshold: fetch_value(artifact, :objective_ratio).to_f,
+          query: {
+            formulas: [
+              { formula: 'success / total' }
+            ],
+            queries: [
+              {
+                data_source: 'metrics',
+                name: 'total',
+                query: metric_sum_query(query_scope(query, include_success: false), fetch_value(query, :metric))
+              },
+              {
+                data_source: 'metrics',
+                name: 'success',
+                query: metric_sum_query(query_scope(query, include_success: true), fetch_value(query, :metric))
+              }
+            ]
+          }
+        }
+      end
+
+      def threshold_time_slice_specification(artifact, query, success_threshold)
+        {
+          comparator: datadog_comparator(fetch_value(success_threshold, :operator)),
+          query_interval_seconds: query_interval_seconds(fetch_value(query, :range)),
+          threshold: Float(fetch_value(success_threshold, :value)),
+          query: {
+            formulas: [
+              { formula: 'main' }
+            ],
+            queries: [
+              {
+                data_source: 'metrics',
+                name: 'main',
+                query: threshold_time_slice_query_expression(query)
+              }
+            ]
+          }
+        }
+      rescue ArgumentError, TypeError
+        raise SloRulesEngine::UnsupportedApplyAction,
+              "Datadog time-slice threshold must be numeric for #{fetch_value(artifact, :name).inspect}"
       end
 
       def monitor_payload(manifest, artifact, source)
@@ -586,6 +617,24 @@ module SloRulesEngine
         end
       end
 
+      def merge_scope_into_query_expression(expression, selector)
+        normalized_selector = normalize_scope(selector)
+        match = expression.to_s.match(/\A([^{}]+)\{([^}]*)\}(.*)\z/)
+        if match
+          prefix = match[1]
+          existing_scope = parse_scope(expression)
+          suffix = match[3]
+          merged_scope = existing_scope.merge(normalized_selector)
+          tags = merged_scope.sort_by { |key, _value| key.to_s }.map { |key, value| "#{key}:#{value}" }
+          return "#{prefix}{#{tags.join(',')}}#{suffix}"
+        end
+
+        tags = normalized_selector.sort_by { |key, _value| key.to_s }.map { |key, value| "#{key}:#{value}" }
+        return expression.to_s if tags.empty?
+
+        "#{expression}{#{tags.join(',')}}"
+      end
+
       def metric_count_query(scope, metric)
         tags = scope.sort_by { |key, _value| key.to_s }.map { |key, value| "#{key}:#{value}" }
         %(count:#{metric}{#{tags.empty? ? '*' : tags.join(',')}}.as_count())
@@ -594,6 +643,16 @@ module SloRulesEngine
       def metric_sum_query(scope, metric)
         tags = scope.sort_by { |key, _value| key.to_s }.map { |key, value| "#{key}:#{value}" }
         %(sum:#{metric}{#{tags.empty? ? '*' : tags.join(',')}}.as_count())
+      end
+
+      def threshold_time_slice_query_expression(query)
+        expression = fetch_value(query, :query)
+        if expression.to_s.empty?
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "Datadog threshold-based time-slice apply requires a provider query expression for #{fetch_value(query, :metric).inspect}"
+        end
+
+        merge_scope_into_query_expression(expression, fetch_value(query, :selector, {}))
       end
 
       def datadog_tags(manifest, artifact, source)
@@ -648,6 +707,27 @@ module SloRulesEngine
                      else 300
                      end
         value * multiplier
+      end
+
+      def datadog_comparator(operator)
+        case operator.to_s
+        when '<', 'lt' then '<'
+        when '<=', 'lte' then '<='
+        when '>', 'gt' then '>'
+        when '>=', 'gte' then '>='
+        when '==', '=', 'eq' then '=='
+        else
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "unsupported Datadog time-slice threshold operator #{operator.inspect}"
+        end
+      end
+
+      def normalize_scope(scope)
+        return {} unless scope.is_a?(Hash)
+
+        scope.each_with_object({}) do |(key, value), normalized|
+          normalized[key.to_s] = value.to_s
+        end
       end
 
       def slo_reference_name_from_context(artifact)

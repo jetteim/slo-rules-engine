@@ -60,7 +60,7 @@ module SloRulesEngine
         validate_presence(result, "#{path}.sli_instance", fetch_value(artifact, :sli_instance))
         validate_presence(result, "#{path}.slo", fetch_value(artifact, :slo))
         validate_objective_ratio(result, "#{path}.objective_ratio", fetch_value(artifact, :objective_ratio))
-        validate_query_binding(result, "#{path}.query", fetch_value(artifact, :query), require_success_selector: true)
+        validate_query_binding(result, "#{path}.query", fetch_value(artifact, :query), require_success_condition: true)
       end
 
       validate_collection(result, artifacts, :monitors).each_with_index do |artifact, index|
@@ -71,7 +71,7 @@ module SloRulesEngine
         path = "artifacts.telemetry_gap_monitors[#{index}]"
         validate_datadog_monitor(result, artifact, path)
         validate_presence(result, "#{path}.classification", fetch_value(artifact, :classification))
-        validate_query_binding(result, "#{path}.query", fetch_value(artifact, :query), require_success_selector: false)
+        validate_query_binding(result, "#{path}.query", fetch_value(artifact, :query), require_success_condition: false)
       end
 
       validate_collection(result, artifacts, :dashboards).each_with_index do |artifact, index|
@@ -181,7 +181,7 @@ module SloRulesEngine
       end
     end
 
-    def validate_query_binding(result, path, query, require_success_selector:)
+    def validate_query_binding(result, path, query, require_success_condition:)
       validate_hash(result, path, query)
       return unless query.is_a?(Hash)
 
@@ -189,11 +189,28 @@ module SloRulesEngine
       validate_presence(result, "#{path}.data_source", fetch_value(query, :data_source))
       validate_presence(result, "#{path}.type", fetch_value(query, :type))
       validate_hash(result, "#{path}.selector", fetch_value(query, :selector))
-      return unless require_success_selector
+      return unless require_success_condition
 
-      validate_hash(result, "#{path}.success_selector", fetch_value(query, :success_selector))
-      selector = fetch_value(query, :success_selector)
-      result.error("#{path}.success_selector", 'is required') if selector.is_a?(Hash) && selector.empty?
+      success_selector = fetch_value(query, :success_selector)
+      success_threshold = fetch_value(query, :success_threshold)
+      if success_selector.nil? && success_threshold.nil?
+        result.error(path, 'success_selector or success_threshold is required')
+        return
+      end
+
+      if success_selector
+        validate_hash(result, "#{path}.success_selector", success_selector)
+        result.error("#{path}.success_selector", 'is required') if success_selector.is_a?(Hash) && success_selector.empty?
+      end
+
+      return unless success_threshold
+
+      validate_hash(result, "#{path}.success_threshold", success_threshold)
+      return unless success_threshold.is_a?(Hash)
+
+      validate_presence(result, "#{path}.success_threshold.operator", fetch_value(success_threshold, :operator))
+      validate_presence(result, "#{path}.success_threshold.value", fetch_value(success_threshold, :value))
+      validate_presence(result, "#{path}.query", fetch_value(query, :query))
     end
 
     def validate_collection(result, container, key, path: nil)
