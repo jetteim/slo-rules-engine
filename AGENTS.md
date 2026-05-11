@@ -48,6 +48,8 @@ Implemented and already pushed:
 - Datadog dashboard evidence queries now merge reviewed selector scope into provider query expressions
 - Datadog threshold-based distribution and gauge `time_slice` SLOs can infer provider queries from reviewed metric bindings when explicit query text is absent
 - Datadog threshold-based counter `time_slice` SLOs can infer traffic-floor queries from reviewed metric bindings when explicit query text is absent
+- Datadog dashboard payloads now validate the generated template-variable and note/timeseries widget contract explicitly
+- Datadog payload readers now prefer hash keys over colliding Ruby methods such as `Hash#default`
 
 ## Most Recent Checkpoints
 
@@ -63,7 +65,7 @@ Implemented and already pushed:
 Highest-value remaining provider-state gaps:
 
 1. Broaden Datadog `time_slice` translation beyond counter-ratio and the current threshold-based counter/distribution/gauge inputs to the remaining reviewed intent shapes
-2. Remaining Datadog resource semantics not yet validated against the real backend contract, especially dashboard structure and any provider-owned fields still treated heuristically
+2. Remaining Datadog resource semantics not yet validated against the real backend contract, especially richer dashboard structure and any provider-owned fields still treated heuristically
 3. Broader state-management parity for future providers after the Datadog baseline is stronger
 
 Secondary gaps:
@@ -86,6 +88,7 @@ Rationale:
 - dashboard evidence queries now preserve reviewed selector scope instead of drifting to provider-binding-only scope
 - threshold-based distribution and gauge `time_slice` SLOs can now be translated from reviewed metric bindings without explicit Datadog query text
 - threshold-based counter `time_slice` SLOs can now be translated from reviewed metric bindings without explicit Datadog query text
+- dashboard template variables and note/timeseries widgets now have an explicit Datadog payload contract instead of heuristic acceptance
 - the next meaningful gap is closing the remaining distance between reviewed intent and actual Datadog backend semantics for the other `time_slice` and provider-owned payload shapes
 
 ## Verification Commands

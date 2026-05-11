@@ -170,6 +170,10 @@ module SloRulesEngine
       end
 
       def fetch_value(hash, key, default = nil)
+        if hash.is_a?(Hash)
+          return hash.fetch(key) { hash.fetch(key.to_s, default) }
+        end
+
         return hash.public_send(key) if hash.respond_to?(key)
         return default unless hash.respond_to?(:fetch)
 

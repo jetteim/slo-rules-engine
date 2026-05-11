@@ -72,6 +72,7 @@ Explicit features:
 - **Threshold inference for Datadog time-slice SLOs:** reviewed threshold-based distribution and gauge bindings can infer Datadog query expressions from metric type, selector scope, objective, and operator when explicit provider query text is absent.
 - **Traffic-floor inference for Datadog time-slice SLOs:** reviewed threshold-based counter bindings can infer Datadog `sum:...as_count()` query expressions from metric name and selector scope when explicit provider query text is absent.
 - **Selector-aware Datadog dashboard evidence:** generated Datadog dashboard timeseries queries merge reviewed selector scope into provider query expressions so dashboard evidence stays aligned with the reviewed SLI instance rather than drifting to backend-binding-only scope.
+- **Dashboard payload contract:** generated Datadog dashboards validate the expected template variables (`service`, `sli`, `sli_instance`, `slo`) and the generated note/timeseries widget structure before live mutation.
 - **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but initially manage files and handoff plans rather than mutating live backends.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

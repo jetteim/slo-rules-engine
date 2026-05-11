@@ -139,6 +139,7 @@ module SloRulesEngine
         validate_presence(result, 'title', fetch_value(payload, :title))
         validate_exact(result, 'layout_type', fetch_value(payload, :layout_type), 'ordered')
         validate_identity_tags(result, payload, source_prefixes: ['artifacts.dashboards.'])
+        validate_dashboard_template_variables(result, fetch_value(payload, :template_variables))
         widgets = fetch_value(payload, :widgets)
         validate_array(result, 'widgets', widgets)
         Array(widgets).each_with_index do |widget, index|
@@ -147,7 +148,51 @@ module SloRulesEngine
           validate_hash(result, path, definition)
           next unless definition.is_a?(Hash)
 
-          validate_presence(result, "#{path}.type", fetch_value(definition, :type))
+          validate_widget_definition(result, path, definition, index)
+        end
+      end
+
+      def validate_dashboard_template_variables(result, variables)
+        validate_array(result, 'template_variables', variables)
+        return unless variables.is_a?(Array)
+
+        expected = %w[service sli sli_instance slo]
+        actual = variables.map { |entry| fetch_value(entry, :name).to_s }.sort
+        result.error('template_variables', "must define exactly #{expected.join(', ')}") unless actual == expected.sort
+
+        variables.each_with_index do |entry, index|
+          path = "template_variables[#{index}]"
+          validate_hash(result, path, entry)
+          next unless entry.is_a?(Hash)
+
+          validate_presence(result, "#{path}.name", fetch_value(entry, :name))
+          validate_presence(result, "#{path}.prefix", fetch_value(entry, :prefix))
+          validate_presence(result, "#{path}.default", fetch_value(entry, :default))
+        end
+      end
+
+      def validate_widget_definition(result, path, definition, index)
+        type = fetch_value(definition, :type)
+        validate_presence(result, "#{path}.type", type)
+        case index
+        when 0
+          validate_exact(result, "#{path}.type", type, 'note')
+          validate_presence(result, "#{path}.content", fetch_value(definition, :content))
+          validate_exact(result, "#{path}.background_color", fetch_value(definition, :background_color), 'white')
+        when 1
+          validate_exact(result, "#{path}.type", type, 'timeseries')
+          validate_presence(result, "#{path}.title", fetch_value(definition, :title))
+          requests = fetch_value(definition, :requests)
+          validate_array(result, "#{path}.requests", requests)
+          Array(requests).each_with_index do |request, request_index|
+            request_path = "#{path}.requests[#{request_index}]"
+            validate_hash(result, request_path, request)
+            next unless request.is_a?(Hash)
+
+            validate_presence(result, "#{request_path}.q", fetch_value(request, :q))
+          end
+        else
+          result.error(path, 'only note and timeseries widgets are supported in generated dashboards')
         end
       end
 
@@ -251,6 +296,10 @@ module SloRulesEngine
       end
 
       def fetch_value(hash, key, default = nil)
+        if hash.is_a?(Hash)
+          return hash.fetch(key) { hash.fetch(key.to_s, default) }
+        end
+
         return hash.public_send(key) if hash.respond_to?(key)
         return default unless hash.respond_to?(:fetch)
 

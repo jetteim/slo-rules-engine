@@ -833,6 +833,49 @@ class DatadogApplyTest < Minitest::Test
     end
   end
 
+  def test_datadog_payload_validator_rejects_invalid_dashboard_contract
+    dashboard_payload = Marshal.load(
+      Marshal.dump(SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(3).payload)
+    )
+    dashboard_payload[:template_variables] = [{ name: 'service', prefix: 'service', default: 'checkout-api' }]
+    dashboard_payload[:widgets] = [
+      {
+        definition: {
+          type: 'note',
+          content: '',
+          background_color: 'yellow'
+        }
+      },
+      {
+        definition: {
+          type: 'timeseries',
+          title: '',
+          requests: [{ q: '' }]
+        }
+      }
+    ]
+
+    error = assert_raises(SloRulesEngine::Datadog::PayloadError) do
+      SloRulesEngine::Datadog::PayloadValidator.validate!('datadog.dashboard', dashboard_payload)
+    end
+
+    assert error.result.errors.any? do |entry|
+      entry.path == 'template_variables' && entry.message.include?('service, sli, sli_instance, slo')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'widgets[0].definition.background_color' && entry.message.include?('white')
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'widgets[0].definition.content' && entry.message == 'is required'
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'widgets[1].definition.title' && entry.message == 'is required'
+    end
+    assert error.result.errors.any? do |entry|
+      entry.path == 'widgets[1].definition.requests[0].q' && entry.message == 'is required'
+    end
+  end
+
   def test_datadog_payload_validator_rejects_inconsistent_slo_threshold_contract
     slo_payload = Marshal.load(
       Marshal.dump(SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(0).payload)

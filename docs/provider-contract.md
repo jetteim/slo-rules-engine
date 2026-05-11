@@ -115,6 +115,7 @@ Expected state behavior:
 - reviewed threshold-based `time_slice` SLOs must translate reviewed `success_threshold` operators and values into Datadog comparators, numeric thresholds, and provider-query expressions merged with reviewed selector scope
 - when explicit Datadog query text is absent, reviewed threshold-based counter, distribution, and gauge bindings must still be translatable from metric type, selector scope, operator, and reviewed objective/threshold inputs
 - generated Datadog dashboard evidence queries must merge reviewed selector scope into provider query expressions so dashboard drill-down remains aligned with the reviewed SLI instance
+- generated Datadog dashboards must validate the expected template-variable set and the generated note/timeseries widget structure before live mutation
 - burn-rate monitor payloads require the Datadog `burn_rate(...).over("30d")...` query shape and `options.thresholds.critical` must match the query threshold
 - telemetry-gap monitor payloads require the `avg(last_10m):... < 0` no-data query shape with `notify_no_data: true`, `no_data_timeframe: 10`, and `critical: 0`
 - reconciliation compares provider-owned tags and ignores unmanaged backend tags; provider-schema conformance must still be verified before production use
