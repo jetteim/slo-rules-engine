@@ -1,0 +1,61 @@
+# Telemetry-First Adoption Map
+
+This document replaces copy-forward planning with a value-oriented adoption path.
+
+The engine should help teams start from telemetry they already have, produce reviewed SLO intent quickly, and move accepted definitions into managed backend state without manual glue work.
+
+## Primary Outcome
+
+Turn measured service telemetry into a review-ready onboarding queue, reviewed SLO definitions, and managed provider artifacts.
+
+## Adoption Flows
+
+### 1. Service Portfolio Discovery To Review Queue
+
+**Trigger:** many services emit telemetry, but there is no reviewed SLO backlog.
+
+**Outcome:** a prioritized queue of services with evidence packets and review readiness scores.
+
+**Needed capability increments:**
+
+- batch telemetry discovery across service and selector scopes
+- service grouping from discovered telemetry
+- readiness scoring based on eligibility, coverage, and data quality
+- onboarding summary output for maintainers and platform teams
+
+### 2. Service Evidence To Draft Definition
+
+**Trigger:** one service has enough telemetry evidence to propose an SLO definition.
+
+**Outcome:** a public-safe Ruby DSL draft with candidate SLIs/SLOs, conservative findings, and review notes.
+
+**Needed capability increments:**
+
+- candidate confidence and explanation
+- saved evidence packets with findings and reasoning
+- draft generation that reuses normalized lookup and discovery envelopes
+- validation that the draft remains loadable and reviewable
+
+### 3. Reviewed Definition To Managed Provider State
+
+**Trigger:** a maintainer accepts the neutral reliability intent.
+
+**Outcome:** reviewed manifests can be diffed, imported, applied, pruned, and verified through explicit provider-state workflows.
+
+**Needed capability increments:**
+
+- backend change impact summaries for diff, apply, and prune plans
+- stricter provider payload reconciliation
+- explicit destructive-change signaling before mutation
+
+## What We Are Not Optimizing For
+
+- copying internal service definitions into this repository
+- preserving organization-specific naming or routing conventions
+- treating prior implementations as the product roadmap
+
+## Current Best Next Value
+
+1. finish the provider-state baseline until apply plans clearly show change impact and destructive risk
+2. make telemetry-first portfolio onboarding produce ranked service queues and saved evidence packets
+3. deepen future providers only after those two flows are stable

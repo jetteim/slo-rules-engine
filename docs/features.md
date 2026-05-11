@@ -3,6 +3,7 @@
 This file tracks the long-running feature baseline.
 
 See [Evolution Plan](evolution-plan.md) for value streams, capability mapping, contribution streams, and delivery order.
+See [Telemetry-First Adoption Map](adoption-map.md) for the value-oriented onboarding path and near-term adoption backlog.
 
 ## Keep
 
@@ -13,7 +14,7 @@ See [Evolution Plan](evolution-plan.md) for value streams, capability mapping, c
 - Reality checks against historical telemetry and measured metric inventories.
 - SLI/SLO candidate generation from measured telemetry with findings for rejected or incomplete signals.
 - Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and notification routing.
-- Coupling reports for unsupported or implementation-coupled definitions.
+- Machine-readable findings for unsupported or implementation-coupled definitions.
 - Golden-style tests for generated artifacts.
 
 ## Onboarding Capability: Generate SLIs And SLOs From Telemetry

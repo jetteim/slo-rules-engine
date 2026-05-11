@@ -27,6 +27,7 @@ Ruby DSL or generated draft
 Telemetry-derived draft generation is an onboarding stream that feeds the primary stream. Operational alert response, portfolio onboarding, provider contribution, backend state management, and reality checking are separate streams because they have different beneficiaries and outcomes.
 
 See [Evolution Plan](evolution-plan.md) for the full value-stream and capability map.
+See [Telemetry-First Adoption Map](adoption-map.md) for the service onboarding path and near-term value backlog.
 
 ## Data Flow
 

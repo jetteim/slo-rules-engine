@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build OSS-safe reliability modeling depth for the SLO rules engine, including first-class onboarding support for SLI/SLO draft generation from existing telemetry inventory and without importing private rule definitions, private identifiers, or generated private artifacts.
+**Goal:** Build OSS-safe reliability modeling depth for the SLO rules engine, including first-class onboarding support for SLI/SLO draft generation from existing telemetry inventory without introducing private identifiers or generated private artifacts.
 
 **Architecture:** The engine remains a three-layer system: Ruby DSL, neutral reliability model, and provider/integration outputs. This plan strengthens the neutral reliability layer so SLI/SLO intent, miss-policy, measurement details, review gates, and observability handoff are explicit before any backend artifact generation.
 
@@ -54,7 +54,7 @@ Supporting streams:
 
 1. Existing telemetry to draft SLO definition.
 2. Reviewed SLO intent to operational alert response.
-3. Legacy or private rule evidence to OSS-safe engine capability.
+3. Service telemetry discovery to reviewed onboarding queue.
 4. Provider contribution to supported backend bundle.
 5. Reviewed artifact manifest to managed backend state.
 6. Existing backend telemetry to SLO reality check.
@@ -70,7 +70,7 @@ The active implementation packet starts with telemetry-derived drafting because 
 - **Telemetry-Derived SLO Drafting:** measured telemetry inventory, eligibility findings, SLI/SLO inference, draft DSL generation, validation handoff.
 - **Operational Alert Context:** burn-rate alerts, telemetry-gap notifications, contextual annotations, dashboard variables.
 - **Delivery Integration Routing:** route catalogs, route availability checks, notification router integration.
-- **OSS-Safe Migration:** migration reports, forbidden-term scan, synthetic fixtures, anonymization helpers.
+- **Portfolio Telemetry Onboarding:** batch discovery, onboarding queue, candidate scoring, evidence packets, and saved review handoff state.
 - **Provider Contribution Safety:** provider boundaries, guardrails, fixture rules, deterministic output expectations, unsupported-field behavior, and review checklist.
 - **Backend State Management:** artifact schemas, diff harness, explicit apply/prune commands, import existing resources.
 - **Reality Checking:** provider binding checks, missing metric checks, backend API adapters.

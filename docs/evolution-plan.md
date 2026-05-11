@@ -2,6 +2,8 @@
 
 This document describes how the engine should evolve from a public-safe DSL skeleton into a provider-independent SLO workflow with contribution paths for new backends.
 
+See [Telemetry-First Adoption Map](adoption-map.md) for the value-oriented onboarding path and near-term adoption backlog.
+
 ## Product Intent
 
 The engine keeps service reliability intent independent from observability backends. A service definition should describe what reliability means for a service; providers then translate that intent into backend artifacts.
@@ -209,7 +211,7 @@ Existing telemetry and prior implementation behavior are evidence for better mod
 
 - The neutral DSL owns reliability intent; providers own backend translation.
 - Existing telemetry is evidence for candidates, not automatic SLO policy.
-- Legacy or private rules are evidence only and must stay outside this repository.
+- Private or internal reference material is evidence only and must stay outside this repository.
 - Generated artifacts must be reproducible from accepted model input.
 - Missing telemetry is a reliability signal; it must not be silently ignored.
 - Provider contributions must use synthetic fixtures and explicit unsupported-field handling.

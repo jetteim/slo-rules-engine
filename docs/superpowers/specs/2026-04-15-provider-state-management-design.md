@@ -6,13 +6,13 @@
 
 **Outcome:** Maintainers can move from reviewed SLO intent to managed backend state without making provider generation mutate live systems implicitly.
 
-**Scope:** Include telemetry lookup, provider online sanity checks, apply planning, dry-run, explicit live apply, and architecture rules for future providers. Exclude copying service definitions, backend credentials, internal routing targets, and organization-specific constants from legacy material.
+**Scope:** Include telemetry lookup, provider online sanity checks, apply planning, dry-run, explicit live apply, and architecture rules for future providers. Exclude copying service definitions, backend credentials, internal routing targets, and organization-specific constants from private or internal reference material.
 
 **Architecture impact:** Component-level change inside `slo-rules-engine`: provider metadata expands from artifact capabilities to automation modes; new telemetry lookup and backend state components sit beside provider generation; CLI gains explicit state-management commands that are separate from `generate`.
 
 **Implementation handoff:** `docs/superpowers/plans/2026-04-15-provider-state-management.md`
 
-**Evidence:** Legacy implementation review found reusable public-safe patterns for metric inventory, Thanos/Prometheus validation, Datadog validation, Datadog API apply, dry-run, and prune. Current repo review found generation and static reality checks but no live lookup or applier layer.
+**Evidence:** Private or internal reference review found reusable public-safe patterns for metric inventory, Thanos/Prometheus validation, Datadog validation, Datadog API apply, dry-run, and prune. Current repo review found generation and static reality checks but no live lookup or applier layer.
 
 ## Observability State Pipeline Model
 
@@ -160,7 +160,7 @@ Required behavior:
 - Backend mutation must be reversible or explicitly confirmed.
 - Tests must not require network access.
 - Apply logic must never store credentials.
-- Private legacy examples must not enter fixtures, docs, commits, or generated artifacts.
+- Private or internal examples must not enter fixtures, docs, commits, or generated artifacts.
 - Missing telemetry must become a finding, not a silent pass.
 
 ## Feature Packets
@@ -252,4 +252,4 @@ Every provider contribution must state:
 - Running Sloth CLI.
 - Pruning live Datadog resources.
 - Importing private service inventory.
-- Copying legacy service definitions or backend constants.
+- Copying private service definitions or backend constants.
