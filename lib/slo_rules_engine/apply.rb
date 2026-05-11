@@ -12,6 +12,7 @@ module SloRulesEngine
     :backend_id,
     :actual,
     :changes,
+    :risk,
     keyword_init: true
   ) do
     def to_h
@@ -23,13 +24,15 @@ module SloRulesEngine
         payload: payload,
         backend_id: backend_id,
         actual: actual,
-        changes: changes
+        changes: changes,
+        risk: risk
       }.compact
     end
   end
 
   ApplyPlan = Struct.new(:provider, :mode, :operations, keyword_init: true) do
     DESTRUCTIVE_ACTIONS = %w[delete recreate recreate_and_wait].freeze
+    RISK_ORDER = %w[low medium high].freeze
 
     def initialize(**kwargs)
       super
@@ -51,12 +54,16 @@ module SloRulesEngine
     end
 
     def summary
+      risk_counts = risk_counts_by_level
       {
         total_operations: operations.length,
         actionable_operations: operations.count { |operation| operation.action != 'noop' },
         destructive_operations: operations.count { |operation| DESTRUCTIVE_ACTIONS.include?(operation.action) },
+        risky_operations: risk_counts.values.sum,
+        highest_risk_level: highest_risk_level(risk_counts),
         operations_by_action: counts_by(&:action),
-        operations_by_target: counts_by(&:target)
+        operations_by_target: counts_by(&:target),
+        operations_by_risk: risk_counts
       }
     end
 
@@ -66,6 +73,20 @@ module SloRulesEngine
       operations.each_with_object(Hash.new(0)) do |operation, counts|
         counts[yield(operation)] += 1
       end
+    end
+
+    def risk_counts_by_level
+      operations.each_with_object(Hash.new(0)) do |operation, counts|
+        level = operation.risk&.fetch(:level, nil) || operation.risk&.fetch('level', nil)
+        next unless level
+
+        counts[level] += 1
+      end
+    end
+
+    def highest_risk_level(risk_counts)
+      detected = RISK_ORDER.select { |level| risk_counts[level].positive? }
+      detected.last || 'none'
     end
   end
 

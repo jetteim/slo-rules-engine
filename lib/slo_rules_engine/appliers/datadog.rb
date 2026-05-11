@@ -218,7 +218,8 @@ module SloRulesEngine
           payload: desired_payload,
           backend_id: backend_id,
           actual: actual_payload,
-          changes: changes
+          changes: changes,
+          risk: datadog_operation_risk(action: action, target: spec.fetch(:target))
         )
       end
 
@@ -327,7 +328,8 @@ module SloRulesEngine
               target: spec.fetch(:target),
               name: entry_name,
               source: "managed_state.#{spec.fetch(:bucket)}[#{index}]",
-              backend_id: fetch_value(entry, :id)
+              backend_id: fetch_value(entry, :id),
+              risk: datadog_operation_risk(action: 'delete', target: spec.fetch(:target))
             )
           end.compact
         end
@@ -343,6 +345,36 @@ module SloRulesEngine
           @client.delete_dashboard(operation.backend_id)
         else
           raise SloRulesEngine::UnsupportedApplyAction, "unsupported Datadog prune target #{operation.target.inspect}"
+        end
+      end
+
+      def datadog_operation_risk(action:, target:)
+        case [action, target]
+        when ['recreate', 'datadog.monitor'], ['recreate_and_wait', 'datadog.monitor']
+          {
+            level: 'high',
+            reasons: ['recreate_deletes_existing_monitor', 'alert_coverage_may_drop']
+          }
+        when ['recreate', 'datadog.dashboard'], ['recreate_and_wait', 'datadog.dashboard']
+          {
+            level: 'medium',
+            reasons: ['recreate_deletes_existing_dashboard']
+          }
+        when ['delete', 'datadog.monitor']
+          {
+            level: 'high',
+            reasons: ['prune_deletes_managed_monitor', 'alert_coverage_removed']
+          }
+        when ['delete', 'datadog.slo']
+          {
+            level: 'high',
+            reasons: ['prune_force_deletes_managed_slo', 'slo_coverage_removed']
+          }
+        when ['delete', 'datadog.dashboard']
+          {
+            level: 'medium',
+            reasons: ['prune_deletes_managed_dashboard']
+          }
         end
       end
 

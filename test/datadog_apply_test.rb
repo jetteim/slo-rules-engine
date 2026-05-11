@@ -72,6 +72,11 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'update', plan.operations.fetch(0).action
     assert_equal 'recreate', plan.operations.fetch(1).action
     assert_equal 456, plan.operations.fetch(1).backend_id
+    assert_equal 'high', plan.operations.fetch(1).risk.fetch(:level)
+    assert_includes plan.operations.fetch(1).risk.fetch(:reasons), 'recreate_deletes_existing_monitor'
+    assert_includes plan.operations.fetch(1).risk.fetch(:reasons), 'alert_coverage_may_drop'
+    assert_equal 1, plan.to_h.fetch(:summary).fetch(:risky_operations)
+    assert_equal 'high', plan.to_h.fetch(:summary).fetch(:highest_risk_level)
   end
 
   def test_datadog_applier_rejects_invalid_manifest_schema
@@ -284,6 +289,10 @@ class DatadogApplyTest < Minitest::Test
       ['datadog.dashboard', 'dashboard-orphan'],
       ['datadog.slo', 'slo-orphan']
     ], plan.operations.map { |operation| [operation.target, operation.backend_id] }
+    assert_equal ['high', 'medium', 'high'], plan.operations.map { |operation| operation.risk.fetch(:level) }
+    assert_equal 3, plan.to_h.fetch(:summary).fetch(:risky_operations)
+    assert_equal 'high', plan.to_h.fetch(:summary).fetch(:highest_risk_level)
+    assert_equal({ 'high' => 2, 'medium' => 1 }, plan.to_h.fetch(:summary).fetch(:operations_by_risk))
   end
 
   def test_datadog_applier_prune_deletes_orphan_managed_resources

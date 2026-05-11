@@ -34,7 +34,16 @@ class ApplyTest < Minitest::Test
     operations = [
       SloRulesEngine::ApplyOperation.new(action: 'create', target: 'datadog.slo', name: 'slo', source: 'artifacts.slos[0]'),
       SloRulesEngine::ApplyOperation.new(action: 'noop', target: 'datadog.monitor', name: 'burn', source: 'artifacts.monitors[0]'),
-      SloRulesEngine::ApplyOperation.new(action: 'delete', target: 'datadog.dashboard', name: 'dashboard', source: 'artifacts.dashboards[0]')
+      SloRulesEngine::ApplyOperation.new(
+        action: 'delete',
+        target: 'datadog.dashboard',
+        name: 'dashboard',
+        source: 'artifacts.dashboards[0]',
+        risk: {
+          level: 'medium',
+          reasons: ['prune_deletes_dashboard']
+        }
+      )
     ]
     plan = SloRulesEngine::ApplyPlan.new(provider: 'datadog', mode: 'diff', operations: operations)
 
@@ -43,8 +52,11 @@ class ApplyTest < Minitest::Test
     assert_equal 3, payload.fetch(:summary).fetch(:total_operations)
     assert_equal 2, payload.fetch(:summary).fetch(:actionable_operations)
     assert_equal 1, payload.fetch(:summary).fetch(:destructive_operations)
+    assert_equal 1, payload.fetch(:summary).fetch(:risky_operations)
+    assert_equal 'medium', payload.fetch(:summary).fetch(:highest_risk_level)
     assert_equal({ 'create' => 1, 'noop' => 1, 'delete' => 1 }, payload.fetch(:summary).fetch(:operations_by_action))
     assert_equal({ 'datadog.slo' => 1, 'datadog.monitor' => 1, 'datadog.dashboard' => 1 }, payload.fetch(:summary).fetch(:operations_by_target))
+    assert_equal({ 'medium' => 1 }, payload.fetch(:summary).fetch(:operations_by_risk))
   end
 
   def test_manifest_bundle_applier_plans_manifest_write

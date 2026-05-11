@@ -59,6 +59,7 @@ This is the running plan for the long refactor.
 - [x] Add explicit import command.
 - [x] Add explicit prune command.
 - [x] Add generated artifact diff harness.
+- [x] Add provider-specific risk signaling to state plans.
 
 ## Phase 5: Telemetry-First Adoption
 
