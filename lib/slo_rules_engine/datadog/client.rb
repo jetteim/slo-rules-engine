@@ -189,7 +189,8 @@ module SloRulesEngine
         desired_by_title = desired_titles.each_with_object({}) do |entry, hash|
           hash[entry.fetch(:title)] = entry.fetch(:title)
         end
-        dashboards = {}
+        source_matches_by_title = Hash.new { |hash, key| hash[key] = [] }
+        title_matches_by_title = Hash.new { |hash, key| hash[key] = [] }
         lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
         lists.each do |list|
           list_id = fetch_value(list, :id)
@@ -202,29 +203,32 @@ module SloRulesEngine
             detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
             source = extract_source_ref(Array(fetch_value(detail, :tags, [])).map(&:to_s))
             tags = Array(fetch_value(detail, :tags, [])).map(&:to_s)
-            desired_title = if source && desired_by_source.key?(source)
-                              desired_by_source.fetch(source)
-                            elsif tags.include?(MANAGED_MONITOR_TAG)
-                              desired_by_title[title]
-                            else
-                              nil
-                            end
-            next unless desired_title
-
-            match_identity = if source && desired_by_source.key?(source)
-                               match_identity('source_ref', 'high')
-                             else
-                               match_identity('title', 'medium')
-                             end
-            dashboards[desired_title] ||= {
+            match = {
               id: fetch_value(entry, :id),
               title: title,
-              payload: normalize_dashboard_payload(detail),
-              match_identity: match_identity
+              payload: normalize_dashboard_payload(detail)
             }.compact
+            if source && desired_by_source.key?(source)
+              source_matches_by_title[desired_by_source.fetch(source)] << match
+            elsif tags.include?(MANAGED_MONITOR_TAG) && desired_by_title.key?(title)
+              title_matches_by_title[desired_by_title.fetch(title)] << match
+            end
           end
         end
-        dashboards
+        desired_titles.each_with_object({}) do |entry, dashboards|
+          desired_title = entry.fetch(:title)
+          matches = source_matches_by_title[desired_title]
+          strategy = 'source_ref'
+          if matches.empty?
+            matches = title_matches_by_title[desired_title]
+            strategy = 'title'
+          end
+          next if matches.empty?
+
+          dashboards[desired_title] = matches.first.merge(
+            match_identity: match_identity_for_matches(strategy, matches.length)
+          )
+        end
       end
 
       def load_managed_slos(service)
@@ -285,28 +289,26 @@ module SloRulesEngine
       end
 
       def find_slo_match(name, source)
-        source_match = find_slo_by_query(source_query(source))
-        return { entry: source_match, match_identity: match_identity('source_ref', 'high') } if source_match
+        source_matches = find_slo_matches_by_query(source_query(source))
+        source_match = build_match(source_matches, 'source_ref')
+        return source_match if source_match
 
-        name_match = find_slo_by_query(name)
-        return unless name_match
-
-        { entry: name_match, match_identity: match_identity('name', 'medium') }
+        build_match(find_slo_matches_by_query(name), 'name')
       end
 
-      def find_slo_by_query(query)
-        return if query.to_s.empty?
+      def find_slo_matches_by_query(query)
+        return [] if query.to_s.empty?
 
         path = "/api/v1/slo/search?#{URI.encode_www_form('page[number]' => 0, 'page[size]' => 20, query: query)}"
         response = request('GET', path)
         entries = Array(response.dig('data', 'attributes', 'slos'))
         if query.start_with?("#{MANAGED_MONITOR_TAG} AND source_ref:")
-          entries.find do |entry|
+          entries.select do |entry|
             tags = Array(fetch_value(fetch_value(fetch_value(entry, :data, {}), :attributes, {}), :all_tags, [])).map(&:to_s)
             tags.include?(query.sub("#{MANAGED_MONITOR_TAG} AND ", ''))
           end
         else
-          entries.find do |entry|
+          entries.select do |entry|
             attributes = fetch_value(fetch_value(entry, :data, {}), :attributes, {})
             tags = Array(fetch_value(attributes, :all_tags, [])).map(&:to_s)
             fetch_value(attributes, :name) == query && tags.include?(MANAGED_MONITOR_TAG)
@@ -315,24 +317,22 @@ module SloRulesEngine
       end
 
       def find_monitor_match(name, source)
-        source_match = find_monitor_by_tags(source_monitor_tags(source))
-        return { entry: source_match, match_identity: match_identity('source_ref', 'high') } if source_match
+        source_matches = find_monitor_matches_by_tags(source_monitor_tags(source))
+        source_match = build_match(source_matches, 'source_ref')
+        return source_match if source_match
 
         path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: MANAGED_MONITOR_TAG, name: name)}"
         entries = Array(request('GET', path))
-        name_match = entries.find { |entry| fetch_value(entry, :name) == name }
-        return unless name_match
-
-        { entry: name_match, match_identity: match_identity('name', 'medium') }
+        build_match(entries.select { |entry| fetch_value(entry, :name) == name }, 'name')
       end
 
-      def find_monitor_by_tags(tags)
-        return if tags.to_s.empty?
+      def find_monitor_matches_by_tags(tags)
+        return [] if tags.to_s.empty?
 
         path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: tags)}"
         entries = Array(request('GET', path))
         expected_tag = tags.split(',', 2).last
-        entries.find do |entry|
+        entries.select do |entry|
           Array(fetch_value(entry, :tags, [])).map(&:to_s).include?(expected_tag)
         end
       end
@@ -385,6 +385,26 @@ module SloRulesEngine
           strategy: strategy,
           confidence: confidence
         }
+      end
+
+      def build_match(entries, strategy)
+        return if entries.empty?
+
+        { entry: entries.first, match_identity: match_identity_for_matches(strategy, entries.length) }
+      end
+
+      def match_identity_for_matches(strategy, count)
+        return match_identity(strategy, base_confidence_for(strategy)) if count == 1
+
+        match_identity("ambiguous_#{strategy}", 'low')
+      end
+
+      def base_confidence_for(strategy)
+        {
+          'source_ref' => 'high',
+          'name' => 'medium',
+          'title' => 'medium'
+        }.fetch(strategy)
       end
 
       def uri_for(path)

@@ -8,11 +8,11 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Provider-state deepening
-2. Telemetry-first onboarding path
-3. Provider breadth and telemetry-first scale after the baseline is solid
+1. Telemetry-first onboarding path
+2. Provider-state follow-up hardening if new backend evidence exposes a concrete safety gap
+3. Provider breadth after the telemetry-first baseline is stronger
 
-The current stream is provider-state deepening. Do not switch to telemetry-first work until the current provider-state checkpoint is at a safe commit/push boundary.
+The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
 ## Non-Negotiable Working Rules
 
@@ -56,10 +56,12 @@ Implemented and already pushed:
 - Live Datadog `update` and `recreate` mutations are now blocked when ownership was matched without managed `source_ref` identity
 - Live Datadog prune deletes are now also blocked when ownership confidence is only service-scope fallback
 - Datadog import and diff fallback matching now reject same-name SLOs and same-title dashboards unless they are explicitly engine-managed
+- Datadog duplicate `source_ref` and duplicate fallback matches now degrade to low-confidence identity instead of being silently accepted as trustworthy
 
 ## Most Recent Checkpoints
 
-- latest: `fix: require managed tags for datadog fallback matches`
+- latest: `fix: detect ambiguous datadog identity matches`
+- previous: `fix: require managed tags for datadog fallback matches`
 - `70b5071` `feat: add datadog identity confidence signaling`
 - `107a067` `feat: add datadog provider risk signaling`
 - `ad18132` `feat: add provider state impact summaries`
@@ -76,20 +78,20 @@ Implemented and already pushed:
 Highest-value remaining provider-state gaps:
 
 1. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
-2. Broader state-management parity for future providers after the Datadog baseline is stronger
-3. Decide whether provider-state is now complete enough to demote behind telemetry-first onboarding
+2. Batch telemetry discovery and review-readiness ranking for service portfolios
+3. Candidate confidence and saved evidence packets for telemetry-derived drafts
 
 Secondary gaps:
 
-1. Batch telemetry discovery across service portfolios and selector inputs
-2. Candidate confidence and saved evidence packets for telemetry-derived drafts
-3. Service onboarding summary that ranks discovered services and signals by review readiness
+1. Broader state-management parity for future providers after the Datadog baseline is stronger
+2. Service onboarding summary that ranks discovered services and signals by review readiness
+3. Optional live Datadog contract verification when credentials and safe backend access are available
 
 ## Recommended Next Slice
 
-Next recommended provider-state slice:
+Next recommended slice:
 
-- reassess the remaining Datadog backend-contract heuristics, and if no substantial safety gaps remain, move telemetry-first onboarding ahead of further provider-state work
+- start telemetry-first onboarding depth with batch discovery across service portfolios and selector inputs
 
 Rationale:
 
@@ -99,8 +101,9 @@ Rationale:
 - live Datadog `update` and `recreate` now enforce managed source identity
 - low-confidence prune deletes now use the same enforcement threshold
 - fallback name/title matching no longer claims ownership of unmanaged SLOs or dashboards
-- the next decision is whether any remaining Datadog contract gaps are substantial enough to keep provider-state at the front of the roadmap
-- Datadog is still the reference live provider, so its remaining contract gaps should be closed before widening other providers
+- duplicate source identity now degrades to weak ownership instead of silently selecting an arbitrary backend match
+- the remaining Datadog contract gaps are now narrower than the telemetry-first adoption gap
+- Datadog remains the reference live provider, but follow-up hardening can now be evidence-driven instead of roadmap-leading
 
 ## Verification Commands
 

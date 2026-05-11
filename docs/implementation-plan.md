@@ -63,6 +63,7 @@ This is the running plan for the long refactor.
 - [x] Add identity-confidence signaling for weaker backend matches.
 - [x] Block live Datadog update/recreate/prune mutations when ownership confidence is weak.
 - [x] Require explicit engine-managed tags for Datadog fallback name/title ownership matches.
+- [x] Detect ambiguous Datadog source-ref and fallback matches and degrade them to weak identity.
 
 ## Phase 5: Telemetry-First Adoption
 
