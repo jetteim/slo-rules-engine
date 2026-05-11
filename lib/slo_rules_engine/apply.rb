@@ -12,6 +12,7 @@ module SloRulesEngine
     :backend_id,
     :actual,
     :changes,
+    :match_identity,
     :risk,
     keyword_init: true
   ) do
@@ -25,6 +26,7 @@ module SloRulesEngine
         backend_id: backend_id,
         actual: actual,
         changes: changes,
+        match_identity: match_identity,
         risk: risk
       }.compact
     end

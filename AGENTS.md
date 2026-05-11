@@ -52,9 +52,11 @@ Implemented and already pushed:
 - Datadog payload readers now prefer hash keys over colliding Ruby methods such as `Hash#default`
 - `diff`, `apply`, and `prune` plans now emit shared change-impact summaries with total, actionable, destructive, action, and target counts
 - Datadog state plans now flag recreate and prune-delete operations with provider-specific risk levels and reasons
+- Datadog import and state plans now preserve `match_identity` evidence and flag weaker name/title fallback matches explicitly
 
 ## Most Recent Checkpoints
 
+- `107a067` `feat: add datadog provider risk signaling`
 - `ad18132` `feat: add provider state impact summaries`
 - `88576ec` `docs: replace migration roadmap with adoption map`
 - `4630f3e` `feat: report orphan datadog backend resources on import`
@@ -70,7 +72,7 @@ Highest-value remaining provider-state gaps:
 
 1. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 2. Broader state-management parity for future providers after the Datadog baseline is stronger
-3. Import/diff confidence signaling when Datadog matching falls back to weaker identity evidence
+3. More explicit operator signaling when backend ownership cannot be established confidently enough for mutation
 
 Secondary gaps:
 
@@ -82,13 +84,14 @@ Secondary gaps:
 
 Next recommended provider-state slice:
 
-- tighten remaining Datadog backend-contract semantics and add confidence signaling where import/diff relies on weaker identity evidence than managed source tags
+- tighten remaining Datadog backend-contract semantics and decide whether low-confidence ownership should stay advisory or block mutation for specific actions
 
 Rationale:
 
 - the shared change-impact summary baseline now exists across `diff`, `apply`, and `prune`
 - provider-specific risk signaling now exists for recreate and prune-delete operations
-- the next remaining provider-state value is better confidence signaling around Datadog identity and backend contract edge cases, not more generic plan shape work
+- weaker identity matches are now explicit in import and plan output
+- the next remaining provider-state value is deciding when low-confidence ownership should escalate from evidence to enforcement
 - Datadog is still the reference live provider, so its remaining contract gaps should be closed before widening other providers
 
 ## Verification Commands

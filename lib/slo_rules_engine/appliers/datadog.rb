@@ -102,7 +102,8 @@ module SloRulesEngine
           source: 'backend_api',
           state: state,
           findings: missing_backend_resource_findings(manifest, state) +
-            orphan_backend_resource_findings(manifest, managed_state)
+            orphan_backend_resource_findings(manifest, managed_state) +
+            weak_identity_match_findings(state)
         )
       end
 
@@ -219,7 +220,11 @@ module SloRulesEngine
           backend_id: backend_id,
           actual: actual_payload,
           changes: changes,
-          risk: datadog_operation_risk(action: action, target: spec.fetch(:target))
+          match_identity: fetch_value(backend_state, :match_identity),
+          risk: merge_risks(
+            datadog_operation_risk(action: action, target: spec.fetch(:target)),
+            weak_identity_risk(fetch_value(backend_state, :match_identity))
+          )
         )
       end
 
@@ -378,6 +383,39 @@ module SloRulesEngine
         end
       end
 
+      def weak_identity_risk(match_identity)
+        return unless weak_match_identity?(match_identity)
+
+        {
+          level: 'medium',
+          reasons: ['matched_without_source_ref']
+        }
+      end
+
+      def weak_match_identity?(match_identity)
+        return false unless match_identity
+
+        fetch_value(match_identity, :confidence) != 'high'
+      end
+
+      def merge_risks(*risks)
+        present = risks.compact
+        return if present.empty?
+
+        {
+          level: present.max_by { |risk| risk_priority(fetch_value(risk, :level)) }.then { |risk| fetch_value(risk, :level) },
+          reasons: present.flat_map { |risk| Array(fetch_value(risk, :reasons, [])) }.uniq
+        }
+      end
+
+      def risk_priority(level)
+        {
+          'low' => 1,
+          'medium' => 2,
+          'high' => 3
+        }.fetch(level, 0)
+      end
+
       def desired_state(manifest)
         {
           slos: collection(manifest, :slos).each_with_index.map do |artifact, index|
@@ -421,6 +459,28 @@ module SloRulesEngine
             backend_id: operation.backend_id,
             message: "managed backend resource #{operation.name.inspect} is not present in the reviewed manifest"
           }
+        end
+      end
+
+      def weak_identity_match_findings(state)
+        {
+          slos: 'datadog.slo',
+          monitors: 'datadog.monitor',
+          dashboards: 'datadog.dashboard'
+        }.flat_map do |bucket, target|
+          fetch_value(state, bucket, {}).map do |desired_name, entry|
+            match_identity = fetch_value(entry, :match_identity)
+            next unless weak_match_identity?(match_identity)
+
+            {
+              code: 'weak_identity_match',
+              target: target,
+              name: desired_name,
+              strategy: fetch_value(match_identity, :strategy),
+              confidence: fetch_value(match_identity, :confidence),
+              message: "backend resource #{desired_name.inspect} matched without managed source_ref identity"
+            }
+          end.compact
         end
       end
 

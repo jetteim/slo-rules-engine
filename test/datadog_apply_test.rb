@@ -1000,6 +1000,10 @@ class DatadogApplyTest < Minitest::Test
     assert_equal 'slo-123', state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:id)
     assert_equal 456, state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:id)
     assert_equal 'abc123', state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:id)
+    assert_equal 'name', state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:match_identity).fetch(:strategy)
+    assert_equal 'medium', state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:match_identity).fetch(:confidence)
+    assert_equal 'name', state.fetch(:monitors).fetch('SLO burn rate: checkout-api/http-requests/public-api/successful-requests').fetch(:match_identity).fetch(:strategy)
+    assert_equal 'title', state.fetch(:dashboards).fetch('checkout-api SLO decision dashboard').fetch(:match_identity).fetch(:strategy)
     assert_equal 'metric',
                  state.fetch(:slos).fetch('checkout-api http-requests public-api successful-requests').fetch(:payload).fetch(:type)
     assert_equal 'slo alert',
@@ -1075,12 +1079,90 @@ class DatadogApplyTest < Minitest::Test
 
     assert_equal 'slo-123', state.fetch(:slos).fetch(desired_slo_name).fetch(:id)
     assert_equal 'legacy checkout slo', state.fetch(:slos).fetch(desired_slo_name).fetch(:payload).fetch(:name)
+    assert_equal 'source_ref', state.fetch(:slos).fetch(desired_slo_name).fetch(:match_identity).fetch(:strategy)
+    assert_equal 'high', state.fetch(:slos).fetch(desired_slo_name).fetch(:match_identity).fetch(:confidence)
     assert_equal 456, state.fetch(:monitors).fetch(desired_monitor_name).fetch(:id)
     assert_equal 'legacy burn monitor', state.fetch(:monitors).fetch(desired_monitor_name).fetch(:payload).fetch(:name)
+    assert_equal 'source_ref', state.fetch(:monitors).fetch(desired_monitor_name).fetch(:match_identity).fetch(:strategy)
     assert_equal 789, state.fetch(:monitors).fetch(desired_gap_name).fetch(:id)
     assert_equal 'legacy telemetry gap monitor', state.fetch(:monitors).fetch(desired_gap_name).fetch(:payload).fetch(:name)
     assert_equal 'abc123', state.fetch(:dashboards).fetch(desired_dashboard_title).fetch(:id)
     assert_equal 'legacy dashboard title', state.fetch(:dashboards).fetch(desired_dashboard_title).fetch(:payload).fetch(:title)
+    assert_equal 'source_ref', state.fetch(:dashboards).fetch(desired_dashboard_title).fetch(:match_identity).fetch(:strategy)
+  end
+
+  def test_datadog_diff_flags_weaker_name_based_identity_matches
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_title = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      slos: {
+        slo_name => {
+          id: 'slo-123',
+          payload: SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(0).payload,
+          match_identity: { strategy: 'name', confidence: 'medium' }
+        }
+      },
+      monitors: {
+        monitor_name => {
+          id: 456,
+          payload: SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(1).payload.merge(
+            query: SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(1).payload.fetch(:query).sub(/__SLO_REF__\[.*?\]/, 'slo-123')
+          ),
+          match_identity: { strategy: 'name', confidence: 'medium' }
+        },
+        gap_monitor_name => {
+          id: 789,
+          payload: SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(2).payload,
+          match_identity: { strategy: 'source_ref', confidence: 'high' }
+        }
+      },
+      dashboards: {
+        dashboard_title => {
+          id: 'dashboard-123',
+          payload: SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new).plan(@manifest).operations.fetch(3).payload,
+          match_identity: { strategy: 'title', confidence: 'medium' }
+        }
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.diff(@manifest)
+
+    assert_equal 'medium', plan.operations.fetch(0).risk.fetch(:level)
+    assert_includes plan.operations.fetch(0).risk.fetch(:reasons), 'matched_without_source_ref'
+    assert_equal({ strategy: 'name', confidence: 'medium' }, plan.operations.fetch(0).match_identity)
+    assert_equal({ strategy: 'title', confidence: 'medium' }, plan.operations.fetch(3).match_identity)
+    assert_equal 3, plan.to_h.fetch(:summary).fetch(:risky_operations)
+  end
+
+  def test_datadog_import_reports_weaker_identity_match_findings
+    manifest = Marshal.load(Marshal.dump(@manifest))
+    slo_name = manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_title = manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      slos: {
+        slo_name => { id: 'slo-123', payload: { name: slo_name }, match_identity: { strategy: 'name', confidence: 'medium' } }
+      },
+      monitors: {
+        monitor_name => { id: 456, payload: { name: monitor_name }, match_identity: { strategy: 'name', confidence: 'medium' } },
+        gap_monitor_name => { id: 789, payload: { name: gap_monitor_name }, match_identity: { strategy: 'source_ref', confidence: 'high' } }
+      },
+      dashboards: {
+        dashboard_title => { id: 'dashboard-123', payload: { title: dashboard_title }, match_identity: { strategy: 'title', confidence: 'medium' } }
+      },
+      managed_state: { slos: [], monitors: [], dashboards: [] }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    imported = applier.import(manifest)
+
+    findings = imported.findings.select { |entry| entry.fetch(:code) == 'weak_identity_match' }
+    assert_equal 3, findings.length
+    assert_equal ['datadog.dashboard', 'datadog.monitor', 'datadog.slo'], findings.map { |entry| entry.fetch(:target) }.sort
   end
 
   def test_datadog_client_lists_managed_resources_for_service

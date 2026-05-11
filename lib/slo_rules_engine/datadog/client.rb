@@ -135,13 +135,14 @@ module SloRulesEngine
           match = find_slo_match(desired_name, desired_source(entry))
           next unless match
 
-          data = fetch_value(match, :data, {})
+          data = fetch_value(match.fetch(:entry), :data, {})
           detail = request('GET', "/api/v1/slo/#{fetch_value(data, :id)}?with_configured_alert_ids=true")
           payload = normalize_slo_payload(first_resource(detail))
           slos[desired_name] = {
             id: fetch_value(data, :id),
             name: fetch_value(fetch_value(data, :attributes, {}), :name),
-            payload: payload
+            payload: payload,
+            match_identity: match.fetch(:match_identity)
           }.compact
         end
       end
@@ -152,11 +153,12 @@ module SloRulesEngine
           match = find_monitor_match(desired_name, desired_source(entry))
           next unless match
 
-          detail = request('GET', "/api/v1/monitor/#{fetch_value(match, :id)}")
+          detail = request('GET', "/api/v1/monitor/#{fetch_value(match.fetch(:entry), :id)}")
           monitors[desired_name] = {
-            id: fetch_value(match, :id),
-            name: fetch_value(match, :name),
-            payload: normalize_monitor_payload(detail)
+            id: fetch_value(match.fetch(:entry), :id),
+            name: fetch_value(match.fetch(:entry), :name),
+            payload: normalize_monitor_payload(detail),
+            match_identity: match.fetch(:match_identity)
           }.compact
         end
       end
@@ -196,10 +198,16 @@ module SloRulesEngine
                             end
             next unless desired_title
 
+            match_identity = if source && desired_by_source.key?(source)
+                               match_identity('source_ref', 'high')
+                             else
+                               match_identity('title', 'medium')
+                             end
             dashboards[desired_title] ||= {
               id: fetch_value(entry, :id),
               title: title,
-              payload: normalize_dashboard_payload(detail)
+              payload: normalize_dashboard_payload(detail),
+              match_identity: match_identity
             }.compact
           end
         end
@@ -265,9 +273,12 @@ module SloRulesEngine
 
       def find_slo_match(name, source)
         source_match = find_slo_by_query(source_query(source))
-        return source_match if source_match
+        return { entry: source_match, match_identity: match_identity('source_ref', 'high') } if source_match
 
-        find_slo_by_query(name)
+        name_match = find_slo_by_query(name)
+        return unless name_match
+
+        { entry: name_match, match_identity: match_identity('name', 'medium') }
       end
 
       def find_slo_by_query(query)
@@ -290,11 +301,14 @@ module SloRulesEngine
 
       def find_monitor_match(name, source)
         source_match = find_monitor_by_tags(source_monitor_tags(source))
-        return source_match if source_match
+        return { entry: source_match, match_identity: match_identity('source_ref', 'high') } if source_match
 
         path = "/api/v1/monitor?#{URI.encode_www_form(monitor_tags: MANAGED_MONITOR_TAG, name: name)}"
         entries = Array(request('GET', path))
-        entries.find { |entry| fetch_value(entry, :name) == name }
+        name_match = entries.find { |entry| fetch_value(entry, :name) == name }
+        return unless name_match
+
+        { entry: name_match, match_identity: match_identity('name', 'medium') }
       end
 
       def find_monitor_by_tags(tags)
@@ -349,6 +363,13 @@ module SloRulesEngine
 
       def extract_source_ref(tags)
         tags.find { |tag| tag.start_with?('source_ref:') }&.sub('source_ref:', '')
+      end
+
+      def match_identity(strategy, confidence)
+        {
+          strategy: strategy,
+          confidence: confidence
+        }
       end
 
       def uri_for(path)

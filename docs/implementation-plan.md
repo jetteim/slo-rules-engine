@@ -60,6 +60,7 @@ This is the running plan for the long refactor.
 - [x] Add explicit prune command.
 - [x] Add generated artifact diff harness.
 - [x] Add provider-specific risk signaling to state plans.
+- [x] Add identity-confidence signaling for weaker backend matches.
 
 ## Phase 5: Telemetry-First Adoption
 
