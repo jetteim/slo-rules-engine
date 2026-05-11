@@ -54,6 +54,7 @@ Implemented and already pushed:
 - Datadog state plans now flag recreate and prune-delete operations with provider-specific risk levels and reasons
 - Datadog import and state plans now preserve `match_identity` evidence and flag weaker name/title fallback matches explicitly
 - Live Datadog `update` and `recreate` mutations are now blocked when ownership was matched without managed `source_ref` identity
+- Live Datadog prune deletes are now also blocked when ownership confidence is only service-scope fallback
 
 ## Most Recent Checkpoints
 
@@ -74,7 +75,7 @@ Highest-value remaining provider-state gaps:
 
 1. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 2. Broader state-management parity for future providers after the Datadog baseline is stronger
-3. Decide whether low-confidence ownership should also block prune or remain advisory there
+3. Decide whether provider-state is now complete enough to demote behind telemetry-first onboarding
 
 Secondary gaps:
 
@@ -86,7 +87,7 @@ Secondary gaps:
 
 Next recommended provider-state slice:
 
-- tighten remaining Datadog backend-contract semantics and decide whether low-confidence ownership should also block prune or remain advisory there
+- reassess the remaining Datadog backend-contract heuristics, and if no substantial safety gaps remain, move telemetry-first onboarding ahead of further provider-state work
 
 Rationale:
 
@@ -94,7 +95,8 @@ Rationale:
 - provider-specific risk signaling now exists for recreate and prune-delete operations
 - weaker identity matches are now explicit in import and plan output
 - live Datadog `update` and `recreate` now enforce managed source identity
-- the next remaining provider-state value is deciding whether prune should use the same enforcement threshold
+- low-confidence prune deletes now use the same enforcement threshold
+- the next decision is whether any remaining Datadog contract gaps are substantial enough to keep provider-state at the front of the roadmap
 - Datadog is still the reference live provider, so its remaining contract gaps should be closed before widening other providers
 
 ## Verification Commands

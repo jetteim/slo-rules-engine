@@ -303,6 +303,40 @@ class DatadogApplyTest < Minitest::Test
     client = FakeDatadogClient.new(
       managed_state: {
         slos: [
+          { id: 'slo-123', name: slo_name, source: 'artifacts.slos[0]' },
+          { id: 'slo-orphan', name: 'checkout-api orphan slo', source: 'orphan.slos[0]' }
+        ],
+        monitors: [
+          { id: 456, name: monitor_name, source: 'artifacts.monitors[0]' },
+          { id: 789, name: gap_monitor_name, source: 'artifacts.telemetry_gap_monitors[0]' },
+          { id: 999, name: 'SLO burn rate: checkout-api/orphan-sli/orphan-instance/orphan-slo', source: 'orphan.monitors[0]' }
+        ],
+        dashboards: [
+          { id: 'dashboard-123', title: dashboard_name, source: 'artifacts.dashboards[0]' },
+          { id: 'dashboard-orphan', title: 'checkout-api orphan dashboard', source: 'orphan.dashboards[0]' }
+        ]
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    plan = applier.prune(@manifest, mode: 'live')
+
+    assert_equal 'live', plan.mode
+    assert_equal [
+      ['DELETE', '/api/v1/monitor/999'],
+      ['DELETE', '/api/v1/dashboard/dashboard-orphan'],
+      ['DELETE', '/api/v1/slo/slo-orphan?force=true']
+    ], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
+  end
+
+  def test_datadog_prune_rejects_live_delete_when_ownership_match_is_weak
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)
+    gap_monitor_name = @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name)
+    dashboard_name = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    client = FakeDatadogClient.new(
+      managed_state: {
+        slos: [
           { id: 'slo-123', name: slo_name },
           { id: 'slo-orphan', name: 'checkout-api orphan slo' }
         ],
@@ -319,14 +353,13 @@ class DatadogApplyTest < Minitest::Test
     )
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)
 
-    plan = applier.prune(@manifest, mode: 'live')
+    error = assert_raises(SloRulesEngine::Datadog::OwnershipError) do
+      applier.prune(@manifest, mode: 'live')
+    end
 
-    assert_equal 'live', plan.mode
-    assert_equal [
-      ['DELETE', '/api/v1/monitor/999'],
-      ['DELETE', '/api/v1/dashboard/dashboard-orphan'],
-      ['DELETE', '/api/v1/slo/slo-orphan?force=true']
-    ], client.requests.map { |request| [request.fetch(:method), request.fetch(:path)] }
+    assert_equal [], client.requests
+    assert_equal 'delete', error.operation.action
+    assert_equal({ strategy: 'service_scope_only', confidence: 'low' }, error.operation.match_identity)
   end
 
   def test_datadog_apply_translates_payloads_and_resolves_slo_ids_for_monitors

@@ -92,4 +92,46 @@ class RulesCtlTest < Minitest::Test
       assert_equal 'match_identity', payload.fetch('errors').fetch(0).fetch('path')
     end
   end
+
+  def test_prune_renders_unsafe_provider_state_error
+    load "#{ROOT}/examples/services/checkout.rb"
+    definition = SloRulesEngine.definitions.fetch(0)
+    manifest = SloRulesEngine.default_provider_registry.fetch('datadog')
+      .generate(definition)
+      .to_h
+      .merge(service: definition.service)
+    operation = SloRulesEngine::ApplyOperation.new(
+      action: 'delete',
+      target: 'datadog.monitor',
+      name: 'orphan monitor',
+      source: 'managed_state.monitors[2]',
+      match_identity: { strategy: 'service_scope_only', confidence: 'low' }
+    )
+    result = SloRulesEngine::ValidationResult.new
+    result.error('match_identity', 'live Datadog mutation requires managed source_ref identity for delete operations')
+    ownership_error = SloRulesEngine::Datadog::OwnershipError.new(operation: operation, result: result)
+    fake_applier = Object.new
+    fake_applier.define_singleton_method(:prune) { |_reviewed_manifest, mode:| raise ownership_error if mode == 'live' }
+
+    Tempfile.create(['reviewed-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      stdout, _stderr = capture_io do
+        exit_error = assert_raises(SystemExit) do
+          SloRulesEngine::Appliers::Datadog.stub(:new, fake_applier) do
+            RulesCtl.prune(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
+          end
+        end
+        assert_equal 1, exit_error.status
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'datadog', payload.fetch('provider')
+      assert_equal 'live', payload.fetch('mode')
+      assert_equal 'unsafe_provider_state', payload.fetch('error').fetch('code')
+      assert_equal 'match_identity', payload.fetch('errors').fetch(0).fetch('path')
+    end
+  end
 end

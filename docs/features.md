@@ -65,7 +65,7 @@ Explicit features:
 - **Change impact summary:** diff, apply, and prune plans emit operation counts and destructive-operation counts before mutation.
 - **Provider-specific risk signaling:** Datadog plans flag monitor recreate, force-delete SLO prune, and managed dashboard/monitor prune operations with risk levels and reasons.
 - **Identity-confidence signaling:** Datadog import and plan output preserve whether backend resources were matched by managed `source_ref` identity or by weaker name/title fallback evidence.
-- **Ownership-safety enforcement:** live Datadog `update` and `recreate` operations are blocked when backend ownership was matched only by weaker name/title fallback evidence.
+- **Ownership-safety enforcement:** live Datadog `update`, `recreate`, and low-confidence `prune` delete operations are blocked when backend ownership was matched only by weaker name/title or service-scope fallback evidence.
 - **Apply planning:** dry-run apply emits planned create, update, write, or handoff operations.
 - **Explicit live mutation:** live backend changes require a separate command, confirmation, and credentials when the provider needs them.
 - **Datadog live API support:** Datadog can apply SLOs, monitors, telemetry-gap monitors, and dashboards through API calls.

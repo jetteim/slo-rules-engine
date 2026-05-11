@@ -337,6 +337,8 @@ module RulesCtl
       }
     )
     exit 1
+  rescue SloRulesEngine::Datadog::OwnershipError => error
+    render_provider_state_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
   rescue SloRulesEngine::ManifestSchemaError => error
     render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
   rescue SloRulesEngine::UnsupportedApplyAction => error

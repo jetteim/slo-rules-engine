@@ -116,6 +116,7 @@ module SloRulesEngine
         ApplyPlan.new(provider: 'datadog', mode: mode, operations: operations).tap do |plan|
           next unless mode == 'live'
 
+          preflight_live_ownership!(plan.operations)
           plan.operations.each do |operation|
             prune_operation(operation)
           end
@@ -127,6 +128,7 @@ module SloRulesEngine
         @client.validate_credentials!
 
         plan(manifest, mode: 'live').tap do |apply_plan|
+          preflight_live_ownership!(apply_plan.operations)
           resolved_slo_ids = apply_plan.operations.each_with_object({}) do |operation, resolved|
             next unless operation.target == 'datadog.slo' && operation.backend_id
 
@@ -134,7 +136,6 @@ module SloRulesEngine
           end
           apply_plan.operations.each do |operation|
             next if operation.action == 'noop'
-            assert_safe_live_ownership!(operation)
 
             response = apply_operation(operation, resolved_slo_ids)
             next unless operation.target == 'datadog.slo'
@@ -329,12 +330,18 @@ module SloRulesEngine
               next
             end
 
+            match_identity = if source
+                               { strategy: 'source_ref', confidence: 'high' }
+                             else
+                               { strategy: 'service_scope_only', confidence: 'low' }
+                             end
             ApplyOperation.new(
               action: 'delete',
               target: spec.fetch(:target),
               name: entry_name,
               source: "managed_state.#{spec.fetch(:bucket)}[#{index}]",
               backend_id: fetch_value(entry, :id),
+              match_identity: match_identity,
               risk: datadog_operation_risk(action: 'delete', target: spec.fetch(:target))
             )
           end.compact
@@ -385,7 +392,7 @@ module SloRulesEngine
       end
 
       def assert_safe_live_ownership!(operation)
-        return unless %w[update recreate recreate_and_wait].include?(operation.action)
+        return unless %w[update recreate recreate_and_wait delete].include?(operation.action)
         return unless weak_match_identity?(operation.match_identity)
 
         strategy = fetch_value(operation.match_identity, :strategy)
@@ -396,6 +403,14 @@ module SloRulesEngine
           "live Datadog mutation requires managed source_ref identity for #{operation.action} operations; matched by #{strategy} with #{confidence} confidence"
         )
         raise SloRulesEngine::Datadog::OwnershipError.new(operation: operation, result: result)
+      end
+
+      def preflight_live_ownership!(operations)
+        operations.each do |operation|
+          next if operation.action == 'noop'
+
+          assert_safe_live_ownership!(operation)
+        end
       end
 
       def weak_identity_risk(match_identity)
