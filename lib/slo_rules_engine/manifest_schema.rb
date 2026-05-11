@@ -213,7 +213,7 @@ module SloRulesEngine
       query_expression = fetch_value(query, :query)
       return unless blank?(query_expression)
 
-      inferable_types = %w[distribution gauge]
+      inferable_types = %w[counter distribution gauge]
       type = fetch_value(query, :type).to_s
       result.error("#{path}.query", "is required for success_threshold when type is not one of #{inferable_types.inspect}") unless inferable_types.include?(type)
     end

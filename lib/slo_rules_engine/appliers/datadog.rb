@@ -662,6 +662,8 @@ module SloRulesEngine
         metric = fetch_value(query, :metric)
 
         case fetch_value(query, :type).to_s
+        when 'counter'
+          metric_sum_query(scope, metric)
         when 'distribution'
           metric_value_query(scope, metric, "p#{query_objective_percent(fetch_value(artifact, :objective_ratio))}")
         when 'gauge'
