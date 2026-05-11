@@ -53,7 +53,7 @@ This is the running plan for the long refactor.
 
 ## Phase 4: Provider State Management
 
-- [ ] Add backend change impact summary for diff, apply, and prune plans.
+- [x] Add backend change impact summary for diff, apply, and prune plans.
 - [x] Add reviewed manifest input path for apply workflows.
 - [x] Add explicit diff command.
 - [x] Add explicit import command.

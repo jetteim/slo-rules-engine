@@ -50,9 +50,11 @@ Implemented and already pushed:
 - Datadog threshold-based counter `time_slice` SLOs can infer traffic-floor queries from reviewed metric bindings when explicit query text is absent
 - Datadog dashboard payloads now validate the generated template-variable and note/timeseries widget contract explicitly
 - Datadog payload readers now prefer hash keys over colliding Ruby methods such as `Hash#default`
+- `diff`, `apply`, and `prune` plans now emit shared change-impact summaries with total, actionable, destructive, action, and target counts
 
 ## Most Recent Checkpoints
 
+- `88576ec` `docs: replace migration roadmap with adoption map`
 - `4630f3e` `feat: report orphan datadog backend resources on import`
 - `20b5d23` `feat: prune orphan datadog managed resources`
 - `adf5f9b` `fix: skip noop manifest bundle apply operations`
@@ -64,9 +66,9 @@ Implemented and already pushed:
 
 Highest-value remaining provider-state gaps:
 
-1. Backend change impact summary for diff, apply, and prune plans
-2. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
-3. Broader state-management parity for future providers after the Datadog baseline is stronger
+1. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
+2. Broader state-management parity for future providers after the Datadog baseline is stronger
+3. Provider-specific risk signaling when some changes are syntactically valid but operationally more dangerous than others
 
 Secondary gaps:
 
@@ -78,13 +80,13 @@ Secondary gaps:
 
 Next recommended provider-state slice:
 
-- add backend change impact summaries to `diff`, `apply`, and `prune` so operators can see destructive risk and change size before mutation
+- tighten remaining Datadog backend-contract semantics and add provider-specific risk signaling where mutation is more dangerous than a raw action count suggests
 
 Rationale:
 
-- provider-state mechanics now exist, but the operator still has to read raw operations to understand change impact
-- a compact impact summary is direct user value and belongs to the explicit state-management baseline
-- it also creates a reusable contract for future providers before more backend-specific deepening
+- the shared change-impact summary baseline now exists across `diff`, `apply`, and `prune`
+- the next remaining provider-state value is better signaling around backend-specific risk, not more generic plan shape work
+- Datadog is still the reference live provider, so its remaining contract gaps should be closed before widening other providers
 
 ## Verification Commands
 

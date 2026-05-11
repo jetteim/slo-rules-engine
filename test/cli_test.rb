@@ -98,6 +98,9 @@ class CLITest < Minitest::Test
     payload = JSON.parse(stdout).fetch(0)
     assert_equal 'datadog', payload.fetch('provider')
     assert_equal 'dry_run', payload.fetch('mode')
+    assert_equal 4, payload.fetch('summary').fetch('total_operations')
+    assert_equal 4, payload.fetch('summary').fetch('actionable_operations')
+    assert_equal 0, payload.fetch('summary').fetch('destructive_operations')
     assert_equal ['datadog.slo', 'datadog.monitor', 'datadog.monitor', 'datadog.dashboard'],
                  payload.fetch('operations').map { |operation| operation.fetch('target') }
   end

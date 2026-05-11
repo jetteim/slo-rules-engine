@@ -29,6 +29,8 @@ module SloRulesEngine
   end
 
   ApplyPlan = Struct.new(:provider, :mode, :operations, keyword_init: true) do
+    DESTRUCTIVE_ACTIONS = %w[delete recreate recreate_and_wait].freeze
+
     def initialize(**kwargs)
       super
       self.operations ||= []
@@ -43,8 +45,27 @@ module SloRulesEngine
         provider: provider,
         mode: mode,
         empty: empty?,
+        summary: summary,
         operations: operations.map(&:to_h)
       }
+    end
+
+    def summary
+      {
+        total_operations: operations.length,
+        actionable_operations: operations.count { |operation| operation.action != 'noop' },
+        destructive_operations: operations.count { |operation| DESTRUCTIVE_ACTIONS.include?(operation.action) },
+        operations_by_action: counts_by(&:action),
+        operations_by_target: counts_by(&:target)
+      }
+    end
+
+    private
+
+    def counts_by
+      operations.each_with_object(Hash.new(0)) do |operation, counts|
+        counts[yield(operation)] += 1
+      end
     end
   end
 
