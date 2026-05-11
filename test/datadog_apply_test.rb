@@ -799,6 +799,65 @@ class DatadogApplyTest < Minitest::Test
     assert_includes client.requests.fetch(2).fetch(:payload).fetch(:query), 'burn_rate("slo-123")'
   end
 
+  def test_datadog_apply_rejects_live_update_when_ownership_match_is_weak
+    slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
+    client = FakeDatadogClient.new(
+      slos: {
+        slo_name => {
+          id: 'slo-123',
+          match_identity: { strategy: 'name', confidence: 'medium' }
+        }
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    error = assert_raises(SloRulesEngine::Datadog::OwnershipError) do
+      applier.apply(@manifest)
+    end
+
+    assert_equal [], client.requests
+    assert_equal 'update', error.operation.action
+    assert_equal({ strategy: 'name', confidence: 'medium' }, error.operation.match_identity)
+    assert error.result.errors.any? do |entry|
+      entry.path == 'match_identity' && entry.message.include?('managed source_ref identity')
+    end
+  end
+
+  def test_datadog_apply_rejects_live_recreate_when_ownership_match_is_weak
+    seed_applier = SloRulesEngine::Appliers::Datadog.new(client: FakeDatadogClient.new)
+    desired_operations = seed_applier.plan(@manifest).operations
+    slo_name = desired_operations.fetch(0).name
+    monitor_name = desired_operations.fetch(1).name
+    slo_payload = Marshal.load(Marshal.dump(desired_operations.fetch(0).payload))
+    client = FakeDatadogClient.new(
+      slos: {
+        slo_name => {
+          id: 'slo-123',
+          payload: slo_payload,
+          match_identity: { strategy: 'source_ref', confidence: 'high' }
+        }
+      },
+      monitors: {
+        monitor_name => {
+          id: 456,
+          payload: {
+            query: 'burn_rate("stale-slo-999").over("30d").long_window("1h").short_window("5m") > 14.4'
+          },
+          match_identity: { strategy: 'name', confidence: 'medium' }
+        }
+      }
+    )
+    applier = SloRulesEngine::Appliers::Datadog.new(client: client)
+
+    error = assert_raises(SloRulesEngine::Datadog::OwnershipError) do
+      applier.apply(@manifest)
+    end
+
+    assert_equal [], client.requests
+    assert_equal 'recreate', error.operation.action
+    assert_equal({ strategy: 'name', confidence: 'medium' }, error.operation.match_identity)
+  end
+
   def test_datadog_apply_rejects_unresolved_monitor_payload_references
     client = FakeDatadogClient.new(slo_create_response: { 'data' => [{}] })
     applier = SloRulesEngine::Appliers::Datadog.new(client: client)

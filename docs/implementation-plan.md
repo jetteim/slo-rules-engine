@@ -61,6 +61,7 @@ This is the running plan for the long refactor.
 - [x] Add generated artifact diff harness.
 - [x] Add provider-specific risk signaling to state plans.
 - [x] Add identity-confidence signaling for weaker backend matches.
+- [x] Block live Datadog update/recreate mutations when ownership confidence is weak.
 
 ## Phase 5: Telemetry-First Adoption
 

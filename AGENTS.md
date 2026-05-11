@@ -53,9 +53,11 @@ Implemented and already pushed:
 - `diff`, `apply`, and `prune` plans now emit shared change-impact summaries with total, actionable, destructive, action, and target counts
 - Datadog state plans now flag recreate and prune-delete operations with provider-specific risk levels and reasons
 - Datadog import and state plans now preserve `match_identity` evidence and flag weaker name/title fallback matches explicitly
+- Live Datadog `update` and `recreate` mutations are now blocked when ownership was matched without managed `source_ref` identity
 
 ## Most Recent Checkpoints
 
+- `70b5071` `feat: add datadog identity confidence signaling`
 - `107a067` `feat: add datadog provider risk signaling`
 - `ad18132` `feat: add provider state impact summaries`
 - `88576ec` `docs: replace migration roadmap with adoption map`
@@ -72,7 +74,7 @@ Highest-value remaining provider-state gaps:
 
 1. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 2. Broader state-management parity for future providers after the Datadog baseline is stronger
-3. More explicit operator signaling when backend ownership cannot be established confidently enough for mutation
+3. Decide whether low-confidence ownership should also block prune or remain advisory there
 
 Secondary gaps:
 
@@ -84,14 +86,15 @@ Secondary gaps:
 
 Next recommended provider-state slice:
 
-- tighten remaining Datadog backend-contract semantics and decide whether low-confidence ownership should stay advisory or block mutation for specific actions
+- tighten remaining Datadog backend-contract semantics and decide whether low-confidence ownership should also block prune or remain advisory there
 
 Rationale:
 
 - the shared change-impact summary baseline now exists across `diff`, `apply`, and `prune`
 - provider-specific risk signaling now exists for recreate and prune-delete operations
 - weaker identity matches are now explicit in import and plan output
-- the next remaining provider-state value is deciding when low-confidence ownership should escalate from evidence to enforcement
+- live Datadog `update` and `recreate` now enforce managed source identity
+- the next remaining provider-state value is deciding whether prune should use the same enforcement threshold
 - Datadog is still the reference live provider, so its remaining contract gaps should be closed before widening other providers
 
 ## Verification Commands

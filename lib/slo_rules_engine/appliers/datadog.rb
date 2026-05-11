@@ -134,6 +134,7 @@ module SloRulesEngine
           end
           apply_plan.operations.each do |operation|
             next if operation.action == 'noop'
+            assert_safe_live_ownership!(operation)
 
             response = apply_operation(operation, resolved_slo_ids)
             next unless operation.target == 'datadog.slo'
@@ -381,6 +382,20 @@ module SloRulesEngine
             reasons: ['prune_deletes_managed_dashboard']
           }
         end
+      end
+
+      def assert_safe_live_ownership!(operation)
+        return unless %w[update recreate recreate_and_wait].include?(operation.action)
+        return unless weak_match_identity?(operation.match_identity)
+
+        strategy = fetch_value(operation.match_identity, :strategy)
+        confidence = fetch_value(operation.match_identity, :confidence)
+        result = SloRulesEngine::ValidationResult.new
+        result.error(
+          'match_identity',
+          "live Datadog mutation requires managed source_ref identity for #{operation.action} operations; matched by #{strategy} with #{confidence} confidence"
+        )
+        raise SloRulesEngine::Datadog::OwnershipError.new(operation: operation, result: result)
       end
 
       def weak_identity_risk(match_identity)

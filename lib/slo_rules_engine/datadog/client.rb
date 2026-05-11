@@ -7,6 +7,16 @@ require 'uri'
 module SloRulesEngine
   module Datadog
     class MissingCredentials < StandardError; end
+    class OwnershipError < StandardError
+      attr_reader :operation, :result
+
+      def initialize(operation:, result:)
+        @operation = operation
+        @result = result
+        super("Datadog live mutation for #{operation.target} #{operation.name.inspect} is unsafe")
+      end
+    end
+
     class ApiError < StandardError
       attr_reader :response
 

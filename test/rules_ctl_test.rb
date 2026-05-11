@@ -50,4 +50,46 @@ class RulesCtlTest < Minitest::Test
       assert_equal 'query', payload.fetch('errors').fetch(0).fetch('path')
     end
   end
+
+  def test_apply_renders_unsafe_provider_state_error
+    load "#{ROOT}/examples/services/checkout.rb"
+    definition = SloRulesEngine.definitions.fetch(0)
+    manifest = SloRulesEngine.default_provider_registry.fetch('datadog')
+      .generate(definition)
+      .to_h
+      .merge(service: definition.service)
+    operation = SloRulesEngine::ApplyOperation.new(
+      action: 'update',
+      target: 'datadog.slo',
+      name: 'checkout-api http-requests public-api successful-requests',
+      source: 'artifacts.slos[0]',
+      match_identity: { strategy: 'name', confidence: 'medium' }
+    )
+    result = SloRulesEngine::ValidationResult.new
+    result.error('match_identity', 'live Datadog mutation requires managed source_ref identity for update operations')
+    ownership_error = SloRulesEngine::Datadog::OwnershipError.new(operation: operation, result: result)
+    fake_applier = Object.new
+    fake_applier.define_singleton_method(:apply) { |_reviewed_manifest| raise ownership_error }
+
+    Tempfile.create(['reviewed-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      stdout, _stderr = capture_io do
+        exit_error = assert_raises(SystemExit) do
+          SloRulesEngine::Appliers::Datadog.stub(:new, fake_applier) do
+            RulesCtl.apply(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
+          end
+        end
+        assert_equal 1, exit_error.status
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'datadog', payload.fetch('provider')
+      assert_equal 'live', payload.fetch('mode')
+      assert_equal 'unsafe_provider_state', payload.fetch('error').fetch('code')
+      assert_equal 'match_identity', payload.fetch('errors').fetch(0).fetch('path')
+    end
+  end
 end
