@@ -201,10 +201,13 @@ module SloRulesEngine
             title = fetch_value(entry, :title)
             detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
             source = extract_source_ref(Array(fetch_value(detail, :tags, [])).map(&:to_s))
+            tags = Array(fetch_value(detail, :tags, [])).map(&:to_s)
             desired_title = if source && desired_by_source.key?(source)
                               desired_by_source.fetch(source)
-                            else
+                            elsif tags.include?(MANAGED_MONITOR_TAG)
                               desired_by_title[title]
+                            else
+                              nil
                             end
             next unless desired_title
 
@@ -304,7 +307,9 @@ module SloRulesEngine
           end
         else
           entries.find do |entry|
-            fetch_value(fetch_value(entry, :data, {}), :attributes, {}).fetch('name', nil) == query
+            attributes = fetch_value(fetch_value(entry, :data, {}), :attributes, {})
+            tags = Array(fetch_value(attributes, :all_tags, [])).map(&:to_s)
+            fetch_value(attributes, :name) == query && tags.include?(MANAGED_MONITOR_TAG)
           end
         end
       end

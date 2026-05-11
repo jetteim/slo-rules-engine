@@ -1106,6 +1106,60 @@ class DatadogApplyTest < Minitest::Test
                     'managed_by:slo-rules-engine'
   end
 
+  def test_datadog_client_ignores_unmanaged_slo_name_fallback_match
+    http = RoutingHttp.new(
+      '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=20&query=checkout-api+http-requests+public-api+successful-requests' => FakeResponse.new(
+        '200',
+        '{"data":{"attributes":{"slos":[{"data":{"id":"slo-123","attributes":{"name":"checkout-api http-requests public-api successful-requests","all_tags":["service:checkout-api"]}}}]}}}'
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.existing_state(
+      desired: {
+        slos: ['checkout-api http-requests public-api successful-requests']
+      }
+    )
+
+    assert_empty state.fetch(:slos)
+  end
+
+  def test_datadog_client_ignores_unmanaged_dashboard_title_fallback_match
+    http = RoutingHttp.new(
+      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
+        '200',
+        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
+      ),
+      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+        '200',
+        '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"}]}'
+      ),
+      '/api/v1/dashboard/abc123' => FakeResponse.new(
+        '200',
+        '{"id":"abc123","title":"checkout-api SLO decision dashboard","layout_type":"ordered","tags":["service:checkout-api"]}'
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.existing_state(
+      desired: {
+        dashboards: ['checkout-api SLO decision dashboard']
+      }
+    )
+
+    assert_empty state.fetch(:dashboards)
+  end
+
   def test_datadog_client_matches_existing_state_by_source_tag_when_backend_names_drift
     desired_slo_name = @manifest.fetch(:artifacts).fetch(:slos).fetch(0).fetch(:name)
     desired_monitor_name = @manifest.fetch(:artifacts).fetch(:monitors).fetch(0).fetch(:name)

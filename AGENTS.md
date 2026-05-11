@@ -55,9 +55,11 @@ Implemented and already pushed:
 - Datadog import and state plans now preserve `match_identity` evidence and flag weaker name/title fallback matches explicitly
 - Live Datadog `update` and `recreate` mutations are now blocked when ownership was matched without managed `source_ref` identity
 - Live Datadog prune deletes are now also blocked when ownership confidence is only service-scope fallback
+- Datadog import and diff fallback matching now reject same-name SLOs and same-title dashboards unless they are explicitly engine-managed
 
 ## Most Recent Checkpoints
 
+- latest: `fix: require managed tags for datadog fallback matches`
 - `70b5071` `feat: add datadog identity confidence signaling`
 - `107a067` `feat: add datadog provider risk signaling`
 - `ad18132` `feat: add provider state impact summaries`
@@ -96,6 +98,7 @@ Rationale:
 - weaker identity matches are now explicit in import and plan output
 - live Datadog `update` and `recreate` now enforce managed source identity
 - low-confidence prune deletes now use the same enforcement threshold
+- fallback name/title matching no longer claims ownership of unmanaged SLOs or dashboards
 - the next decision is whether any remaining Datadog contract gaps are substantial enough to keep provider-state at the front of the roadmap
 - Datadog is still the reference live provider, so its remaining contract gaps should be closed before widening other providers
 

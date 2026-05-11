@@ -62,6 +62,7 @@ This is the running plan for the long refactor.
 - [x] Add provider-specific risk signaling to state plans.
 - [x] Add identity-confidence signaling for weaker backend matches.
 - [x] Block live Datadog update/recreate/prune mutations when ownership confidence is weak.
+- [x] Require explicit engine-managed tags for Datadog fallback name/title ownership matches.
 
 ## Phase 5: Telemetry-First Adoption
 
