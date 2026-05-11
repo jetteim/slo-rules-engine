@@ -774,7 +774,10 @@ module SloRulesEngine
       end
 
       def dashboard_query_expression(query)
-        fetch_value(query, :query) || metric_count_query(query_scope(query, include_success: false), fetch_value(query, :metric))
+        expression = fetch_value(query, :query)
+        return merge_scope_into_query_expression(expression, fetch_value(query, :selector, {})) unless expression.to_s.empty?
+
+        metric_count_query(query_scope(query, include_success: false), fetch_value(query, :metric))
       end
 
       def resolve_payload(payload, resolved_slo_ids)

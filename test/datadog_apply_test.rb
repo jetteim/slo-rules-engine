@@ -366,6 +366,8 @@ class DatadogApplyTest < Minitest::Test
     assert_includes dashboard_payload.fetch(:tags), 'source_ref:artifacts.dashboards.0'
     assert_equal %w[service sli sli_instance slo],
                  dashboard_payload.fetch(:template_variables).map { |variable| variable.fetch(:name) }
+    assert_equal 'p95:http.server.request.duration{route:/checkout,service:checkout-api}',
+                 dashboard_payload.fetch(:widgets).fetch(1).fetch(:definition).fetch(:requests).fetch(0).fetch(:q)
   end
 
   def test_datadog_apply_translates_time_slice_slo_payloads_for_counter_ratio_slos

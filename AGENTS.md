@@ -45,6 +45,7 @@ Implemented and already pushed:
 - Datadog SLO and monitor field-contract validation before live mutation
 - Datadog counter-ratio `time_slice` SLO translation, validation, and diff reconciliation
 - Datadog threshold-based `time_slice` SLO translation for provider query expressions with reviewed `success_threshold`
+- Datadog dashboard evidence queries now merge reviewed selector scope into provider query expressions
 
 ## Most Recent Checkpoints
 
@@ -80,6 +81,7 @@ Rationale:
 - managed identity tags and core SLO/monitor semantics are now validated before live apply
 - counter-ratio `time_slice` SLOs now translate and reconcile cleanly
 - threshold-based `time_slice` SLOs backed by provider query expressions now translate and reconcile cleanly
+- dashboard evidence queries now preserve reviewed selector scope instead of drifting to provider-binding-only scope
 - the next meaningful gap is closing the remaining distance between reviewed intent and actual Datadog backend semantics for the other `time_slice` and provider-owned payload shapes
 
 ## Verification Commands
