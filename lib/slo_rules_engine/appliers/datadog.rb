@@ -498,7 +498,7 @@ module SloRulesEngine
               {
                 data_source: 'metrics',
                 name: 'main',
-                query: threshold_time_slice_query_expression(query)
+                query: threshold_time_slice_query_expression(artifact, query, success_threshold)
               }
             ]
           }
@@ -562,7 +562,7 @@ module SloRulesEngine
       end
 
       def dashboard_payload(manifest, artifact, source)
-        query = first_slo_query(manifest)
+        slo_artifact = first_slo_artifact(manifest)
 
         {
           title: fetch_value(artifact, :title),
@@ -590,7 +590,7 @@ module SloRulesEngine
                 title: 'SLI evidence',
                 requests: [
                   {
-                    q: dashboard_query_expression(query)
+                    q: dashboard_query_expression(slo_artifact)
                   }
                 ]
               }
@@ -645,14 +645,31 @@ module SloRulesEngine
         %(sum:#{metric}{#{tags.empty? ? '*' : tags.join(',')}}.as_count())
       end
 
-      def threshold_time_slice_query_expression(query)
-        expression = fetch_value(query, :query)
-        if expression.to_s.empty?
-          raise SloRulesEngine::UnsupportedApplyAction,
-                "Datadog threshold-based time-slice apply requires a provider query expression for #{fetch_value(query, :metric).inspect}"
-        end
+      def metric_value_query(scope, metric, aggregation)
+        tags = scope.sort_by { |key, _value| key.to_s }.map { |key, value| "#{key}:#{value}" }
+        %(#{aggregation}:#{metric}{#{tags.empty? ? '*' : tags.join(',')}})
+      end
 
-        merge_scope_into_query_expression(expression, fetch_value(query, :selector, {}))
+      def threshold_time_slice_query_expression(artifact, query, success_threshold)
+        expression = fetch_value(query, :query)
+        return merge_scope_into_query_expression(expression, fetch_value(query, :selector, {})) unless expression.to_s.empty?
+
+        infer_threshold_time_slice_query_expression(artifact, query, success_threshold)
+      end
+
+      def infer_threshold_time_slice_query_expression(artifact, query, success_threshold)
+        scope = normalize_scope(fetch_value(query, :selector, {}))
+        metric = fetch_value(query, :metric)
+
+        case fetch_value(query, :type).to_s
+        when 'distribution'
+          metric_value_query(scope, metric, "p#{query_objective_percent(fetch_value(artifact, :objective_ratio))}")
+        when 'gauge'
+          metric_value_query(scope, metric, gauge_aggregation(fetch_value(success_threshold, :operator)))
+        else
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "Datadog threshold-based time-slice apply requires a provider query expression for #{metric.inspect}"
+        end
       end
 
       def datadog_tags(manifest, artifact, source)
@@ -694,6 +711,10 @@ module SloRulesEngine
         (value.to_f * 100).round(3)
       end
 
+      def query_objective_percent(value)
+        format('%.2f', value.to_f * 100).sub(/\.?0+\z/, '')
+      end
+
       def query_interval_seconds(range)
         match = range.to_s.match(/\A(\d+)([smhd])\z/)
         return 300 unless match
@@ -719,6 +740,17 @@ module SloRulesEngine
         else
           raise SloRulesEngine::UnsupportedApplyAction,
                 "unsupported Datadog time-slice threshold operator #{operator.inspect}"
+        end
+      end
+
+      def gauge_aggregation(operator)
+        case operator.to_s
+        when '<', 'lt', '<=', 'lte' then 'max'
+        when '>', 'gt', '>=', 'gte' then 'min'
+        when '==', '=', 'eq' then 'avg'
+        else
+          raise SloRulesEngine::UnsupportedApplyAction,
+                "unsupported Datadog gauge threshold operator #{operator.inspect}"
         end
       end
 
@@ -768,14 +800,19 @@ module SloRulesEngine
         ([fetch_value(artifact, :source).to_s] + variables).join("\n")
       end
 
-      def first_slo_query(manifest)
-        slo = collection(manifest, :slos).fetch(0, {})
-        fetch_value(slo, :query, {})
+      def first_slo_artifact(manifest)
+        collection(manifest, :slos).fetch(0, {})
       end
 
-      def dashboard_query_expression(query)
+      def dashboard_query_expression(artifact)
+        query = fetch_value(artifact, :query, {})
         expression = fetch_value(query, :query)
         return merge_scope_into_query_expression(expression, fetch_value(query, :selector, {})) unless expression.to_s.empty?
+
+        success_threshold = fetch_value(query, :success_threshold, {})
+        if success_threshold.is_a?(Hash) && !success_threshold.empty?
+          return infer_threshold_time_slice_query_expression(artifact, query, success_threshold)
+        end
 
         metric_count_query(query_scope(query, include_success: false), fetch_value(query, :metric))
       end

@@ -210,7 +210,12 @@ module SloRulesEngine
 
       validate_presence(result, "#{path}.success_threshold.operator", fetch_value(success_threshold, :operator))
       validate_presence(result, "#{path}.success_threshold.value", fetch_value(success_threshold, :value))
-      validate_presence(result, "#{path}.query", fetch_value(query, :query))
+      query_expression = fetch_value(query, :query)
+      return unless blank?(query_expression)
+
+      inferable_types = %w[distribution gauge]
+      type = fetch_value(query, :type).to_s
+      result.error("#{path}.query", "is required for success_threshold when type is not one of #{inferable_types.inspect}") unless inferable_types.include?(type)
     end
 
     def validate_collection(result, container, key, path: nil)
