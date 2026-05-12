@@ -176,4 +176,48 @@ class RulesCtlTest < Minitest::Test
       end
     end
   end
+
+  def test_discover_telemetry_scope_file_records_failed_scopes_and_exits_one
+    fake_adapter = Object.new
+    fake_adapter.define_singleton_method(:discover) do |service: nil, selectors: {}, host: nil|
+      if service == 'checkout-api'
+        SloRulesEngine::TelemetryLookup::Result.new(
+          provider: 'datadog',
+          signals: [SloRulesEngine::TelemetryLookup.discovered_signal(metric: 'http.server.request.duration', source: 'datadog')],
+          findings: []
+        )
+      else
+        raise 'backend query failed'
+      end
+    end
+
+    Tempfile.create(['scopes', '.json']) do |file|
+      file.write(JSON.generate([
+        { label: 'checkout-prod', service: 'checkout-api' },
+        { label: 'payments-prod', selectors: { team: 'payments' } }
+      ]))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        stdout, _stderr = capture_io do
+          exit_error = assert_raises(SystemExit) do
+            SloRulesEngine::TelemetryLookup::Datadog.stub(:new, fake_adapter) do
+              RulesCtl.discover_telemetry([
+                '--provider=datadog',
+                "--scope-file=#{file.path}",
+                "--output-dir=#{dir}"
+              ])
+            end
+          end
+          assert_equal 1, exit_error.status
+        end
+
+        payload = JSON.parse(stdout)
+        assert_equal 1, payload.fetch('successful_scopes')
+        assert_equal 1, payload.fetch('failed_scopes')
+        failed_scope = payload.fetch('scopes').find { |entry| entry.fetch('status') == 'error' }
+        assert_equal 'discovery_failed', failed_scope.fetch('error').fetch('code')
+      end
+    end
+  end
 end
