@@ -1,5 +1,6 @@
 /.bundle/
 /coverage/
 /tmp/
+.forbidden-terms
 *.gem
 .DS_Store
