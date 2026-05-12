@@ -584,6 +584,44 @@ class CLITest < Minitest::Test
     assert_includes stderr, '--host is only supported for datadog discovery'
   end
 
+  def test_discover_telemetry_scope_file_requires_output_dir
+    Tempfile.create(['scopes', '.json']) do |file|
+      file.write(JSON.generate([{ label: 'checkout-prod', service: 'checkout-api' }]))
+      file.flush
+
+      _stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'discover-telemetry',
+        '--provider=prometheus_stack',
+        "--scope-file=#{file.path}"
+      )
+
+      refute status.success?
+      assert_includes stderr, 'missing --output-dir'
+    end
+  end
+
+  def test_discover_telemetry_scope_file_rejects_single_scope_flags
+    Tempfile.create(['scopes', '.json']) do |file|
+      file.write(JSON.generate([{ label: 'checkout-prod', service: 'checkout-api' }]))
+      file.flush
+
+      _stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'discover-telemetry',
+        '--provider=prometheus_stack',
+        "--scope-file=#{file.path}",
+        '--service=checkout-api',
+        '--output-dir=/tmp/discovery'
+      )
+
+      refute status.success?
+      assert_includes stderr, '--scope-file cannot be combined with --service, --selector, or --host'
+    end
+  end
+
   def test_candidates_accept_lookup_result_envelope
     Tempfile.create(['lookup-signals', '.json']) do |file|
       file.write(JSON.generate(

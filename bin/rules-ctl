@@ -556,6 +556,8 @@ module RulesCtl
 
   def discover_telemetry(argv)
     provider_key = nil
+    scope_file = nil
+    output_dir = nil
     service = nil
     host = nil
     selector_values = []
@@ -564,6 +566,8 @@ module RulesCtl
     to = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--scope-file=FILE', 'JSON file containing discovery scopes') { |value| scope_file = value }
+      opts.on('--output-dir=DIR', 'Directory for batch discovery output') { |value| output_dir = value }
       opts.on('--service=SERVICE', 'Service scope for discovery') { |value| service = value }
       opts.on('--host=HOST', 'Host scope for Datadog discovery') { |value| host = value }
       opts.on('--selector=KEY=VALUE', 'Additional selector scope') { |value| selector_values << value }
@@ -573,6 +577,24 @@ module RulesCtl
     end
     parser.parse!(argv)
     abort_usage('missing --provider') unless provider_key
+    if scope_file
+      if !service.to_s.empty? || !selector_values.empty? || !host.to_s.empty?
+        abort_usage('--scope-file cannot be combined with --service, --selector, or --host')
+      end
+      abort_usage('missing --output-dir') if output_dir.to_s.empty?
+
+      scopes = SloRulesEngine::TelemetryBatchDiscovery.load_scopes(scope_file, provider: provider_key)
+      adapter = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to)
+      result = SloRulesEngine::TelemetryBatchDiscovery::Runner.new(
+        provider: provider_key,
+        adapter: adapter,
+        output_dir: output_dir
+      ).run(scopes)
+      puts JSON.pretty_generate(result)
+      exit 1 unless result[:failed_scopes].zero?
+      return
+    end
+
     selectors = parse_selectors(selector_values)
     abort_usage('missing discovery scope') if service.to_s.empty? && selectors.empty? && host.to_s.empty?
     if provider_key == 'datadog' && !host.to_s.empty? && (!service.to_s.empty? || !selectors.empty?)

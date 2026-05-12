@@ -134,4 +134,46 @@ class RulesCtlTest < Minitest::Test
       assert_equal 'match_identity', payload.fetch('errors').fetch(0).fetch('path')
     end
   end
+
+  def test_discover_telemetry_scope_file_writes_index_and_exits_zero_when_all_scopes_succeed
+    fake_adapter = Object.new
+    fake_adapter.define_singleton_method(:discover) do |service: nil, selectors: {}, host: nil|
+      SloRulesEngine::TelemetryLookup::Result.new(
+        provider: 'prometheus_stack',
+        signals: [
+          SloRulesEngine::TelemetryLookup.discovered_signal(
+            metric: "metric.for.#{service || selectors.fetch('team')}",
+            source: 'prometheus'
+          )
+        ],
+        findings: []
+      )
+    end
+
+    Tempfile.create(['scopes', '.json']) do |file|
+      file.write(JSON.generate([
+        { label: 'checkout-prod', service: 'checkout-api' },
+        { label: 'payments-prod', selectors: { team: 'payments' } }
+      ]))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        stdout, _stderr = capture_io do
+          SloRulesEngine::TelemetryLookup::Prometheus.stub(:new, fake_adapter) do
+            RulesCtl.discover_telemetry([
+              '--provider=prometheus_stack',
+              "--scope-file=#{file.path}",
+              "--output-dir=#{dir}"
+            ])
+          end
+        end
+
+        payload = JSON.parse(stdout)
+        assert_equal 'prometheus_stack', payload.fetch('provider')
+        assert_equal 2, payload.fetch('successful_scopes')
+        assert_equal 0, payload.fetch('failed_scopes')
+        assert File.exist?(File.join(dir, 'index.json'))
+      end
+    end
+  end
 end
