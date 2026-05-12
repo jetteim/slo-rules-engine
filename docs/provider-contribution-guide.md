@@ -50,9 +50,12 @@ Required baseline:
 
 - `lookup-telemetry` for explicit metric or query evidence, or an explicit statement that lookup is unsupported.
 - `discover-telemetry` for service or selector-scoped inventory when the backend can enumerate metrics, or an explicit statement that discovery is unsupported.
+- provider adapters should expose `lookup(metric:, kind:, user_visible:, query: nil)` and `discover(service: nil, selectors: {}, host: nil)` when telemetry evidence is supported.
 - normalized result envelopes with `provider`, `signals`, and `findings`.
+- saved batch-discovery result files must preserve the same normalized envelope plus scope metadata so later onboarding stages can reuse them without provider-specific parsing.
 - conservative signal classification; unknown metrics stay `unknown` or become findings until reviewed.
 - machine-readable failure output for unsupported scopes, missing credentials, or backend limitations.
+- documented scope constraints for both single-scope discovery and `discover-telemetry --scope-file` batch mode.
 
 The provider adapter owns backend-specific payloads. Onboarding commands should only consume normalized `signals` and `findings`.
 
@@ -76,10 +79,12 @@ Expected behavior:
 - State actions documented.
 - Lookup and discovery behavior documented.
 - Unsupported discovery scopes documented.
+- Batch discovery compatibility documented when discovery is supported.
 - Synthetic fixture added or reused.
 - Model report reviewed before provider generation.
 - Unit tests cover supported output.
 - Lookup-result envelopes covered by onboarding tests.
+- Batch discovery tests cover invalid scope combinations and reusable normalized saved output where relevant.
 - Apply-plan tests cover dry-run behavior.
 - Negative-path tests cover unsupported scopes or missing credentials where relevant.
 - Unsupported fields produce warnings.

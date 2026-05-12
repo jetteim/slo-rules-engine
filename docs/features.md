@@ -25,7 +25,7 @@ Explicit features:
 
 - **Telemetry inventory ingestion:** accept measured telemetry inventory JSON as the starting input.
 - **Telemetry discovery baseline:** discover active metrics by service or selector scope before candidate review.
-- **Portfolio discovery:** discover telemetry for multiple services and preserve service-scoped evidence packets for review.
+- **Portfolio discovery:** discover telemetry for multiple services through `discover-telemetry --scope-file`, preserve one normalized evidence file per scope, and write an aggregate `index.json` for later review ranking.
 - **Signal eligibility review:** reject unsupported, non-user-visible, or metric-less signals with machine-readable findings.
 - **SLI/SLO candidate inference:** map eligible signals to SLI identifiers, SLO identifiers, objectives, success conditions, and calculation-basis recommendations.
 - **Candidate confidence and explanation:** explain why a signal became a candidate and how strong the evidence is before review.
@@ -47,6 +47,7 @@ Explicit features:
 
 - **Provider telemetry lookup:** query Datadog or Prometheus-compatible backends through injectable clients and emit normalized telemetry inventory.
 - **Service-scoped discovery:** inventory active metrics by service or selector scope through `discover-telemetry` and reuse the same normalized evidence shape as explicit lookup.
+- **Batch discovery reuse:** `discover-telemetry --scope-file` reuses the same provider discovery adapter one scope at a time and persists saved evidence packets without provider-specific postprocessing.
 - **Online sanity checks:** report missing metrics, missing time series, missing histogram buckets, and calculation-basis sensitivity from file telemetry, saved lookup results, or explicit online lookup.
 - **Calculation-basis evidence:** use observed request volume and estimated failed observations before alerting to recommend observations-based or time-slice-based SLOs.
 - **Candidate reuse:** feed lookup or discovery output into the same `candidates` and `draft-definition` flow as file-based telemetry inventory.

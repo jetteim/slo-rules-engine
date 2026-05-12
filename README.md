@@ -67,6 +67,7 @@ bin/rules-ctl candidates examples/telemetry/checkout-signals.json
 bin/rules-ctl discover-telemetry --provider datadog --service checkout-api
 bin/rules-ctl discover-telemetry --provider datadog --host checkout-host
 bin/rules-ctl discover-telemetry --provider prometheus_stack --service checkout-api --base-url http://localhost:9090
+bin/rules-ctl discover-telemetry --provider datadog --scope-file ./examples/telemetry/scopes.json --output-dir ./discovery
 bin/rules-ctl lookup-telemetry --provider datadog --metric http.server.request.duration --kind latency --query 'p95:http.server.request.duration{service:checkout-api}'
 bin/rules-ctl lookup-telemetry --provider prometheus_stack --metric http_server_request_duration_seconds_count --kind errors --base-url http://localhost:9090
 bin/rules-ctl candidates examples/telemetry/checkout-lookup-result.json
@@ -96,6 +97,7 @@ bin/rules-ctl integrations list
 ```
 
 The `candidates` and `draft-definition` commands accept either a raw telemetry signal array or a normalized provider evidence envelope with `provider`, `signals`, and `findings`.
+Batch `discover-telemetry --scope-file` writes one normalized evidence file per scope plus an aggregate `index.json` for later review-readiness ranking and draft generation.
 
 Confirmed `apply` now requires `--manifest` so live state changes always use reviewed provider artifacts instead of regenerating definitions inline.
 Confirmed `prune` now requires `--manifest` so destructive state removal is also tied to reviewed provider artifacts.

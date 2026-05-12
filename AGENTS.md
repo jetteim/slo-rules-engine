@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the first batch discovery spec is being written and reviewed before implementation. Do not start code changes for batch discovery until the written spec is approved.
+Current telemetry-first status: batch discovery through `discover-telemetry --scope-file` is implemented, tested, and pushed. The next telemetry-first slices should build on saved evidence files and the aggregate `index.json`, not reopen the batch orchestration layer.
 
 ## Non-Negotiable Working Rules
 
@@ -59,12 +59,20 @@ Implemented and already pushed:
 - Live Datadog prune deletes are now also blocked when ownership confidence is only service-scope fallback
 - Datadog import and diff fallback matching now reject same-name SLOs and same-title dashboards unless they are explicitly engine-managed
 - Datadog duplicate `source_ref` and duplicate fallback matches now degrade to low-confidence identity instead of being silently accepted as trustworthy
+- Batch telemetry discovery via `discover-telemetry --scope-file` with one provider per run
+- One saved normalized discovery evidence file per scope plus aggregate `index.json`
+- CLI validation for scope-file conflicts, required output directory, and per-scope runtime failure recording
 
 ## Most Recent Checkpoints
 
-- spec pending review: `docs/superpowers/specs/2026-05-12-telemetry-batch-discovery-design.md`
-- latest: `fix: detect ambiguous datadog identity matches`
-- previous: `fix: require managed tags for datadog fallback matches`
+- latest: `test: cover batch discovery scope failures`
+- previous: `feat: add scope-file telemetry discovery`
+- `25c0de9` `feat: add telemetry batch discovery runner`
+- `c9fbef8` `docs: add telemetry batch discovery plan`
+- `e342fa5` `docs: add telemetry batch discovery design`
+- `a28d6cf` `docs: clarify notification router integration role`
+- `4a5260b` `fix: detect ambiguous datadog identity matches`
+- `bfd78f5` `fix: require managed tags for datadog fallback matches`
 - `70b5071` `feat: add datadog identity confidence signaling`
 - `107a067` `feat: add datadog provider risk signaling`
 - `ad18132` `feat: add provider state impact summaries`
@@ -78,11 +86,11 @@ Implemented and already pushed:
 
 ## Current Open Gaps
 
-Highest-value remaining provider-state gaps:
+Highest-value remaining gaps:
 
-1. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
-2. Batch telemetry discovery and review-readiness ranking for service portfolios
-3. Candidate confidence and saved evidence packets for telemetry-derived drafts
+1. Review-readiness ranking for service portfolios using saved batch discovery evidence
+2. Candidate confidence and saved evidence packets for telemetry-derived drafts
+3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
 
@@ -94,19 +102,14 @@ Secondary gaps:
 
 Next recommended slice:
 
-- start telemetry-first onboarding depth with batch discovery across service portfolios and selector inputs
+- build service onboarding summaries that rank saved discovery scopes by review readiness
 
 Rationale:
 
-- the shared change-impact summary baseline now exists across `diff`, `apply`, and `prune`
-- provider-specific risk signaling now exists for recreate and prune-delete operations
-- weaker identity matches are now explicit in import and plan output
-- live Datadog `update` and `recreate` now enforce managed source identity
-- low-confidence prune deletes now use the same enforcement threshold
-- fallback name/title matching no longer claims ownership of unmanaged SLOs or dashboards
-- duplicate source identity now degrades to weak ownership instead of silently selecting an arbitrary backend match
-- the remaining Datadog contract gaps are now narrower than the telemetry-first adoption gap
-- Datadog remains the reference live provider, but follow-up hardening can now be evidence-driven instead of roadmap-leading
+- batch discovery now captures reusable normalized evidence for many scopes in one run
+- the next value is not more orchestration; it is turning saved evidence into a ranked review queue
+- candidate confidence and evidence handoff should now build on persisted scope results instead of rerunning backend discovery
+- Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
 
@@ -129,5 +132,5 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/appliers/datadog.rb`
+5. Inspect `lib/slo_rules_engine/telemetry_batch_discovery.rb`
 6. Continue the highest-priority open slice listed above

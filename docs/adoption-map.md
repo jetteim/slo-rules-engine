@@ -18,7 +18,7 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 **Needed capability increments:**
 
-- batch telemetry discovery across service and selector scopes
+- batch telemetry discovery across service and selector scopes with one saved normalized evidence file per scope plus aggregate `index.json`
 - service grouping from discovered telemetry
 - readiness scoring based on eligibility, coverage, and data quality
 - onboarding summary output for maintainers and platform teams
@@ -32,7 +32,7 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 **Needed capability increments:**
 
 - candidate confidence and explanation
-- saved evidence packets with findings and reasoning
+- saved evidence packets with findings, reasoning, and review handoff context
 - draft generation that reuses normalized lookup and discovery envelopes
 - validation that the draft remains loadable and reviewable
 
@@ -56,6 +56,6 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. finish the provider-state baseline until apply plans clearly show change impact and destructive risk
-2. make telemetry-first portfolio onboarding produce ranked service queues and saved evidence packets
-3. deepen future providers only after those two flows are stable
+1. turn saved batch discovery evidence into ranked service review queues
+2. add candidate confidence and saved evidence handoff for telemetry-derived drafts
+3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline

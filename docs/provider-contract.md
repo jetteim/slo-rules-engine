@@ -63,9 +63,12 @@ When telemetry evidence is supported:
 
 - `lookup-telemetry` returns normalized evidence for one explicit metric or query.
 - `discover-telemetry` returns normalized evidence for a documented service, selector, host, or backend-specific scope.
+- `discover-telemetry --scope-file` may orchestrate repeated provider `discover(...)` calls for one provider run and must preserve the same normalized evidence shape in each saved per-scope result file.
 - results must normalize to `provider`, `signals`, and `findings` so onboarding and reality-check flows can reuse them without backend-specific parsing.
+- saved batch-discovery evidence must remain reusable by later onboarding stages without provider-specific transformation.
 - unsupported scopes or filters must fail explicitly.
 - provider-specific scope limits must be documented.
+- providers that support discovery must document whether they support the shared batch CLI contract and what scope combinations are valid in that mode.
 
 Discovery is evidence for review, not automatic SLO policy. Candidate generation and `draft-definition` consume normalized `signals`; backend-specific payload details stay inside provider adapters.
 
@@ -125,6 +128,7 @@ Expected telemetry behavior:
 - explicit metric lookup through Datadog query APIs
 - service/tag-filter discovery or host-scoped discovery through the active metrics API
 - host scope must not be combined with tag-filter discovery in one request
+- batch discovery through `discover-telemetry --scope-file` with one saved normalized evidence file per scope and one aggregate `index.json`
 
 ### `prometheus_stack`
 
@@ -151,6 +155,7 @@ Expected telemetry behavior:
 - explicit metric lookup through Prometheus-compatible series and query APIs
 - service or selector-scoped discovery through metric-name label values
 - normalized lookup output reusable by onboarding and reality-check flows
+- batch discovery through `discover-telemetry --scope-file` for service and selector scopes
 
 ### `sloth`
 
@@ -170,6 +175,7 @@ The Sloth provider does not execute the Sloth CLI or apply generated rules. It p
 Expected telemetry behavior:
 
 - reuse the Prometheus-compatible lookup and discovery baseline for onboarding and sanity checks
+- batch discovery support is inherited through the Prometheus-compatible discovery interface
 
 ## Delivery Integrations
 

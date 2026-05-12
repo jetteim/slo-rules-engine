@@ -801,7 +801,7 @@ module RulesCtl
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
-        bin/rules-ctl discover-telemetry --provider=<provider> [--service=<service>] [--selector=key=value] [--base-url=<url>]
+        bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>

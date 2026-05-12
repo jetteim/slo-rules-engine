@@ -41,7 +41,7 @@ This design keeps the first slice small:
 
 - it reuses existing provider adapters;
 - it reuses the current normalized discovery result envelope;
-- it does not introduce provider mixing in one run;
+- it does not introduce multi-provider execution in one run;
 - it does not introduce automatic backend enumeration yet;
 - it produces reusable evidence for later ranking and onboarding stages.
 

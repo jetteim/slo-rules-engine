@@ -622,6 +622,19 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_discover_telemetry_scope_file_help_lists_batch_option
+    stdout, stderr, status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'discover-telemetry',
+      '--help'
+    )
+
+    assert status.success?, stderr
+    assert_includes stdout, '--scope-file=FILE'
+    assert_includes stdout, '--output-dir=DIR'
+  end
+
   def test_candidates_accept_lookup_result_envelope
     Tempfile.create(['lookup-signals', '.json']) do |file|
       file.write(JSON.generate(
