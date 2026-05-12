@@ -14,6 +14,8 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
+Current telemetry-first status: the first batch discovery spec is being written and reviewed before implementation. Do not start code changes for batch discovery until the written spec is approved.
+
 ## Non-Negotiable Working Rules
 
 - Keep the repo public-safe. Private/internal rules are reference material only and must not be copied in.
@@ -60,6 +62,7 @@ Implemented and already pushed:
 
 ## Most Recent Checkpoints
 
+- spec pending review: `docs/superpowers/specs/2026-05-12-telemetry-batch-discovery-design.md`
 - latest: `fix: detect ambiguous datadog identity matches`
 - previous: `fix: require managed tags for datadog fallback matches`
 - `70b5071` `feat: add datadog identity confidence signaling`
