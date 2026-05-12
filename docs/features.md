@@ -13,7 +13,7 @@ See [Telemetry-First Adoption Map](adoption-map.md) for the value-oriented onboa
 - Validation that SLO alert route keys and provider-specific route sources exist.
 - Reality checks against historical telemetry and measured metric inventories.
 - SLI/SLO candidate generation from measured telemetry with findings for rejected or incomplete signals.
-- Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and notification routing.
+- Generation of SLO rules, burn-rate alerts, telemetry-gap notifications, dashboards, and delivery integration route catalogs.
 - Machine-readable findings for unsupported or implementation-coupled definitions.
 - Golden-style tests for generated artifacts.
 

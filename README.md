@@ -8,7 +8,7 @@ The project keeps the useful shape of an SRE rules DSL while removing organizati
 
 - Keep a concise Ruby DSL for service level definitions.
 - Convert DSL definitions into neutral service reliability intent.
-- Generate SLOs, alert rules, notification routing, and dashboards through providers.
+- Generate SLOs, alert rules, dashboards, and delivery integration route catalogs from reviewed reliability intent.
 - Support reality checks against measured telemetry.
 - Generate candidate SLIs/SLOs from existing telemetry during onboarding, starting from checked-in inventories or provider discovery output.
 - Manage generated backend state through explicit dry-run and apply workflows.
@@ -31,7 +31,8 @@ Initial providers:
 - `datadog`: Datadog metric SLOs, counter-ratio and threshold-based time-slice SLOs, monitors, dashboards, route references, query validation, source-tagged state reconciliation, and live API apply support.
 - `prometheus_stack`: Prometheus-compatible recording/alert rules, Alertmanager routing, Grafana dashboards, PromQL reality checks, and manifest-bundle apply support.
 - `sloth`: Sloth `prometheus/v1` SLO specs for Prometheus rule generation and external-generator apply handoff.
-Initial integration:
+
+Initial delivery integration:
 
 - `notification_router`: generated route catalog entries for contextual alert delivery used by backend providers.
 
