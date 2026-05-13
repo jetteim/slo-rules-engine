@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: batch discovery through `discover-telemetry --scope-file` is implemented and pushed, and service onboarding summary ranking from saved batch discovery evidence is implemented locally with a green test suite. The next telemetry-first slices should build on saved evidence files and the aggregate `index.json`, not reopen the batch orchestration layer.
+Current telemetry-first status: batch discovery through `discover-telemetry --scope-file` and service onboarding summary ranking are implemented and pushed. Candidate review now includes confidence and explanations locally, and `onboarding-summary --handoff-dir` writes saved evidence packets with discovery findings, candidate reasoning, and unreviewed review state. The next telemetry-first slices should build on saved evidence files, handoff packets, and the aggregate `index.json`, not reopen the batch orchestration layer.
 
 ## Non-Negotiable Working Rules
 
@@ -65,11 +65,17 @@ Implemented and already pushed:
 - `onboarding-summary <discovery-index.json>` ranks saved discovery scopes as `ready`, `partial`, `insufficient`, or `failed`
 - `.forbidden-terms` has been removed from repo history and is now local-only and gitignored
 
+Implemented by the latest telemetry-first slice:
+
+- Candidate review output includes confidence scores, reasons, caveats, and explanations for telemetry-derived drafts
+- `onboarding-summary --handoff-dir` writes per-scope handoff packets preserving discovery evidence, candidate reasoning, and review state placeholders
+
 ## Most Recent Checkpoints
 
-- latest local green slice: `feat: add onboarding summary readiness ranking` (not committed in this worktree yet)
-- latest pushed: `chore: untrack forbidden terms list`
-- previous pushed: `docs: finalize telemetry batch discovery handoff`
+- latest checkpoint: candidate confidence and onboarding handoff packets
+- latest pushed before this slice: `feat: add onboarding summary readiness ranking`
+- previous pushed before this slice: `chore: untrack forbidden terms list`
+- `docs: finalize telemetry batch discovery handoff`
 - `25c0de9` `feat: add telemetry batch discovery runner`
 - `c9fbef8` `docs: add telemetry batch discovery plan`
 - `e342fa5` `docs: add telemetry batch discovery design`
@@ -91,27 +97,27 @@ Implemented and already pushed:
 
 Highest-value remaining gaps:
 
-1. Candidate confidence and saved evidence packets for telemetry-derived drafts
-2. Provider-backed or file-backed review handoff artifacts that preserve accepted onboarding evidence
+1. File-backed review acceptance that records accepted or rejected candidates in saved handoff packets
+2. Reviewed draft generation from accepted handoff packets without rerunning backend discovery
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
 
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
-2. Docs/update checkpoint for the new `onboarding-summary` command if it is committed
+2. Docs/update checkpoint for the new handoff packet command if it is committed
 3. Optional live Datadog contract verification when credentials and safe backend access are available
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- add candidate confidence and saved evidence handoff on top of `onboarding-summary` and saved discovery packets
+- add file-backed review acceptance on top of saved handoff packets
 
 Rationale:
 
 - batch discovery now captures reusable normalized evidence for many scopes in one run
-- onboarding summary now turns those saved results into a ranked review queue
-- the next value is carrying forward confidence, reasoning, and accepted handoff state without rerunning backend discovery
+- onboarding summary now turns those saved results into a ranked review queue and can write handoff packets
+- the next value is recording accepted/rejected candidate decisions and generating reviewed drafts without rerunning backend discovery
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
@@ -119,6 +125,8 @@ Rationale:
 Use these before claiming a checkpoint:
 
 ```bash
+ruby -Ilib test/onboarding_summary_test.rb
+ruby -Ilib test/rules_ctl_test.rb
 ruby -Ilib test/datadog_apply_test.rb
 ruby -Ilib test/cli_test.rb
 ruby -Ilib test/all_test.rb

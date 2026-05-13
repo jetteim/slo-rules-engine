@@ -12,6 +12,16 @@ class RulesCtlTest < Minitest::Test
     SloRulesEngine.clear_definitions
   end
 
+  def stub_singleton(receiver, method_name, replacement)
+    original = receiver.method(method_name)
+    receiver.define_singleton_method(method_name) { |*_args, **_kwargs, &_block| replacement }
+    yield
+  ensure
+    receiver.define_singleton_method(method_name) do |*args, **kwargs, &block|
+      original.call(*args, **kwargs, &block)
+    end
+  end
+
   def test_apply_renders_invalid_provider_payload_error
     load "#{ROOT}/examples/services/checkout.rb"
     definition = SloRulesEngine.definitions.fetch(0)
@@ -35,7 +45,7 @@ class RulesCtlTest < Minitest::Test
 
       stdout, _stderr = capture_io do
         exit_error = assert_raises(SystemExit) do
-          SloRulesEngine::Appliers::Datadog.stub(:new, fake_applier) do
+          stub_singleton(SloRulesEngine::Appliers::Datadog, :new, fake_applier) do
             RulesCtl.apply(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
           end
         end
@@ -77,7 +87,7 @@ class RulesCtlTest < Minitest::Test
 
       stdout, _stderr = capture_io do
         exit_error = assert_raises(SystemExit) do
-          SloRulesEngine::Appliers::Datadog.stub(:new, fake_applier) do
+          stub_singleton(SloRulesEngine::Appliers::Datadog, :new, fake_applier) do
             RulesCtl.apply(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
           end
         end
@@ -119,7 +129,7 @@ class RulesCtlTest < Minitest::Test
 
       stdout, _stderr = capture_io do
         exit_error = assert_raises(SystemExit) do
-          SloRulesEngine::Appliers::Datadog.stub(:new, fake_applier) do
+          stub_singleton(SloRulesEngine::Appliers::Datadog, :new, fake_applier) do
             RulesCtl.prune(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
           end
         end
@@ -159,7 +169,7 @@ class RulesCtlTest < Minitest::Test
 
       Dir.mktmpdir do |dir|
         stdout, _stderr = capture_io do
-          SloRulesEngine::TelemetryLookup::Prometheus.stub(:new, fake_adapter) do
+          stub_singleton(SloRulesEngine::TelemetryLookup::Prometheus, :new, fake_adapter) do
             RulesCtl.discover_telemetry([
               '--provider=prometheus_stack',
               "--scope-file=#{file.path}",
@@ -201,7 +211,7 @@ class RulesCtlTest < Minitest::Test
       Dir.mktmpdir do |dir|
         stdout, _stderr = capture_io do
           exit_error = assert_raises(SystemExit) do
-            SloRulesEngine::TelemetryLookup::Datadog.stub(:new, fake_adapter) do
+            stub_singleton(SloRulesEngine::TelemetryLookup::Datadog, :new, fake_adapter) do
               RulesCtl.discover_telemetry([
                 '--provider=datadog',
                 "--scope-file=#{file.path}",
@@ -256,6 +266,47 @@ class RulesCtlTest < Minitest::Test
       assert_equal 'datadog', payload.fetch('provider')
       assert_equal 'checkout-prod', payload.fetch('scopes').fetch(0).fetch('label')
       assert_equal 'ready', payload.fetch('scopes').fetch(0).fetch('readiness')
+    end
+  end
+
+  def test_onboarding_summary_writes_handoff_packets
+    Dir.mktmpdir do |dir|
+      File.write(
+        File.join(dir, 'checkout-prod.json'),
+        JSON.pretty_generate(
+          provider: 'datadog',
+          scope: { label: 'checkout-prod', service: 'checkout-api' },
+          signals: [
+            { kind: 'latency', metric: 'http.server.request.duration', user_visible: true, source: 'datadog' }
+          ],
+          findings: []
+        )
+      )
+      File.write(
+        File.join(dir, 'index.json'),
+        JSON.pretty_generate(
+          provider: 'datadog',
+          generated_at: '2026-05-13T09:00:00Z',
+          total_scopes: 1,
+          successful_scopes: 1,
+          failed_scopes: 0,
+          scopes: [
+            { label: 'checkout-prod', scope: { label: 'checkout-prod', service: 'checkout-api' }, status: 'ok', result_file: 'checkout-prod.json', signal_count: 1, finding_count: 0 }
+          ]
+        )
+      )
+
+      handoff_dir = File.join(dir, 'handoff')
+      stdout, _stderr = capture_io do
+        RulesCtl.onboarding_summary(['--handoff-dir', handoff_dir, File.join(dir, 'index.json')])
+      end
+
+      payload = JSON.parse(stdout)
+      handoff_file = payload.fetch('scopes').fetch(0).fetch('handoff_file')
+      assert_equal File.join(handoff_dir, 'checkout-prod.handoff.json'), handoff_file
+      assert File.exist?(handoff_file), "expected #{handoff_file} to exist"
+      packet = JSON.parse(File.read(handoff_file))
+      assert_equal 'unreviewed', packet.fetch('review').fetch('status')
     end
   end
 end

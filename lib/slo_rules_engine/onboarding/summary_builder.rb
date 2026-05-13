@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'fileutils'
+
 module SloRulesEngine
   module Onboarding
     class SummaryBuilder
@@ -10,10 +12,10 @@ module SloRulesEngine
         'failed' => 3
       }.freeze
 
-      def build(index_path)
+      def build(index_path, handoff_dir: nil)
         index = JSON.parse(File.read(index_path), symbolize_names: true)
         base_dir = File.dirname(index_path)
-        scopes = Array(index[:scopes]).map { |entry| summarize_scope(entry, base_dir) }
+        scopes = Array(index[:scopes]).map { |entry| summarize_scope(entry, base_dir, index, handoff_dir) }
 
         {
           provider: index[:provider],
@@ -28,7 +30,7 @@ module SloRulesEngine
 
       private
 
-      def summarize_scope(entry, base_dir)
+      def summarize_scope(entry, base_dir, index, handoff_dir)
         if entry[:status].to_s != 'ok'
           return {
             label: entry[:label],
@@ -51,8 +53,15 @@ module SloRulesEngine
         candidate_finding_codes = Array(review[:findings]).map { |finding| finding[:code] }.compact
         candidate_count = Array(review[:candidates]).length
         signal_count = Array(payload[:signals]).length
+        handoff_file = write_handoff_packet(
+          entry: entry,
+          index: index,
+          payload: payload,
+          review: review,
+          handoff_dir: handoff_dir
+        )
 
-        {
+        summary = {
           label: entry[:label],
           scope: payload[:scope] || entry[:scope],
           status: entry[:status],
@@ -65,6 +74,47 @@ module SloRulesEngine
           candidate_finding_count: candidate_finding_codes.length,
           finding_codes: (discovery_finding_codes + candidate_finding_codes).uniq
         }
+        summary[:handoff_file] = handoff_file if handoff_file
+        summary
+      end
+
+      def write_handoff_packet(entry:, index:, payload:, review:, handoff_dir:)
+        return nil if handoff_dir.to_s.empty?
+
+        FileUtils.mkdir_p(handoff_dir)
+        path = File.join(handoff_dir, "#{entry.fetch(:label)}.handoff.json")
+        discovery_findings = Array(payload[:findings])
+        packet = {
+          label: entry[:label],
+          provider: payload[:provider] || index[:provider],
+          generated_at: index[:generated_at],
+          scope: payload[:scope] || entry[:scope],
+          source: {
+            discovery_index: 'index.json',
+            discovery_result_file: entry[:result_file]
+          },
+          discovery: {
+            signals: Array(payload[:signals]),
+            findings: discovery_findings,
+            finding_codes: discovery_findings.map { |finding| finding[:code] }.compact
+          },
+          candidate_review: review,
+          review: {
+            status: 'unreviewed',
+            accepted_candidate_uids: [],
+            rejected_candidate_uids: [],
+            notes: []
+          },
+          handoff: {
+            required_review_steps: [
+              'accept or reject each candidate',
+              'confirm objective and success condition',
+              'bind provider queries before apply'
+            ]
+          }
+        }
+        File.write(path, JSON.pretty_generate(packet))
+        path
       end
 
       def readiness(candidate_count, discovery_finding_codes, candidate_finding_codes)

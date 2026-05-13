@@ -50,6 +50,29 @@ class OnboardingTest < Minitest::Test
     assert_equal %w[non_user_visible unsupported_signal missing_metric], review[:findings].map { |finding| finding[:code] }
   end
 
+  def test_review_explains_candidate_confidence
+    generator = SloRulesEngine::Onboarding::CandidateGenerator.new
+
+    review = generator.review([
+      {
+        kind: 'latency',
+        metric: 'http.server.request.duration',
+        user_visible: true,
+        source: 'datadog',
+        observations_per_second: 25,
+        failed_observations_to_alert: 120
+      }
+    ])
+
+    candidate = review.fetch(:candidates).fetch(0)
+    assert_equal 'high', candidate.fetch(:confidence).fetch(:level)
+    assert_operator candidate.fetch(:confidence).fetch(:score), :>=, 80
+    assert_includes candidate.fetch(:confidence).fetch(:reasons), 'signal kind maps to a default SLI'
+    assert_includes candidate.fetch(:confidence).fetch(:reasons), 'traffic evidence supports calculation-basis review'
+    assert_includes candidate.fetch(:explanation), 'http.server.request.duration'
+    assert_includes candidate.fetch(:explanation), 'request-latency'
+  end
+
   def test_generates_loadable_definition_draft_from_telemetry
     generator = SloRulesEngine::Onboarding::DefinitionDraftGenerator.new
 
@@ -71,6 +94,7 @@ class OnboardingTest < Minitest::Test
 
     assert_includes draft, "service 'checkout-api'"
     assert_includes draft, "uid 'request-latency'"
+    assert_includes draft, '# candidate: request-latency confidence=high'
     assert_includes draft, "metric 'http.server.request.duration'"
     assert_includes draft, "user_visible_rationale 'Measured telemetry is close to user-visible service quality.'"
     assert_includes draft, 'measurement_details do'

@@ -72,6 +72,53 @@ class OnboardingSummaryTest < Minitest::Test
     end
   end
 
+  def test_build_writes_saved_handoff_packets
+    Dir.mktmpdir do |dir|
+      write_json(
+        File.join(dir, 'checkout-prod.json'),
+        provider: 'datadog',
+        scope: { label: 'checkout-prod', service: 'checkout-api' },
+        signals: [
+          {
+            kind: 'latency',
+            metric: 'http.server.request.duration',
+            user_visible: true,
+            source: 'datadog',
+            observations_per_second: 25,
+            failed_observations_to_alert: 120
+          }
+        ],
+        findings: [{ code: 'discovery_note', message: 'Preserved discovery finding.' }]
+      )
+
+      write_json(
+        File.join(dir, 'index.json'),
+        provider: 'datadog',
+        generated_at: '2026-05-13T09:00:00Z',
+        total_scopes: 1,
+        successful_scopes: 1,
+        failed_scopes: 0,
+        scopes: [
+          { label: 'checkout-prod', scope: { label: 'checkout-prod', service: 'checkout-api' }, status: 'ok', result_file: 'checkout-prod.json', signal_count: 1, finding_count: 1 }
+        ]
+      )
+
+      handoff_dir = File.join(dir, 'handoff')
+      summary = SloRulesEngine::Onboarding::SummaryBuilder.new.build(File.join(dir, 'index.json'), handoff_dir: handoff_dir)
+      scope = summary.fetch(:scopes).fetch(0)
+
+      assert_equal File.join(handoff_dir, 'checkout-prod.handoff.json'), scope.fetch(:handoff_file)
+      packet = JSON.parse(File.read(scope.fetch(:handoff_file)))
+      assert_equal 'checkout-prod', packet.fetch('label')
+      assert_equal 'datadog', packet.fetch('provider')
+      assert_equal 'unreviewed', packet.fetch('review').fetch('status')
+      assert_equal [], packet.fetch('review').fetch('accepted_candidate_uids')
+      assert_equal ['discovery_note'], packet.fetch('discovery').fetch('finding_codes')
+      assert_equal 'high', packet.fetch('candidate_review').fetch('candidates').fetch(0).fetch('confidence').fetch('level')
+      assert_includes packet.fetch('handoff').fetch('required_review_steps'), 'accept or reject each candidate'
+    end
+  end
+
   private
 
   def write_json(path, payload)

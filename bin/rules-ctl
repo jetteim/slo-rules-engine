@@ -489,11 +489,16 @@ module RulesCtl
   end
 
   def onboarding_summary(argv)
+    handoff_dir = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--handoff-dir=DIR', 'Write per-scope onboarding handoff packets under DIR') { |value| handoff_dir = value }
+    end
+    parser.parse!(argv)
     index_path = argv.shift
     abort_usage('missing discovery index path') if index_path.to_s.empty?
     abort_usage('unexpected arguments') unless argv.empty?
 
-    summary = SloRulesEngine::Onboarding::SummaryBuilder.new.build(index_path)
+    summary = SloRulesEngine::Onboarding::SummaryBuilder.new.build(index_path, handoff_dir: handoff_dir)
     puts JSON.pretty_generate(summary)
   end
 
@@ -818,7 +823,7 @@ module RulesCtl
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
         bin/rules-ctl candidates <telemetry.json>
         bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
-        bin/rules-ctl onboarding-summary <discovery-index.json>
+        bin/rules-ctl onboarding-summary [--handoff-dir=<dir>] <discovery-index.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
         bin/rules-ctl migration-report <legacyfile...>

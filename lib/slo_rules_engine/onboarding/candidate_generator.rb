@@ -35,11 +35,15 @@ module SloRulesEngine
             next review
           end
 
+          sli_uid = signal[:sli_uid] || SIGNAL_TO_SLI.fetch(kind)
+          confidence = confidence(signal)
           review[:candidates] << {
-            sli_uid: signal[:sli_uid] || SIGNAL_TO_SLI.fetch(kind),
+            sli_uid: sli_uid,
             signal: kind,
             metric: signal[:metric],
             rationale: signal[:rationale] || 'Measured telemetry is close to user-visible service quality.',
+            confidence: confidence,
+            explanation: explanation(signal, sli_uid, confidence),
             evidence: evidence(signal),
             calculation_basis_recommendation: calculation_basis_recommendation(signal),
             proposed_slo: {
@@ -61,6 +65,46 @@ module SloRulesEngine
           metric: signal[:metric],
           message: message
         }.compact
+      end
+
+      def confidence(signal)
+        score = 55
+        reasons = ['signal kind maps to a default SLI', 'signal is marked user-visible', 'metric is present']
+        caveats = ['review objective, success condition, and provider query binding before accepting']
+
+        if signal[:source].to_s.empty?
+          caveats << 'telemetry source is not recorded'
+        else
+          score += 10
+          reasons << 'telemetry source is recorded'
+        end
+
+        if calculation_basis_recommendation(signal)
+          score += 20
+          reasons << 'traffic evidence supports calculation-basis review'
+        else
+          caveats << 'traffic evidence for calculation-basis review is not recorded'
+        end
+
+        score += 10 if signal.key?(:objective)
+        score = [score, 100].min
+        {
+          level: confidence_level(score),
+          score: score,
+          reasons: reasons,
+          caveats: caveats
+        }
+      end
+
+      def confidence_level(score)
+        return 'high' if score >= 80
+        return 'medium' if score >= 60
+
+        'low'
+      end
+
+      def explanation(signal, sli_uid, confidence)
+        "Metric #{signal.fetch(:metric)} is proposed as #{sli_uid} from #{signal.fetch(:kind)} telemetry with #{confidence.fetch(:level)} confidence."
       end
 
       def default_slo_uid(kind)

@@ -56,6 +56,6 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. turn saved batch discovery evidence into ranked service review queues
-2. add candidate confidence and saved evidence handoff for telemetry-derived drafts
+1. use saved handoff packets to record accepted or rejected candidate review decisions
+2. generate reviewed draft definitions from accepted handoff packets without rerunning backend discovery
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline

@@ -46,6 +46,8 @@ module SloRulesEngine
       def candidate_lines(candidate, service)
         proposed_slo = candidate.fetch(:proposed_slo)
         [
+          "  # candidate: #{comment_text(candidate.fetch(:sli_uid))} confidence=#{comment_text(candidate.fetch(:confidence).fetch(:level))}",
+          "  # explanation: #{comment_text(candidate.fetch(:explanation))}",
           '  sli do',
           "    uid '#{quote(candidate.fetch(:sli_uid))}'",
           "    title '#{quote(titleize(candidate.fetch(:sli_uid)))}'",
@@ -153,6 +155,10 @@ module SloRulesEngine
 
       def quote(value)
         value.to_s.gsub('\\', '\\\\\\').gsub("'", "\\\\'")
+      end
+
+      def comment_text(value)
+        value.to_s.gsub(/\s+/, ' ').strip
       end
     end
   end
