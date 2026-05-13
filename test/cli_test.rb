@@ -635,6 +635,46 @@ class CLITest < Minitest::Test
     assert_includes stdout, '--output-dir=DIR'
   end
 
+  def test_onboarding_summary_ranks_saved_scope_results
+    Dir.mktmpdir do |dir|
+      File.write(
+        File.join(dir, 'checkout-prod.json'),
+        JSON.pretty_generate(
+          provider: 'datadog',
+          scope: { label: 'checkout-prod', service: 'checkout-api' },
+          signals: [
+            { kind: 'latency', metric: 'http.server.request.duration', user_visible: true, source: 'datadog' }
+          ],
+          findings: []
+        )
+      )
+      File.write(
+        File.join(dir, 'index.json'),
+        JSON.pretty_generate(
+          provider: 'datadog',
+          generated_at: '2026-05-13T09:00:00Z',
+          total_scopes: 1,
+          successful_scopes: 1,
+          failed_scopes: 0,
+          scopes: [
+            { label: 'checkout-prod', scope: { label: 'checkout-prod', service: 'checkout-api' }, status: 'ok', result_file: 'checkout-prod.json', signal_count: 1, finding_count: 0 }
+          ]
+        )
+      )
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'onboarding-summary',
+        File.join(dir, 'index.json')
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout)
+      assert_equal 'ready', payload.fetch('scopes').fetch(0).fetch('readiness')
+    end
+  end
+
   def test_candidates_accept_lookup_result_envelope
     Tempfile.create(['lookup-signals', '.json']) do |file|
       file.write(JSON.generate(

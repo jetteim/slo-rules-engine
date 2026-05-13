@@ -39,6 +39,8 @@ module RulesCtl
       candidates(argv)
     when 'draft-definition'
       draft_definition(argv)
+    when 'onboarding-summary'
+      onboarding_summary(argv)
     when 'recommend-calculation-basis'
       recommend_calculation_basis(argv)
     when 'reality-check'
@@ -486,6 +488,15 @@ module RulesCtl
     )
   end
 
+  def onboarding_summary(argv)
+    index_path = argv.shift
+    abort_usage('missing discovery index path') if index_path.to_s.empty?
+    abort_usage('unexpected arguments') unless argv.empty?
+
+    summary = SloRulesEngine::Onboarding::SummaryBuilder.new.build(index_path)
+    puts JSON.pretty_generate(summary)
+  end
+
   def recommend_calculation_basis(argv)
     observations_per_second = nil
     failed_observations_to_alert = nil
@@ -807,6 +818,7 @@ module RulesCtl
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
         bin/rules-ctl candidates <telemetry.json>
         bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
+        bin/rules-ctl onboarding-summary <discovery-index.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
         bin/rules-ctl migration-report <legacyfile...>

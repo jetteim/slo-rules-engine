@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: batch discovery through `discover-telemetry --scope-file` is implemented, tested, and pushed. The next telemetry-first slices should build on saved evidence files and the aggregate `index.json`, not reopen the batch orchestration layer.
+Current telemetry-first status: batch discovery through `discover-telemetry --scope-file` is implemented and pushed, and service onboarding summary ranking from saved batch discovery evidence is implemented locally with a green test suite. The next telemetry-first slices should build on saved evidence files and the aggregate `index.json`, not reopen the batch orchestration layer.
 
 ## Non-Negotiable Working Rules
 
@@ -62,11 +62,14 @@ Implemented and already pushed:
 - Batch telemetry discovery via `discover-telemetry --scope-file` with one provider per run
 - One saved normalized discovery evidence file per scope plus aggregate `index.json`
 - CLI validation for scope-file conflicts, required output directory, and per-scope runtime failure recording
+- `onboarding-summary <discovery-index.json>` ranks saved discovery scopes as `ready`, `partial`, `insufficient`, or `failed`
+- `.forbidden-terms` has been removed from repo history and is now local-only and gitignored
 
 ## Most Recent Checkpoints
 
-- latest: `test: cover batch discovery scope failures`
-- previous: `feat: add scope-file telemetry discovery`
+- latest local green slice: `feat: add onboarding summary readiness ranking` (not committed in this worktree yet)
+- latest pushed: `chore: untrack forbidden terms list`
+- previous pushed: `docs: finalize telemetry batch discovery handoff`
 - `25c0de9` `feat: add telemetry batch discovery runner`
 - `c9fbef8` `docs: add telemetry batch discovery plan`
 - `e342fa5` `docs: add telemetry batch discovery design`
@@ -88,27 +91,27 @@ Implemented and already pushed:
 
 Highest-value remaining gaps:
 
-1. Review-readiness ranking for service portfolios using saved batch discovery evidence
-2. Candidate confidence and saved evidence packets for telemetry-derived drafts
+1. Candidate confidence and saved evidence packets for telemetry-derived drafts
+2. Provider-backed or file-backed review handoff artifacts that preserve accepted onboarding evidence
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
 
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
-2. Service onboarding summary that ranks discovered services and signals by review readiness
+2. Docs/update checkpoint for the new `onboarding-summary` command if it is committed
 3. Optional live Datadog contract verification when credentials and safe backend access are available
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- build service onboarding summaries that rank saved discovery scopes by review readiness
+- add candidate confidence and saved evidence handoff on top of `onboarding-summary` and saved discovery packets
 
 Rationale:
 
 - batch discovery now captures reusable normalized evidence for many scopes in one run
-- the next value is not more orchestration; it is turning saved evidence into a ranked review queue
-- candidate confidence and evidence handoff should now build on persisted scope results instead of rerunning backend discovery
+- onboarding summary now turns those saved results into a ranked review queue
+- the next value is carrying forward confidence, reasoning, and accepted handoff state without rerunning backend discovery
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
@@ -132,5 +135,5 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/telemetry_batch_discovery.rb`
+5. Inspect `lib/slo_rules_engine/onboarding/summary_builder.rb`
 6. Continue the highest-priority open slice listed above
