@@ -71,6 +71,8 @@ This is the running plan for the long refactor.
 - [x] Add service onboarding summary that ranks discovered services and signals by review readiness.
 - [x] Add candidate confidence and explanation output for telemetry-derived drafts.
 - [x] Add saved evidence packets that preserve discovery findings, candidate reasoning, and review handoff state.
+- [x] Add file-backed review acceptance for saved handoff packets.
+- [ ] Generate reviewed draft definitions from accepted handoff packets.
 
 ## Phase 6: Contract Hardening
 

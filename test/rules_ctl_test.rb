@@ -309,4 +309,71 @@ class RulesCtlTest < Minitest::Test
       assert_equal 'unreviewed', packet.fetch('review').fetch('status')
     end
   end
+
+  def test_review_handoff_records_accepted_candidates
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(handoff_packet))
+
+      stdout, _stderr = capture_io do
+        RulesCtl.review_handoff([
+          '--accept=request-latency',
+          '--reject=request-traffic',
+          '--note=Latency is ready for draft generation.',
+          path
+        ])
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal 'reviewed', payload.fetch('review').fetch('status')
+      assert_equal ['request-latency'], payload.fetch('review').fetch('accepted_candidate_uids')
+      packet = JSON.parse(File.read(path))
+      assert_equal ['request-traffic'], packet.fetch('review').fetch('rejected_candidate_uids')
+    end
+  end
+
+  def test_review_handoff_rejects_unknown_candidate
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(handoff_packet))
+
+      stdout, _stderr = capture_io do
+        exit_error = assert_raises(SystemExit) do
+          RulesCtl.review_handoff(['--accept=missing-sli', path])
+        end
+        assert_equal 1, exit_error.status
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'invalid_candidate_uid', payload.fetch('error').fetch('code')
+      assert_equal 'unreviewed', JSON.parse(File.read(path)).fetch('review').fetch('status')
+    end
+  end
+
+  def handoff_packet
+    {
+      label: 'checkout-prod',
+      provider: 'datadog',
+      scope: { label: 'checkout-prod', service: 'checkout-api' },
+      discovery: {
+        signals: [{ kind: 'latency', metric: 'http.server.request.duration', user_visible: true }],
+        findings: [],
+        finding_codes: []
+      },
+      candidate_review: {
+        candidates: [
+          { sli_uid: 'request-latency', metric: 'http.server.request.duration', confidence: { level: 'high' } },
+          { sli_uid: 'request-traffic', metric: 'http.server.requests', confidence: { level: 'medium' } }
+        ],
+        findings: []
+      },
+      review: {
+        status: 'unreviewed',
+        accepted_candidate_uids: [],
+        rejected_candidate_uids: [],
+        notes: []
+      }
+    }
+  end
 end

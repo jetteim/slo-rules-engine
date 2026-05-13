@@ -69,12 +69,14 @@ Implemented by the latest telemetry-first slice:
 
 - Candidate review output includes confidence scores, reasons, caveats, and explanations for telemetry-derived drafts
 - `onboarding-summary --handoff-dir` writes per-scope handoff packets preserving discovery evidence, candidate reasoning, and review state placeholders
+- `review-handoff` records accepted and rejected candidate decisions in saved handoff packets while preserving discovery and candidate evidence
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: candidate confidence and onboarding handoff packets
-- latest pushed before this slice: `feat: add onboarding summary readiness ranking`
-- previous pushed before this slice: `chore: untrack forbidden terms list`
+- latest checkpoint: file-backed handoff review acceptance
+- previous checkpoint: `feat: add onboarding handoff packets`
+- previous pushed: `feat: add onboarding summary readiness ranking`
+- earlier pushed: `chore: untrack forbidden terms list`
 - `docs: finalize telemetry batch discovery handoff`
 - `25c0de9` `feat: add telemetry batch discovery runner`
 - `c9fbef8` `docs: add telemetry batch discovery plan`
@@ -97,8 +99,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. File-backed review acceptance that records accepted or rejected candidates in saved handoff packets
-2. Reviewed draft generation from accepted handoff packets without rerunning backend discovery
+1. Reviewed draft generation from accepted handoff packets without rerunning backend discovery
+2. Validation that accepted handoff packets are complete enough for provider handoff
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -111,13 +113,14 @@ Secondary gaps:
 
 Next recommended slice:
 
-- add file-backed review acceptance on top of saved handoff packets
+- generate reviewed draft definitions from accepted handoff packets without rerunning backend discovery
 
 Rationale:
 
 - batch discovery now captures reusable normalized evidence for many scopes in one run
 - onboarding summary now turns those saved results into a ranked review queue and can write handoff packets
-- the next value is recording accepted/rejected candidate decisions and generating reviewed drafts without rerunning backend discovery
+- handoff review now records accepted/rejected candidate decisions
+- the next value is generating reviewed drafts from accepted handoff state without rerunning backend discovery
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
@@ -126,6 +129,7 @@ Use these before claiming a checkpoint:
 
 ```bash
 ruby -Ilib test/onboarding_summary_test.rb
+ruby -Ilib test/onboarding_handoff_test.rb
 ruby -Ilib test/rules_ctl_test.rb
 ruby -Ilib test/datadog_apply_test.rb
 ruby -Ilib test/cli_test.rb

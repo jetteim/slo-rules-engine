@@ -29,6 +29,7 @@ require_relative 'slo_rules_engine/telemetry_lookup/prometheus'
 require_relative 'slo_rules_engine/onboarding/candidate_generator'
 require_relative 'slo_rules_engine/onboarding/definition_draft_generator'
 require_relative 'slo_rules_engine/onboarding/summary_builder'
+require_relative 'slo_rules_engine/onboarding/handoff_reviewer'
 require_relative 'slo_rules_engine/reliability_model'
 
 module SloRulesEngine

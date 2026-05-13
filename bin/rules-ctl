@@ -41,6 +41,8 @@ module RulesCtl
       draft_definition(argv)
     when 'onboarding-summary'
       onboarding_summary(argv)
+    when 'review-handoff'
+      review_handoff(argv)
     when 'recommend-calculation-basis'
       recommend_calculation_basis(argv)
     when 'reality-check'
@@ -502,6 +504,39 @@ module RulesCtl
     puts JSON.pretty_generate(summary)
   end
 
+  def review_handoff(argv)
+    accepted_candidate_uids = []
+    rejected_candidate_uids = []
+    notes = []
+    parser = OptionParser.new do |opts|
+      opts.on('--accept=UID', 'Accept a candidate SLI uid from the handoff packet') { |value| accepted_candidate_uids << value }
+      opts.on('--reject=UID', 'Reject a candidate SLI uid from the handoff packet') { |value| rejected_candidate_uids << value }
+      opts.on('--note=TEXT', 'Add a review note to the handoff packet') { |value| notes << value }
+    end
+    parser.parse!(argv)
+    handoff_path = argv.shift
+    abort_usage('missing handoff packet path') if handoff_path.to_s.empty?
+    abort_usage('unexpected arguments') unless argv.empty?
+
+    packet = SloRulesEngine::Onboarding::HandoffReviewer.new.review(
+      handoff_path,
+      accepted_candidate_uids: accepted_candidate_uids,
+      rejected_candidate_uids: rejected_candidate_uids,
+      notes: notes
+    )
+    puts JSON.pretty_generate(packet)
+  rescue SloRulesEngine::Onboarding::HandoffReviewer::ReviewError => error
+    puts JSON.pretty_generate(
+      valid: false,
+      handoff_file: handoff_path,
+      error: {
+        code: error.code,
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
   def recommend_calculation_basis(argv)
     observations_per_second = nil
     failed_observations_to_alert = nil
@@ -824,6 +859,7 @@ module RulesCtl
         bin/rules-ctl candidates <telemetry.json>
         bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
         bin/rules-ctl onboarding-summary [--handoff-dir=<dir>] <discovery-index.json>
+        bin/rules-ctl review-handoff [--accept=<uid>] [--reject=<uid>] [--note=<text>] <handoff.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
         bin/rules-ctl migration-report <legacyfile...>
