@@ -70,10 +70,11 @@ Implemented by the latest telemetry-first slice:
 - Candidate review output includes confidence scores, reasons, caveats, and explanations for telemetry-derived drafts
 - `onboarding-summary --handoff-dir` writes per-scope handoff packets preserving discovery evidence, candidate reasoning, and review state placeholders
 - `review-handoff` records accepted and rejected candidate decisions in saved handoff packets while preserving discovery and candidate evidence
+- `draft-from-handoff` emits reviewed Ruby DSL drafts from accepted handoff candidates without rerunning backend discovery
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: file-backed handoff review acceptance
+- latest checkpoint: reviewed draft generation from accepted handoff packets
 - previous checkpoint: `feat: add onboarding handoff packets`
 - previous pushed: `feat: add onboarding summary readiness ranking`
 - earlier pushed: `chore: untrack forbidden terms list`
@@ -99,8 +100,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Reviewed draft generation from accepted handoff packets without rerunning backend discovery
-2. Validation that accepted handoff packets are complete enough for provider handoff
+1. Validation that accepted handoff packets are complete enough for provider handoff
+2. Preserving reviewed handoff provenance through generated provider manifests
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -113,14 +114,15 @@ Secondary gaps:
 
 Next recommended slice:
 
-- generate reviewed draft definitions from accepted handoff packets without rerunning backend discovery
+- validate accepted handoff packets before provider handoff
 
 Rationale:
 
 - batch discovery now captures reusable normalized evidence for many scopes in one run
 - onboarding summary now turns those saved results into a ranked review queue and can write handoff packets
 - handoff review now records accepted/rejected candidate decisions
-- the next value is generating reviewed drafts from accepted handoff state without rerunning backend discovery
+- reviewed drafts can now be generated from accepted handoff state without rerunning backend discovery
+- the next value is validating handoff completeness before provider artifacts are generated
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

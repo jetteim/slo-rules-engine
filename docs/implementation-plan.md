@@ -72,7 +72,8 @@ This is the running plan for the long refactor.
 - [x] Add candidate confidence and explanation output for telemetry-derived drafts.
 - [x] Add saved evidence packets that preserve discovery findings, candidate reasoning, and review handoff state.
 - [x] Add file-backed review acceptance for saved handoff packets.
-- [ ] Generate reviewed draft definitions from accepted handoff packets.
+- [x] Generate reviewed draft definitions from accepted handoff packets.
+- [ ] Validate accepted handoff packets before provider handoff.
 
 ## Phase 6: Contract Hardening
 

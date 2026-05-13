@@ -9,9 +9,20 @@ module SloRulesEngine
 
       def generate(service:, owner:, signals:, environment: 'production')
         review = @candidate_generator.review(signals)
+        generate_from_review(
+          service: service,
+          owner: owner,
+          review: review,
+          environment: environment,
+          header: '# Generated from telemetry inventory. Review before production use.'
+        )
+      end
+
+      def generate_from_review(service:, owner:, review:, environment: 'production', header: '# Generated from telemetry inventory. Review before production use.', review_notes: [])
         lines = [
-          '# Generated from telemetry inventory. Review before production use.'
+          header
         ]
+        lines.concat(review_note_comments(review_notes))
         lines.concat(finding_comments(review.fetch(:findings)))
         lines.concat([
           'SRE.define do',
@@ -30,6 +41,10 @@ module SloRulesEngine
       end
 
       private
+
+      def review_note_comments(notes)
+        Array(notes).map { |note| "# review note: #{comment_text(note)}" }
+      end
 
       def finding_comments(findings)
         findings.map do |finding|

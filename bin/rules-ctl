@@ -39,6 +39,8 @@ module RulesCtl
       candidates(argv)
     when 'draft-definition'
       draft_definition(argv)
+    when 'draft-from-handoff'
+      draft_from_handoff(argv)
     when 'onboarding-summary'
       onboarding_summary(argv)
     when 'review-handoff'
@@ -490,6 +492,40 @@ module RulesCtl
     )
   end
 
+  def draft_from_handoff(argv)
+    service = nil
+    owner = nil
+    environment = 'production'
+    parser = OptionParser.new do |opts|
+      opts.on('--service=SERVICE', 'Service name for the draft definition') { |value| service = value }
+      opts.on('--owner=OWNER', 'Service owner for the draft definition') { |value| owner = value }
+      opts.on('--environment=ENVIRONMENT', 'Environment for the draft definition') { |value| environment = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --service') unless service
+    abort_usage('missing --owner') unless owner
+    handoff_path = argv.shift
+    abort_usage('missing handoff packet path') if handoff_path.to_s.empty?
+    abort_usage('unexpected arguments') unless argv.empty?
+
+    puts SloRulesEngine::Onboarding::HandoffDraftGenerator.new.generate(
+      handoff_path,
+      service: service,
+      owner: owner,
+      environment: environment
+    )
+  rescue SloRulesEngine::Onboarding::HandoffDraftGenerator::DraftError => error
+    puts JSON.pretty_generate(
+      valid: false,
+      handoff_file: handoff_path,
+      error: {
+        code: error.code,
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
   def onboarding_summary(argv)
     handoff_dir = nil
     parser = OptionParser.new do |opts|
@@ -858,6 +894,7 @@ module RulesCtl
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
         bin/rules-ctl candidates <telemetry.json>
         bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
+        bin/rules-ctl draft-from-handoff --service=<name> --owner=<owner> [--environment=<env>] <handoff.json>
         bin/rules-ctl onboarding-summary [--handoff-dir=<dir>] <discovery-index.json>
         bin/rules-ctl review-handoff [--accept=<uid>] [--reject=<uid>] [--note=<text>] <handoff.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N

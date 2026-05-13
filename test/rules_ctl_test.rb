@@ -351,6 +351,47 @@ class RulesCtlTest < Minitest::Test
     end
   end
 
+  def test_draft_from_handoff_outputs_accepted_candidate_draft
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(reviewed_handoff_packet))
+
+      stdout, _stderr = capture_io do
+        RulesCtl.draft_from_handoff([
+          '--service=checkout-api',
+          '--owner=payments-platform',
+          path
+        ])
+      end
+
+      assert_includes stdout, "uid 'request-latency'"
+      refute_includes stdout, "uid 'request-traffic'"
+      assert_includes stdout, '# review note: Latency is accepted for the first onboarding draft.'
+    end
+  end
+
+  def test_draft_from_handoff_rejects_unreviewed_packet
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(handoff_packet))
+
+      stdout, _stderr = capture_io do
+        exit_error = assert_raises(SystemExit) do
+          RulesCtl.draft_from_handoff([
+            '--service=checkout-api',
+            '--owner=payments-platform',
+            path
+          ])
+        end
+        assert_equal 1, exit_error.status
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'unreviewed_handoff', payload.fetch('error').fetch('code')
+    end
+  end
+
   def handoff_packet
     {
       label: 'checkout-prod',
@@ -373,6 +414,53 @@ class RulesCtlTest < Minitest::Test
         accepted_candidate_uids: [],
         rejected_candidate_uids: [],
         notes: []
+      }
+    }
+  end
+
+  def reviewed_handoff_packet
+    packet = handoff_packet
+    packet[:candidate_review] = {
+      candidates: [
+        handoff_candidate(
+          sli_uid: 'request-latency',
+          signal: 'latency',
+          metric: 'http.server.request.duration',
+          slo_uid: 'fast-enough'
+        ),
+        handoff_candidate(
+          sli_uid: 'request-traffic',
+          signal: 'traffic',
+          metric: 'http.server.requests',
+          slo_uid: 'healthy-enough'
+        )
+      ],
+      findings: []
+    }
+    packet[:review] = {
+      status: 'reviewed',
+      accepted_candidate_uids: ['request-latency'],
+      rejected_candidate_uids: ['request-traffic'],
+      notes: ['Latency is accepted for the first onboarding draft.']
+    }
+    packet
+  end
+
+  def handoff_candidate(sli_uid:, signal:, metric:, slo_uid:)
+    {
+      sli_uid: sli_uid,
+      signal: signal,
+      metric: metric,
+      rationale: 'Measured telemetry is close to user-visible service quality.',
+      confidence: { level: 'high', score: 85, reasons: [], caveats: [] },
+      explanation: "Metric #{metric} is proposed as #{sli_uid}.",
+      evidence: { source: 'datadog' },
+      calculation_basis_recommendation: nil,
+      proposed_slo: {
+        uid: slo_uid,
+        objective: 0.99,
+        success_condition: 'Observation meets the reviewed service quality threshold.',
+        calculation_basis: 'observations'
       }
     }
   end
