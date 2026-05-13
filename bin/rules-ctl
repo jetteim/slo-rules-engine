@@ -15,6 +15,8 @@ module RulesCtl
     case command
     when 'validate'
       validate(argv)
+    when 'validate-handoff'
+      validate_handoff(argv)
     when 'generate'
       generate(argv)
     when 'apply'
@@ -64,6 +66,16 @@ module RulesCtl
     results = definitions.map { |definition| validator.validate(definition).to_h.merge(service: definition.service) }
     puts JSON.pretty_generate(results)
     exit(results.all? { |result| result[:valid] } ? 0 : 1)
+  end
+
+  def validate_handoff(argv)
+    handoff_path = argv.shift
+    abort_usage('missing handoff packet path') if handoff_path.to_s.empty?
+    abort_usage('unexpected arguments') unless argv.empty?
+
+    result = SloRulesEngine::Onboarding::HandoffValidator.new.validate_file(handoff_path)
+    puts JSON.pretty_generate(result.to_h)
+    exit 1 unless result.valid?
   end
 
   def generate(argv)
@@ -515,13 +527,17 @@ module RulesCtl
       environment: environment
     )
   rescue SloRulesEngine::Onboarding::HandoffDraftGenerator::DraftError => error
+    validation = if error.code == 'invalid_handoff'
+                   SloRulesEngine::Onboarding::HandoffValidator.new.validate_file(handoff_path)
+                 end
     puts JSON.pretty_generate(
       valid: false,
       handoff_file: handoff_path,
       error: {
         code: error.code,
         message: error.message
-      }
+      },
+      errors: validation&.errors&.map(&:to_h) || []
     )
     exit 1
   end
@@ -883,6 +899,7 @@ module RulesCtl
     warn <<~USAGE
       Usage:
         bin/rules-ctl validate <definitionfile...>
+        bin/rules-ctl validate-handoff <handoff.json>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>

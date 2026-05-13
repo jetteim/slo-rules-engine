@@ -366,6 +366,7 @@ class RulesCtlTest < Minitest::Test
 
       assert_includes stdout, "uid 'request-latency'"
       refute_includes stdout, "uid 'request-traffic'"
+      assert_includes stdout, '# handoff: checkout-prod provider=datadog'
       assert_includes stdout, '# review note: Latency is accepted for the first onboarding draft.'
     end
   end
@@ -389,6 +390,66 @@ class RulesCtlTest < Minitest::Test
       payload = JSON.parse(stdout)
       assert_equal false, payload.fetch('valid')
       assert_equal 'unreviewed_handoff', payload.fetch('error').fetch('code')
+    end
+  end
+
+  def test_draft_from_handoff_rejects_invalid_reviewed_packet
+    Dir.mktmpdir do |dir|
+      packet = reviewed_handoff_packet
+      packet.fetch(:candidate_review).fetch(:candidates).fetch(0).delete(:metric)
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(packet))
+
+      stdout, _stderr = capture_io do
+        exit_error = assert_raises(SystemExit) do
+          RulesCtl.draft_from_handoff([
+            '--service=checkout-api',
+            '--owner=payments-platform',
+            path
+          ])
+        end
+        assert_equal 1, exit_error.status
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'invalid_handoff', payload.fetch('error').fetch('code')
+      assert payload.fetch('errors').any? { |error| error.fetch('path') == 'candidate_review.candidates[0].metric' }
+    end
+  end
+
+  def test_validate_handoff_reports_valid_reviewed_packet
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(reviewed_handoff_packet))
+
+      stdout, _stderr = capture_io do
+        RulesCtl.validate_handoff([path])
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal true, payload.fetch('valid')
+      assert_equal 1, payload.fetch('accepted_candidate_count')
+    end
+  end
+
+  def test_validate_handoff_exits_one_for_invalid_packet
+    Dir.mktmpdir do |dir|
+      packet = reviewed_handoff_packet
+      packet.fetch(:candidate_review).fetch(:candidates).fetch(0).delete(:metric)
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(packet))
+
+      stdout, _stderr = capture_io do
+        exit_error = assert_raises(SystemExit) do
+          RulesCtl.validate_handoff([path])
+        end
+        assert_equal 1, exit_error.status
+      end
+
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert payload.fetch('errors').any? { |error| error.fetch('path') == 'candidate_review.candidates[0].metric' }
     end
   end
 

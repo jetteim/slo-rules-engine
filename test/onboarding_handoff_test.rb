@@ -60,6 +60,7 @@ class OnboardingHandoffTest < Minitest::Test
       )
 
       assert_includes draft, '# Generated from reviewed onboarding handoff. Review before production use.'
+      assert_includes draft, '# handoff: checkout-prod provider=datadog'
       assert_includes draft, "uid 'request-latency'"
       assert_includes draft, '# review note: Latency is accepted for the first onboarding draft.'
       refute_includes draft, "uid 'request-traffic'"
@@ -96,6 +97,53 @@ class OnboardingHandoffTest < Minitest::Test
       end
 
       assert_equal 'unreviewed_handoff', error.code
+    end
+  end
+
+  def test_draft_generation_rejects_invalid_reviewed_handoff
+    Dir.mktmpdir do |dir|
+      packet = reviewed_handoff_packet
+      packet.fetch(:candidate_review).fetch(:candidates).fetch(0).delete(:metric)
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(packet))
+
+      error = assert_raises(SloRulesEngine::Onboarding::HandoffDraftGenerator::DraftError) do
+        SloRulesEngine::Onboarding::HandoffDraftGenerator.new.generate(
+          path,
+          service: 'checkout-api',
+          owner: 'payments-platform'
+        )
+      end
+
+      assert_equal 'invalid_handoff', error.code
+      assert_includes error.message, 'candidate_review.candidates[0].metric'
+    end
+  end
+
+  def test_validation_accepts_reviewed_handoff_with_complete_accepted_candidates
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(reviewed_handoff_packet))
+
+      result = SloRulesEngine::Onboarding::HandoffValidator.new.validate_file(path)
+
+      assert result.valid?, result.to_h.inspect
+      assert_equal 1, result.to_h.fetch(:accepted_candidate_count)
+      assert_equal 'checkout-prod', result.to_h.fetch(:label)
+    end
+  end
+
+  def test_validation_rejects_incomplete_accepted_candidates
+    Dir.mktmpdir do |dir|
+      packet = reviewed_handoff_packet
+      packet.fetch(:candidate_review).fetch(:candidates).fetch(0).delete(:proposed_slo)
+      path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(path, JSON.pretty_generate(packet))
+
+      result = SloRulesEngine::Onboarding::HandoffValidator.new.validate_file(path)
+
+      refute result.valid?
+      assert result.errors.any? { |error| error.path == 'candidate_review.candidates[0].proposed_slo' }
     end
   end
 

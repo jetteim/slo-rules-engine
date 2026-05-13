@@ -70,6 +70,7 @@ bin/rules-ctl discover-telemetry --provider prometheus_stack --service checkout-
 bin/rules-ctl discover-telemetry --provider datadog --scope-file ./examples/telemetry/scopes.json --output-dir ./discovery
 bin/rules-ctl onboarding-summary --handoff-dir ./handoff ./discovery/index.json
 bin/rules-ctl review-handoff --accept=request-latency --reject=request-traffic --note='Latency accepted for draft generation.' ./handoff/checkout-prod.handoff.json
+bin/rules-ctl validate-handoff ./handoff/checkout-prod.handoff.json
 bin/rules-ctl draft-from-handoff --service checkout-api --owner payments-platform ./handoff/checkout-prod.handoff.json
 bin/rules-ctl lookup-telemetry --provider datadog --metric http.server.request.duration --kind latency --query 'p95:http.server.request.duration{service:checkout-api}'
 bin/rules-ctl lookup-telemetry --provider prometheus_stack --metric http_server_request_duration_seconds_count --kind errors --base-url http://localhost:9090
@@ -102,7 +103,7 @@ bin/rules-ctl integrations list
 The `candidates` and `draft-definition` commands accept either a raw telemetry signal array or a normalized provider evidence envelope with `provider`, `signals`, and `findings`.
 Batch `discover-telemetry --scope-file` writes one normalized evidence file per scope plus an aggregate `index.json` for later review-readiness ranking and draft generation.
 The `onboarding-summary --handoff-dir` command writes per-scope handoff packets, and `review-handoff` records accepted or rejected candidate decisions without changing saved discovery or candidate evidence.
-The `draft-from-handoff` command emits a Ruby DSL draft from accepted handoff candidates without rerunning backend discovery.
+The `validate-handoff` command checks reviewed packets before handoff, and `draft-from-handoff` emits a Ruby DSL draft from accepted handoff candidates without rerunning backend discovery.
 
 Confirmed `apply` now requires `--manifest` so live state changes always use reviewed provider artifacts instead of regenerating definitions inline.
 Confirmed `prune` now requires `--manifest` so destructive state removal is also tied to reviewed provider artifacts.

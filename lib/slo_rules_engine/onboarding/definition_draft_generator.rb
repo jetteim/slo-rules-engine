@@ -18,10 +18,11 @@ module SloRulesEngine
         )
       end
 
-      def generate_from_review(service:, owner:, review:, environment: 'production', header: '# Generated from telemetry inventory. Review before production use.', review_notes: [])
+      def generate_from_review(service:, owner:, review:, environment: 'production', header: '# Generated from telemetry inventory. Review before production use.', review_notes: [], provenance_comments: [])
         lines = [
           header
         ]
+        lines.concat(comment_lines(provenance_comments))
         lines.concat(review_note_comments(review_notes))
         lines.concat(finding_comments(review.fetch(:findings)))
         lines.concat([
@@ -41,6 +42,10 @@ module SloRulesEngine
       end
 
       private
+
+      def comment_lines(values)
+        Array(values).map { |value| "# #{comment_text(value)}" }
+      end
 
       def review_note_comments(notes)
         Array(notes).map { |note| "# review note: #{comment_text(note)}" }

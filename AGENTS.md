@@ -71,10 +71,11 @@ Implemented by the latest telemetry-first slice:
 - `onboarding-summary --handoff-dir` writes per-scope handoff packets preserving discovery evidence, candidate reasoning, and review state placeholders
 - `review-handoff` records accepted and rejected candidate decisions in saved handoff packets while preserving discovery and candidate evidence
 - `draft-from-handoff` emits reviewed Ruby DSL drafts from accepted handoff candidates without rerunning backend discovery
+- `validate-handoff` checks reviewed packets before draft/provider handoff, and reviewed drafts include handoff provenance comments
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: reviewed draft generation from accepted handoff packets
+- latest checkpoint: handoff validation and reviewed draft provenance
 - previous checkpoint: `feat: add onboarding handoff packets`
 - previous pushed: `feat: add onboarding summary readiness ranking`
 - earlier pushed: `chore: untrack forbidden terms list`
@@ -100,8 +101,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Validation that accepted handoff packets are complete enough for provider handoff
-2. Preserving reviewed handoff provenance through generated provider manifests
+1. Preserving reviewed handoff provenance through generated provider manifests
+2. Validating generated provider manifests retain review evidence before apply
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -114,7 +115,7 @@ Secondary gaps:
 
 Next recommended slice:
 
-- validate accepted handoff packets before provider handoff
+- preserve reviewed handoff provenance through generated provider manifests
 
 Rationale:
 
@@ -122,7 +123,8 @@ Rationale:
 - onboarding summary now turns those saved results into a ranked review queue and can write handoff packets
 - handoff review now records accepted/rejected candidate decisions
 - reviewed drafts can now be generated from accepted handoff state without rerunning backend discovery
-- the next value is validating handoff completeness before provider artifacts are generated
+- handoff packets can now be validated before draft/provider handoff
+- the next value is carrying review provenance into generated provider artifacts before apply workflows
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
