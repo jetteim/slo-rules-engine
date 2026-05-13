@@ -23,7 +23,7 @@ module SloRulesEngine
       end
 
       def generate(definition)
-        manifest(sloth_specs: [sloth_spec(definition)])
+        manifest({ sloth_specs: [sloth_spec(definition)] }, definition: definition)
       end
 
       private

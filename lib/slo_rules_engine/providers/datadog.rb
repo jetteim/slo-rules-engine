@@ -47,7 +47,7 @@ module SloRulesEngine
           artifacts[:dashboards] << dashboard(definition, sli, instance, slo)
         end
 
-        manifest(artifacts)
+        manifest(artifacts, definition: definition)
       end
 
       private

@@ -74,7 +74,8 @@ This is the running plan for the long refactor.
 - [x] Add file-backed review acceptance for saved handoff packets.
 - [x] Generate reviewed draft definitions from accepted handoff packets.
 - [x] Validate accepted handoff packets before provider handoff.
-- [ ] Preserve reviewed handoff provenance through generated provider manifests.
+- [x] Preserve reviewed handoff provenance through generated provider manifests.
+- [ ] Validate generated provider manifests retain review evidence before apply.
 
 ## Phase 6: Contract Hardening
 

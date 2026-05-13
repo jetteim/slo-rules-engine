@@ -18,7 +18,7 @@ module SloRulesEngine
         )
       end
 
-      def generate_from_review(service:, owner:, review:, environment: 'production', header: '# Generated from telemetry inventory. Review before production use.', review_notes: [], provenance_comments: [])
+      def generate_from_review(service:, owner:, review:, environment: 'production', header: '# Generated from telemetry inventory. Review before production use.', review_notes: [], provenance_comments: [], review_provenance: nil)
         lines = [
           header
         ]
@@ -31,8 +31,9 @@ module SloRulesEngine
           "  owner '#{quote(owner)}'",
           "  description 'Draft service level definition generated from measured telemetry.'",
           "  environments '#{quote(environment)}'",
-          ''
         ])
+        lines.concat(review_provenance_lines(review_provenance))
+        lines << ''
         review.fetch(:candidates).each_with_index do |candidate, index|
           lines.concat(candidate_lines(candidate, service))
           lines << '' if index < review.fetch(:candidates).length - 1
@@ -49,6 +50,18 @@ module SloRulesEngine
 
       def review_note_comments(notes)
         Array(notes).map { |note| "# review note: #{comment_text(note)}" }
+      end
+
+      def review_provenance_lines(provenance)
+        return [] unless provenance
+
+        [
+          "  review_provenance label: '#{quote(provenance.fetch(:label))}',",
+          "                    provider: '#{quote(provenance.fetch(:provider))}',",
+          "                    accepted_candidate_uids: #{ruby_array(provenance.fetch(:accepted_candidate_uids, []))},",
+          "                    rejected_candidate_uids: #{ruby_array(provenance.fetch(:rejected_candidate_uids, []))},",
+          "                    notes: #{ruby_array(provenance.fetch(:notes, []))}"
+        ]
       end
 
       def finding_comments(findings)
@@ -175,6 +188,10 @@ module SloRulesEngine
 
       def quote(value)
         value.to_s.gsub('\\', '\\\\\\').gsub("'", "\\\\'")
+      end
+
+      def ruby_array(values)
+        "[#{Array(values).map { |value| "'#{quote(value)}'" }.join(', ')}]"
       end
 
       def comment_text(value)

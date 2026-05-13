@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require 'tempfile'
 require_relative '../lib/sre'
 
 class ProvidersTest < Minitest::Test
+  ROOT = File.expand_path('..', __dir__)
+
   def setup
     SloRulesEngine.clear_definitions
     load File.expand_path('../examples/services/checkout.rb', __dir__)
@@ -116,6 +119,20 @@ class ProvidersTest < Minitest::Test
     assert_equal 'checkout-api', slo[:alerting][:page_alert][:labels][:routing_key]
   end
 
+  def test_provider_manifests_preserve_reviewed_handoff_provenance
+    definition = reviewed_handoff_definition
+
+    SloRulesEngine.default_provider_registry.list.each do |provider|
+      manifest = provider.generate(definition).to_h
+      provenance = manifest.fetch(:review_provenance)
+
+      assert_equal 'checkout-prod', provenance.fetch(:label)
+      assert_equal 'datadog', provenance.fetch(:provider)
+      assert_equal ['request-latency'], provenance.fetch(:accepted_candidate_uids)
+      assert_equal ['Latency accepted.'], provenance.fetch(:notes)
+    end
+  end
+
   def test_notification_router_integration_generates_route_catalog
     registry = SloRulesEngine.default_integration_registry
     manifest = registry.fetch('notification_router').generate(@definition).to_h
@@ -151,5 +168,90 @@ class ProvidersTest < Minitest::Test
       reality_check
       apply_plan
     ]
+  end
+
+  def reviewed_handoff_definition
+    load_string(<<~RUBY)
+      SRE.define do
+        service 'checkout-api'
+        owner 'payments-platform'
+        review_provenance label: 'checkout-prod',
+                          provider: 'datadog',
+                          accepted_candidate_uids: ['request-latency'],
+                          notes: ['Latency accepted.']
+
+        notification_route key: 'checkout-api', source: 'datadog', provider: 'msteams', target: '#checkout'
+        notification_route key: 'checkout-api', source: 'alertmanager', provider: 'msteams', target: '#checkout'
+
+        sli do
+          uid 'request-latency'
+          title 'Request Latency'
+          user_visible_rationale 'Measured telemetry is close to user-visible service quality.'
+
+          measurement_details do
+            source 'datadog'
+            measurement_point 'service request boundary'
+            threshold_requirements 'review histogram units, buckets, and threshold before production use'
+            caveats 'generated draft; confirm telemetry represents user-visible service quality'
+          end
+
+          metric 'http.server.request.duration' do
+            data_source 'telemetry-inventory'
+            type 'histogram'
+            selector service: 'checkout-api'
+            provider_binding 'datadog' do
+              metric 'http.server.request.duration'
+              data_source 'datadog'
+              type 'distribution'
+              selector service: 'checkout-api'
+              query 'p95:http.server.request.duration{service:checkout-api}'
+            end
+            provider_binding 'prometheus_stack' do
+              metric 'http_server_request_duration_seconds_count'
+              data_source 'prometheus'
+              type 'counter'
+              range '5m'
+              selector service: 'checkout-api'
+            end
+            provider_binding 'sloth' do
+              metric 'http_server_request_duration_seconds_count'
+              data_source 'prometheus'
+              type 'counter'
+              range '5m'
+              selector service: 'checkout-api'
+            end
+          end
+
+          instance do
+            uid 'default'
+            slo do
+              uid 'fast-enough'
+              objective 0.99
+              success_threshold '<=', 'user-reviewed latency threshold'
+              calculation_basis 'observations'
+              documentation 'Observation meets the reviewed service quality threshold.'
+              miss_policy do
+                trigger 'error budget exhausted'
+                response 'review generated SLO, assign responder, and restore service health'
+                authority 'pause risky changes for the affected service'
+                exit_condition 'burn rate returns below reviewed policy threshold'
+              end
+              observability_handoff 'bind provider queries', 'generate decision dashboard'
+            end
+          end
+        end
+      end
+    RUBY
+
+    SloRulesEngine.definitions.last
+  end
+
+  def load_string(source)
+    Tempfile.create(['definition', '.rb']) do |file|
+      file.write("require_relative '#{ROOT}/lib/sre'\n")
+      file.write(source)
+      file.flush
+      load file.path
+    end
   end
 end

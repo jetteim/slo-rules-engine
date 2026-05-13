@@ -33,4 +33,26 @@ class ManifestSchemaTest < Minitest::Test
       error.path == 'artifacts.slos[0].query.success_selector' && error.message == 'is required'
     end
   end
+
+  def test_manifest_schema_validates_review_provenance_when_present
+    manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h.merge(
+      service: @definition.service,
+      review_provenance: {
+        label: 'checkout-prod',
+        provider: 'datadog',
+        accepted_candidate_uids: ['request-latency'],
+        notes: ['Latency accepted.']
+      }
+    )
+
+    result = SloRulesEngine::ManifestSchemaValidator.validate(manifest)
+
+    assert result.valid?, result.errors.map(&:to_h).inspect
+
+    manifest.fetch(:review_provenance).delete(:accepted_candidate_uids)
+    result = SloRulesEngine::ManifestSchemaValidator.validate(manifest)
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path == 'review_provenance.accepted_candidate_uids' }
+  end
 end

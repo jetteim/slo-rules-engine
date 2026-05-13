@@ -18,6 +18,7 @@ module SloRulesEngine
       provider = fetch_value(manifest, :provider)
       validate_presence(result, 'provider', provider)
       validate_presence(result, 'service', fetch_value(manifest, :service))
+      validate_review_provenance(result, fetch_value(manifest, :review_provenance)) if fetch_value(manifest, :review_provenance)
       artifacts = fetch_value(manifest, :artifacts)
       unless artifacts.is_a?(Hash)
         result.error('artifacts', 'must be a hash')
@@ -179,6 +180,17 @@ module SloRulesEngine
       else
         result.error("#{path}.type", "unsupported datadog monitor type #{fetch_value(artifact, :type).inspect}")
       end
+    end
+
+    def validate_review_provenance(result, provenance)
+      validate_hash(result, 'review_provenance', provenance)
+      return unless provenance.is_a?(Hash)
+
+      validate_presence(result, 'review_provenance.label', fetch_value(provenance, :label))
+      validate_presence(result, 'review_provenance.provider', fetch_value(provenance, :provider))
+      validate_array(result, 'review_provenance.accepted_candidate_uids', fetch_value(provenance, :accepted_candidate_uids))
+      validate_array(result, 'review_provenance.rejected_candidate_uids', fetch_value(provenance, :rejected_candidate_uids)) if fetch_value(provenance, :rejected_candidate_uids)
+      validate_array(result, 'review_provenance.notes', fetch_value(provenance, :notes)) if fetch_value(provenance, :notes)
     end
 
     def validate_query_binding(result, path, query, require_success_condition:)

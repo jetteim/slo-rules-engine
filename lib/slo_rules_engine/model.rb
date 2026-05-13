@@ -6,6 +6,7 @@ module SloRulesEngine
     :owner,
     :description,
     :environments,
+    :review_provenance,
     :slis,
     :notification_routes,
     :line_references,
@@ -17,6 +18,32 @@ module SloRulesEngine
       self.slis ||= []
       self.notification_routes ||= []
       self.line_references ||= {}
+    end
+  end
+
+  ReviewProvenance = Struct.new(
+    :label,
+    :provider,
+    :accepted_candidate_uids,
+    :rejected_candidate_uids,
+    :notes,
+    keyword_init: true
+  ) do
+    def initialize(**kwargs)
+      super
+      self.accepted_candidate_uids ||= []
+      self.rejected_candidate_uids ||= []
+      self.notes ||= []
+    end
+
+    def to_h
+      {
+        label: label,
+        provider: provider,
+        accepted_candidate_uids: accepted_candidate_uids,
+        rejected_candidate_uids: rejected_candidate_uids,
+        notes: notes
+      }.compact
     end
   end
 
@@ -191,14 +218,17 @@ module SloRulesEngine
     :provider,
     :capabilities,
     :artifacts,
+    :review_provenance,
     keyword_init: true
   ) do
     def to_h
-      {
+      payload = {
         provider: provider,
         capabilities: capabilities,
         artifacts: artifacts
       }
+      payload[:review_provenance] = review_provenance.to_h if review_provenance
+      payload
     end
   end
 end

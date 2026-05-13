@@ -77,6 +77,10 @@ class OnboardingHandoffTest < Minitest::Test
         assert result.valid?, result.to_h.inspect
         assert_equal 'checkout-api', definition.service
         assert_equal 'request-latency', definition.slis.fetch(0).uid
+        assert_equal 'checkout-prod', definition.review_provenance.label
+        assert_equal 'datadog', definition.review_provenance.provider
+        assert_equal ['request-latency'], definition.review_provenance.accepted_candidate_uids
+        assert_equal ['Latency is accepted for the first onboarding draft.'], definition.review_provenance.notes
       end
     end
   ensure

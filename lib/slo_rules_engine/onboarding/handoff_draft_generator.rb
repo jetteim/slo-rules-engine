@@ -42,11 +42,22 @@ module SloRulesEngine
           },
           review_notes: review[:notes] || [],
           provenance_comments: provenance_comments(packet),
+          review_provenance: review_provenance(packet, review),
           header: '# Generated from reviewed onboarding handoff. Review before production use.'
         )
       end
 
       private
+
+      def review_provenance(packet, review)
+        {
+          label: packet[:label],
+          provider: packet[:provider],
+          accepted_candidate_uids: review[:accepted_candidate_uids] || [],
+          rejected_candidate_uids: review[:rejected_candidate_uids] || [],
+          notes: review[:notes] || []
+        }
+      end
 
       def provenance_comments(packet)
         [

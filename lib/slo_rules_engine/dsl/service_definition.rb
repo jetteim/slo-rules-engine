@@ -65,6 +65,17 @@ module SloRulesEngine
         )
       end
 
+      def review_provenance(label:, provider:, accepted_candidate_uids:, rejected_candidate_uids: [], notes: [])
+        record_line(:review_provenance)
+        @review_provenance = ReviewProvenance.new(
+          label: label.to_s,
+          provider: provider.to_s,
+          accepted_candidate_uids: Array(accepted_candidate_uids).map(&:to_s),
+          rejected_candidate_uids: Array(rejected_candidate_uids).map(&:to_s),
+          notes: Array(notes).map(&:to_s)
+        )
+      end
+
       def sli(&block)
         @slis << SLIBuilder.evaluate(&block)
       end
@@ -75,6 +86,7 @@ module SloRulesEngine
           owner: @owner,
           description: @description,
           environments: @environments,
+          review_provenance: @review_provenance,
           slis: @slis,
           notification_routes: @notification_routes,
           line_references: @line_references

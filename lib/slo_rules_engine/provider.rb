@@ -64,8 +64,13 @@ module SloRulesEngine
       result
     end
 
-    def manifest(artifacts)
-      GeneratedManifest.new(provider: key, capabilities: capabilities, artifacts: artifacts)
+    def manifest(artifacts, definition: nil)
+      GeneratedManifest.new(
+        provider: key,
+        capabilities: capabilities,
+        artifacts: artifacts,
+        review_provenance: definition&.review_provenance
+      )
     end
 
     private

@@ -41,7 +41,7 @@ module SloRulesEngine
           artifacts[:grafana_dashboards] << grafana_dashboard(definition, sli, instance, slo)
         end
 
-        manifest(artifacts)
+        manifest(artifacts, definition: definition)
       end
 
       private
