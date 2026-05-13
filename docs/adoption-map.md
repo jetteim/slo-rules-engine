@@ -56,6 +56,6 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. validate generated provider manifests retain review evidence before apply
-2. expose reviewed handoff provenance in review summaries and model reports
+1. expose reviewed handoff provenance in review summaries and model reports
+2. add provenance-aware review checks to generated manifest review queues
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline

@@ -55,4 +55,29 @@ class ManifestSchemaTest < Minitest::Test
     refute result.valid?
     assert result.errors.any? { |error| error.path == 'review_provenance.accepted_candidate_uids' }
   end
+
+  def test_manifest_review_evidence_requires_review_provenance
+    manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h.merge(service: @definition.service)
+
+    result = SloRulesEngine::ManifestReviewEvidenceValidator.validate([manifest])
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path == 'manifests[0].review_provenance' }
+  end
+
+  def test_manifest_review_evidence_requires_accepted_candidate
+    manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h.merge(
+      service: @definition.service,
+      review_provenance: {
+        label: 'checkout-prod',
+        provider: 'datadog',
+        accepted_candidate_uids: []
+      }
+    )
+
+    result = SloRulesEngine::ManifestReviewEvidenceValidator.validate([manifest])
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path == 'manifests[0].review_provenance.accepted_candidate_uids' }
+  end
 end

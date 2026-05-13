@@ -22,13 +22,24 @@ class RulesCtlTest < Minitest::Test
     end
   end
 
+  def with_review_provenance(manifest)
+    manifest.merge(
+      review_provenance: {
+        label: 'checkout-prod',
+        provider: 'datadog',
+        accepted_candidate_uids: ['request-latency'],
+        notes: ['Latency accepted.']
+      }
+    )
+  end
+
   def test_apply_renders_invalid_provider_payload_error
     load "#{ROOT}/examples/services/checkout.rb"
     definition = SloRulesEngine.definitions.fetch(0)
-    manifest = SloRulesEngine.default_provider_registry.fetch('datadog')
+    manifest = with_review_provenance(SloRulesEngine.default_provider_registry.fetch('datadog')
       .generate(definition)
       .to_h
-      .merge(service: definition.service)
+      .merge(service: definition.service))
     result = SloRulesEngine::ValidationResult.new
     result.error('query', 'contains unresolved SLO reference')
     payload_error = SloRulesEngine::Datadog::PayloadError.new(
@@ -64,10 +75,10 @@ class RulesCtlTest < Minitest::Test
   def test_apply_renders_unsafe_provider_state_error
     load "#{ROOT}/examples/services/checkout.rb"
     definition = SloRulesEngine.definitions.fetch(0)
-    manifest = SloRulesEngine.default_provider_registry.fetch('datadog')
+    manifest = with_review_provenance(SloRulesEngine.default_provider_registry.fetch('datadog')
       .generate(definition)
       .to_h
-      .merge(service: definition.service)
+      .merge(service: definition.service))
     operation = SloRulesEngine::ApplyOperation.new(
       action: 'update',
       target: 'datadog.slo',

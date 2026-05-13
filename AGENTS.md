@@ -73,10 +73,11 @@ Implemented by the latest telemetry-first slice:
 - `draft-from-handoff` emits reviewed Ruby DSL drafts from accepted handoff candidates without rerunning backend discovery
 - `validate-handoff` checks reviewed packets before draft/provider handoff, and reviewed drafts include handoff provenance comments
 - Reviewed handoff provenance is now parsed into the neutral DSL model and preserved in generated provider manifests
+- Live `apply --confirm --manifest` now requires reviewed handoff provenance in every manifest before provider mutation or file-backed apply
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: reviewed handoff provenance in provider manifests
+- latest checkpoint: manifest review-evidence gate before live apply
 - previous checkpoint: `feat: add onboarding handoff packets`
 - previous pushed: `feat: add onboarding summary readiness ranking`
 - earlier pushed: `chore: untrack forbidden terms list`
@@ -102,8 +103,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Validating generated provider manifests retain review evidence before apply
-2. Exposing reviewed handoff provenance in review summaries and model reports
+1. Exposing reviewed handoff provenance in review summaries and model reports
+2. Adding provenance-aware review checks to generated manifest review queues
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -116,7 +117,7 @@ Secondary gaps:
 
 Next recommended slice:
 
-- validate generated provider manifests retain review evidence before apply
+- expose reviewed handoff provenance in review summaries and model reports
 
 Rationale:
 
@@ -126,7 +127,8 @@ Rationale:
 - reviewed drafts can now be generated from accepted handoff state without rerunning backend discovery
 - handoff packets can now be validated before draft/provider handoff
 - reviewed handoff provenance now flows through generated provider manifests
-- the next value is adding an explicit manifest review-evidence gate before apply workflows
+- live apply now requires reviewed handoff provenance before provider mutation or file-backed apply
+- the next value is making that provenance visible in review summaries and model reports
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

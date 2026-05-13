@@ -104,6 +104,7 @@ The `candidates` and `draft-definition` commands accept either a raw telemetry s
 Batch `discover-telemetry --scope-file` writes one normalized evidence file per scope plus an aggregate `index.json` for later review-readiness ranking and draft generation.
 The `onboarding-summary --handoff-dir` command writes per-scope handoff packets, and `review-handoff` records accepted or rejected candidate decisions without changing saved discovery or candidate evidence.
 The `validate-handoff` command checks reviewed packets before handoff, and `draft-from-handoff` emits a Ruby DSL draft from accepted handoff candidates without rerunning backend discovery.
+Live `apply --confirm --manifest` requires reviewed handoff provenance in every manifest before provider mutation or file-backed apply.
 
 Confirmed `apply` now requires `--manifest` so live state changes always use reviewed provider artifacts instead of regenerating definitions inline.
 Confirmed `prune` now requires `--manifest` so destructive state removal is also tied to reviewed provider artifacts.

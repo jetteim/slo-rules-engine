@@ -10,6 +10,17 @@ require 'tmpdir'
 class CLITest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
 
+  def with_review_provenance(manifest)
+    manifest.merge(
+      'review_provenance' => {
+        'label' => 'checkout-prod',
+        'provider' => 'datadog',
+        'accepted_candidate_uids' => ['request-latency'],
+        'notes' => ['Latency accepted.']
+      }
+    )
+  end
+
   def test_providers_list_includes_automation_metadata
     stdout, _stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'providers', 'list')
 
@@ -114,7 +125,7 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
     assert generate_status.success?, generate_stderr
-    manifest = JSON.parse(generate_stdout).fetch(0)
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
 
     Tempfile.create(['datadog-live-manifest', '.json']) do |file|
       file.write(JSON.generate(manifest))
@@ -135,6 +146,39 @@ class CLITest < Minitest::Test
       assert_equal false, payload.fetch('valid')
       assert_equal 'datadog', payload.fetch('provider')
       assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
+    end
+  end
+
+  def test_apply_confirm_requires_manifest_review_evidence
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = JSON.parse(generate_stdout).fetch(0)
+
+    Tempfile.create(['datadog-unreviewed-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'apply',
+        '--provider=datadog',
+        '--confirm',
+        "--manifest=#{file.path}"
+      )
+
+      refute status.success?, stderr
+      payload = JSON.parse(stdout)
+      assert_equal false, payload.fetch('valid')
+      assert_equal 'missing_review_evidence', payload.fetch('error').fetch('code')
+      assert payload.fetch('errors').any? { |error| error.fetch('path') == 'manifests[0].review_provenance' }
     end
   end
 
@@ -185,7 +229,7 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
     assert generate_status.success?, generate_stderr
-    manifest = JSON.parse(generate_stdout).fetch(0)
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
 
     Tempfile.create(['sloth-live-manifest', '.json']) do |file|
       file.write(JSON.generate(manifest))
@@ -225,7 +269,7 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
     assert generate_status.success?, generate_stderr
-    manifest = JSON.parse(generate_stdout).fetch(0)
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
 
     Tempfile.create(['datadog-manifest', '.json']) do |file|
       file.write(JSON.generate(manifest))
@@ -257,7 +301,7 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
     assert generate_status.success?, generate_stderr
-    manifest = JSON.parse(generate_stdout).fetch(0)
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
     manifest.fetch('artifacts').fetch('slos').fetch(0).fetch('query').delete('success_selector')
 
     Tempfile.create(['datadog-invalid-manifest', '.json']) do |file|
@@ -292,7 +336,7 @@ class CLITest < Minitest::Test
       "#{ROOT}/examples/services/checkout.rb"
     )
     assert generate_status.success?, generate_stderr
-    manifest = JSON.parse(generate_stdout).fetch(0)
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
 
     Tempfile.create(['sloth-manifest', '.json']) do |file|
       file.write(JSON.generate(manifest))

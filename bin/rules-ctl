@@ -124,6 +124,7 @@ module RulesCtl
     mode = confirm && !dry_run ? 'live' : 'dry_run'
     abort_usage('live apply requires --manifest reviewed manifest input') if mode == 'live' && manifest_path.to_s.empty?
     manifests = resolve_state_manifests(argv, provider, manifest_path)
+    validate_apply_review_evidence!(manifests, provider: provider, provider_key: provider_key, mode: mode) if mode == 'live'
     if provider.key == 'datadog'
       applier = SloRulesEngine::Appliers::Datadog.new
       plans = manifests.map do |manifest|
@@ -840,6 +841,26 @@ module RulesCtl
 
   def validate_manifests!(manifests)
     Array(manifests).each { |manifest| SloRulesEngine::ManifestSchemaValidator.validate!(manifest) }
+  end
+
+  def validate_apply_review_evidence!(manifests, provider:, provider_key:, mode:)
+    result = SloRulesEngine::ManifestReviewEvidenceValidator.validate(manifests)
+    return if result.valid?
+
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'missing_review_evidence',
+        message: 'live apply requires reviewed handoff provenance in every manifest'
+      },
+      errors: result.errors.map(&:to_h),
+      warnings: result.warnings.map(&:to_h)
+    )
+    exit 1
   end
 
   def render_manifest_schema_error(provider:, provider_key:, mode:, error:)
