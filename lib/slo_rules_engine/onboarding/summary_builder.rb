@@ -53,7 +53,7 @@ module SloRulesEngine
         candidate_finding_codes = Array(review[:findings]).map { |finding| finding[:code] }.compact
         candidate_count = Array(review[:candidates]).length
         signal_count = Array(payload[:signals]).length
-        handoff_file = write_handoff_packet(
+        handoff = write_handoff_packet(
           entry: entry,
           index: index,
           payload: payload,
@@ -74,7 +74,11 @@ module SloRulesEngine
           candidate_finding_count: candidate_finding_codes.length,
           finding_codes: (discovery_finding_codes + candidate_finding_codes).uniq
         }
-        summary[:handoff_file] = handoff_file if handoff_file
+        if handoff
+          summary[:handoff_file] = handoff.fetch(:path)
+          summary[:review_summary] = review_summary(handoff.fetch(:packet))
+          summary[:review_provenance] = review_provenance(handoff.fetch(:packet)) if reviewed?(handoff.fetch(:packet))
+        end
         summary
       end
 
@@ -99,12 +103,7 @@ module SloRulesEngine
             finding_codes: discovery_findings.map { |finding| finding[:code] }.compact
           },
           candidate_review: review,
-          review: {
-            status: 'unreviewed',
-            accepted_candidate_uids: [],
-            rejected_candidate_uids: [],
-            notes: []
-          },
+          review: existing_review(path) || default_review,
           handoff: {
             required_review_steps: [
               'accept or reject each candidate',
@@ -114,7 +113,55 @@ module SloRulesEngine
           }
         }
         File.write(path, JSON.pretty_generate(packet))
-        path
+        { path: path, packet: packet }
+      end
+
+      def existing_review(path)
+        return nil unless File.exist?(path)
+
+        review = JSON.parse(File.read(path), symbolize_names: true)[:review]
+        return nil unless review.is_a?(Hash)
+
+        {
+          status: review[:status],
+          accepted_candidate_uids: Array(review[:accepted_candidate_uids]),
+          rejected_candidate_uids: Array(review[:rejected_candidate_uids]),
+          notes: Array(review[:notes])
+        }
+      end
+
+      def default_review
+        {
+          status: 'unreviewed',
+          accepted_candidate_uids: [],
+          rejected_candidate_uids: [],
+          notes: []
+        }
+      end
+
+      def review_summary(packet)
+        review = packet.fetch(:review)
+        {
+          status: review[:status] || 'unreviewed',
+          accepted_candidate_count: Array(review[:accepted_candidate_uids]).length,
+          rejected_candidate_count: Array(review[:rejected_candidate_uids]).length,
+          note_count: Array(review[:notes]).length
+        }
+      end
+
+      def review_provenance(packet)
+        review = packet.fetch(:review)
+        {
+          label: packet[:label],
+          provider: packet[:provider],
+          accepted_candidate_uids: Array(review[:accepted_candidate_uids]),
+          rejected_candidate_uids: Array(review[:rejected_candidate_uids]),
+          notes: Array(review[:notes])
+        }
+      end
+
+      def reviewed?(packet)
+        packet.dig(:review, :status).to_s == 'reviewed'
       end
 
       def readiness(candidate_count, discovery_finding_codes, candidate_finding_codes)

@@ -37,7 +37,7 @@ Explicit features:
 
 ## Reliability Model Report
 
-`rules-ctl model-report` summarizes the neutral reliability model for service definitions. It is intended for review before provider generation and uses synthetic examples in this repository.
+`rules-ctl model-report` summarizes the neutral reliability model for service definitions. It includes reviewed handoff provenance when definitions were generated from accepted onboarding packets, and is intended for review before provider generation using synthetic examples in this repository.
 
 ## Backend Telemetry Lookup And Sanity Checks
 

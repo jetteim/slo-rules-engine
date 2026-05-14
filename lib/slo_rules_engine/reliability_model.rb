@@ -16,11 +16,22 @@ module SloRulesEngine
           calculation_basis_distribution: distribution(slos.map(&:calculation_basis)),
           objectives: slos.map(&:objective).compact.sort,
           observability_handoff_requests: slos.flat_map { |slo| slo.observability_handoff&.requests || [] }.uniq.sort,
+          review_provenance: definitions.filter_map { |definition| review_provenance(definition) },
           private_identifiers: []
         }
       end
 
       private
+
+      def review_provenance(definition)
+        provenance = definition.review_provenance
+        return nil unless provenance
+
+        provenance.to_h.merge(
+          service: definition.service,
+          owner: definition.owner
+        )
+      end
 
       def distribution(values)
         values.each_with_object(Hash.new(0)) { |value, counts| counts[value] += 1 }

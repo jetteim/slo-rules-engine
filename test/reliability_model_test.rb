@@ -52,4 +52,35 @@ class ReliabilityModelTest < Minitest::Test
   ensure
     SloRulesEngine.clear_definitions
   end
+
+  def test_model_report_exposes_review_provenance
+    definition = SloRulesEngine::ServiceLevelDefinition.new(
+      service: 'checkout-api',
+      owner: 'payments-platform',
+      review_provenance: SloRulesEngine::ReviewProvenance.new(
+        label: 'checkout-prod',
+        provider: 'datadog',
+        accepted_candidate_uids: ['request-latency'],
+        rejected_candidate_uids: ['request-traffic'],
+        notes: ['Latency accepted for rollout.']
+      )
+    )
+
+    report = SloRulesEngine::ReliabilityModel::ReportBuilder.new.build([definition])
+
+    assert_equal(
+      [
+        {
+          service: 'checkout-api',
+          owner: 'payments-platform',
+          label: 'checkout-prod',
+          provider: 'datadog',
+          accepted_candidate_uids: ['request-latency'],
+          rejected_candidate_uids: ['request-traffic'],
+          notes: ['Latency accepted for rollout.']
+        }
+      ],
+      report.fetch(:review_provenance)
+    )
+  end
 end

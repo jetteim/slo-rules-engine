@@ -949,4 +949,34 @@ class CLITest < Minitest::Test
     assert_includes payload.fetch('observability_handoff_requests'), 'bind provider queries'
   end
 
+  def test_model_report_command_outputs_review_provenance
+    Tempfile.create(['reviewed-definition', '.rb']) do |file|
+      file.write(<<~RUBY)
+        require_relative '#{ROOT}/lib/sre'
+
+        SRE.define do
+          service 'checkout-api'
+          owner 'payments-platform'
+          review_provenance label: 'checkout-prod',
+                            provider: 'datadog',
+                            accepted_candidate_uids: ['request-latency'],
+                            rejected_candidate_uids: ['request-traffic'],
+                            notes: ['Latency accepted for rollout.']
+        end
+      RUBY
+      file.flush
+
+      stdout, stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'model-report', file.path)
+
+      assert status.success?, stderr
+      provenance = JSON.parse(stdout).fetch('review_provenance').fetch(0)
+      assert_equal 'checkout-api', provenance.fetch('service')
+      assert_equal 'payments-platform', provenance.fetch('owner')
+      assert_equal 'checkout-prod', provenance.fetch('label')
+      assert_equal ['request-latency'], provenance.fetch('accepted_candidate_uids')
+      assert_equal ['request-traffic'], provenance.fetch('rejected_candidate_uids')
+      assert_equal ['Latency accepted for rollout.'], provenance.fetch('notes')
+    end
+  end
+
 end
