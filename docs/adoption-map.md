@@ -56,6 +56,6 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. add provenance-aware review checks to generated manifest review queues
-2. add explicit review status rollups for provider artifact queues
+1. add saved manifest-review queue reports alongside generated provider manifests
+2. connect manifest-review findings back to handoff packet labels for reviewer navigation
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline

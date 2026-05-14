@@ -19,6 +19,8 @@ module RulesCtl
       validate_handoff(argv)
     when 'generate'
       generate(argv)
+    when 'manifest-review'
+      manifest_review(argv)
     when 'apply'
       apply(argv)
     when 'diff'
@@ -102,6 +104,25 @@ module RulesCtl
     puts JSON.pretty_generate(manifests)
   rescue SloRulesEngine::ManifestSchemaError => error
     render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'generate', error: error)
+  end
+
+  def manifest_review(argv)
+    provider_key = nil
+    manifest_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to inspect instead of regenerating from definitions') { |value| manifest_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(manifests, provider: provider.key)
+    puts JSON.pretty_generate(report)
+    exit(report[:valid] ? 0 : 1)
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'manifest_review', error: error)
   end
 
   def apply(argv)
@@ -922,6 +943,7 @@ module RulesCtl
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl validate-handoff <handoff.json>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
+        bin/rules-ctl manifest-review --provider=<provider> [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>

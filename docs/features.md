@@ -39,6 +39,10 @@ Explicit features:
 
 `rules-ctl model-report` summarizes the neutral reliability model for service definitions. It includes reviewed handoff provenance when definitions were generated from accepted onboarding packets, and is intended for review before provider generation using synthetic examples in this repository.
 
+## Manifest Review Queue
+
+`rules-ctl manifest-review` checks generated or saved provider manifests before apply workflows. It reports missing, incomplete, or provider-mismatched reviewed provenance and emits queue-level rollups for reviewed manifests, missing provenance, incomplete provenance, accepted candidates, rejected candidates, and review notes.
+
 ## Backend Telemetry Lookup And Sanity Checks
 
 Telemetry-derived SLO generation should work from either a checked-in telemetry inventory fixture or backend lookup output. Lookup adapters normalize provider evidence before it reaches candidate generation, so SLI/SLO review does not depend on backend-specific query syntax.

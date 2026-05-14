@@ -1,0 +1,52 @@
+# frozen_string_literal: true
+
+require 'minitest/autorun'
+require_relative '../lib/slo_rules_engine'
+
+class ManifestReviewQueueTest < Minitest::Test
+  def test_report_flags_provenance_gaps_and_rolls_up_review_status
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+      [
+        { service: 'checkout-api', provider: 'datadog' },
+        {
+          service: 'payments-api',
+          provider: 'datadog',
+          review_provenance: {
+            label: 'payments-prod',
+            provider: 'prometheus_stack',
+            accepted_candidate_uids: []
+          }
+        },
+        {
+          service: 'catalog-api',
+          provider: 'datadog',
+          review_provenance: {
+            label: 'catalog-prod',
+            provider: 'datadog',
+            accepted_candidate_uids: ['request-latency'],
+            rejected_candidate_uids: ['request-traffic'],
+            notes: ['Latency accepted.']
+          }
+        }
+      ],
+      provider: 'datadog'
+    )
+
+    refute report.fetch(:valid)
+    assert_equal 3, report.fetch(:total_manifests)
+    assert_equal 1, report.fetch(:summary).fetch(:reviewed_manifests)
+    assert_equal 1, report.fetch(:summary).fetch(:missing_provenance_manifests)
+    assert_equal 1, report.fetch(:summary).fetch(:incomplete_provenance_manifests)
+    assert_equal 1, report.fetch(:summary).fetch(:accepted_candidate_total)
+    assert_equal 1, report.fetch(:summary).fetch(:rejected_candidate_total)
+    assert_equal 1, report.fetch(:summary).fetch(:note_total)
+
+    manifests = report.fetch(:manifests)
+    assert_equal 'missing_provenance', manifests.fetch(0).fetch(:status)
+    assert_equal ['missing_review_provenance'], manifests.fetch(0).fetch(:findings).map { |finding| finding.fetch(:code) }
+    assert_equal 'incomplete_provenance', manifests.fetch(1).fetch(:status)
+    assert_equal %w[missing_accepted_candidate provenance_provider_mismatch], manifests.fetch(1).fetch(:findings).map { |finding| finding.fetch(:code) }
+    assert_equal 'reviewed', manifests.fetch(2).fetch(:status)
+    assert_empty manifests.fetch(2).fetch(:findings)
+  end
+end
