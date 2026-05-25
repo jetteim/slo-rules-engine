@@ -86,4 +86,80 @@ class ManifestReviewQueueTest < Minitest::Test
       assert_equal handoff_path, finding.fetch(:handoff_file)
     end
   end
+
+  def test_report_flags_stale_provenance_against_reviewed_handoff
+    Dir.mktmpdir do |dir|
+      handoff_path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(
+        handoff_path,
+        JSON.pretty_generate(
+          label: 'checkout-prod',
+          provider: 'datadog',
+          review: {
+            status: 'reviewed',
+            accepted_candidate_uids: ['request-errors'],
+            rejected_candidate_uids: ['request-latency'],
+            notes: ['Errors accepted after review.']
+          }
+        )
+      )
+
+      report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+        [
+          {
+            service: 'checkout-api',
+            provider: 'datadog',
+            review_provenance: {
+              label: 'checkout-prod',
+              provider: 'datadog',
+              accepted_candidate_uids: ['request-latency'],
+              rejected_candidate_uids: ['request-traffic'],
+              notes: ['Latency accepted first.']
+            }
+          }
+        ],
+        provider: 'datadog',
+        handoff_dir: dir
+      )
+
+      refute report.fetch(:valid)
+      assert_equal 1, report.fetch(:summary).fetch(:stale_provenance_manifests)
+      manifest = report.fetch(:manifests).fetch(0)
+      assert_equal 'stale_provenance', manifest.fetch(:status)
+      assert_equal %w[
+        stale_accepted_candidates
+        stale_rejected_candidates
+        stale_review_notes
+      ], manifest.fetch(:findings).map { |finding| finding.fetch(:code) }
+      assert_equal ['request-errors'], manifest.fetch(:findings).fetch(0).fetch(:expected)
+      assert_equal ['request-latency'], manifest.fetch(:findings).fetch(0).fetch(:actual)
+    end
+  end
+
+  def test_report_flags_missing_handoff_packet_when_handoff_dir_is_supplied
+    Dir.mktmpdir do |dir|
+      report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+        [
+          {
+            service: 'checkout-api',
+            provider: 'datadog',
+            review_provenance: {
+              label: 'checkout-prod',
+              provider: 'datadog',
+              accepted_candidate_uids: ['request-latency']
+            }
+          }
+        ],
+        provider: 'datadog',
+        handoff_dir: dir
+      )
+
+      refute report.fetch(:valid)
+      assert_equal 1, report.fetch(:summary).fetch(:missing_handoff_manifests)
+      manifest = report.fetch(:manifests).fetch(0)
+      assert_equal 'missing_handoff', manifest.fetch(:status)
+      assert_equal false, manifest.fetch(:handoff).fetch(:exists)
+      assert_equal ['missing_handoff_packet'], manifest.fetch(:findings).map { |finding| finding.fetch(:code) }
+    end
+  end
 end

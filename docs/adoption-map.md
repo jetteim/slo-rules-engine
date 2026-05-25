@@ -56,6 +56,6 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. detect stale manifest provenance against updated handoff packet review state
-2. surface manifest-review report paths in generated artifact handoff output
+1. gate live apply on stale manifest-review evidence when handoff packets are supplied
+2. add manifest-review report freshness metadata for generated artifact bundles
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline

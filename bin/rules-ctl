@@ -129,6 +129,7 @@ module RulesCtl
       provider: provider.key,
       handoff_dir: handoff_dir
     )
+    report[:report] = { path: output_path } if output_path
     write_json_file(output_path, report) if output_path
     puts JSON.pretty_generate(report)
     exit(report[:valid] ? 0 : 1)
@@ -879,6 +880,7 @@ module RulesCtl
       handoff_dir: handoff_dir
     )
     path = File.join(output_dir, 'manifest-review', "#{provider.key}.json")
+    report[:report] = { path: path }
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, JSON.pretty_generate(report))
   end

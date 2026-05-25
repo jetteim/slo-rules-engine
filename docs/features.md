@@ -41,9 +41,9 @@ Explicit features:
 
 ## Manifest Review Queue
 
-`rules-ctl manifest-review` checks generated or saved provider manifests before apply workflows. It reports missing, incomplete, or provider-mismatched reviewed provenance, links findings back to handoff packet labels and files when `--handoff-dir` is provided, can persist the report with `--output`, and emits queue-level rollups for reviewed manifests, missing provenance, incomplete provenance, accepted candidates, rejected candidates, and review notes.
+`rules-ctl manifest-review` checks generated or saved provider manifests before apply workflows. It reports missing, incomplete, stale, or provider-mismatched reviewed provenance, links findings back to handoff packet labels and files when `--handoff-dir` is provided, can persist the report with `--output`, and emits queue-level rollups for reviewed manifests, missing provenance, incomplete provenance, stale provenance, accepted candidates, rejected candidates, and review notes.
 
-`rules-ctl generate --output-dir` also writes `manifest-review/<provider>.json` beside generated provider manifests so artifact reviewers have a durable queue report without rerunning review checks.
+`rules-ctl generate --output-dir` also writes `manifest-review/<provider>.json` beside generated provider manifests so artifact reviewers have a durable queue report without rerunning review checks. Saved reports include their own report path for handoff tooling.
 
 ## Backend Telemetry Lookup And Sanity Checks
 

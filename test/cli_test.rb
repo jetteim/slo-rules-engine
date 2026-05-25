@@ -112,6 +112,7 @@ class CLITest < Minitest::Test
 
       report = JSON.parse(File.read(report_path))
       assert_equal false, report.fetch('valid')
+      assert_equal report_path, report.fetch('report').fetch('path')
       assert_equal 1, report.fetch('summary').fetch('missing_provenance_manifests')
       assert_equal 'missing_review_provenance', report.fetch('manifests').fetch(0).fetch('findings').fetch(0).fetch('code')
     end
@@ -235,6 +236,39 @@ class CLITest < Minitest::Test
         file_payload = JSON.parse(File.read(report_file.path))
         assert_equal true, file_payload.fetch('valid')
         assert_equal stdout_payload, file_payload
+      end
+    end
+  end
+
+  def test_manifest_review_output_includes_saved_report_path
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+
+    Tempfile.create(['reviewed-manifest', '.json']) do |manifest_file|
+      manifest_file.write(JSON.pretty_generate(manifest))
+      manifest_file.flush
+
+      Tempfile.create(['manifest-review-report', '.json']) do |report_file|
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'manifest-review',
+          '--provider=datadog',
+          "--manifest=#{manifest_file.path}",
+          "--output=#{report_file.path}"
+        )
+
+        assert status.success?, stderr
+        payload = JSON.parse(stdout)
+        assert_equal report_file.path, payload.fetch('report').fetch('path')
+        assert_equal report_file.path, JSON.parse(File.read(report_file.path)).fetch('report').fetch('path')
       end
     end
   end

@@ -82,7 +82,9 @@ This is the running plan for the long refactor.
 - [x] Add saved manifest-review queue reports alongside generated provider manifests.
 - [x] Connect manifest-review findings back to handoff packet labels for reviewer navigation.
 - [x] Add explicit saved output for manifest-review reports.
-- [ ] Detect stale manifest provenance against updated handoff packet review state.
+- [x] Detect stale manifest provenance against updated handoff packet review state.
+- [x] Surface saved manifest-review report paths in generated artifact handoff output.
+- [ ] Gate live apply on stale manifest-review evidence when handoff packets are supplied.
 
 ## Phase 6: Contract Hardening
 
