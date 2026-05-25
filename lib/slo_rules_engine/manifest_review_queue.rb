@@ -3,9 +3,9 @@
 module SloRulesEngine
   module ManifestReviewQueue
     class ReportBuilder
-      def build(manifests, provider: nil)
+      def build(manifests, provider: nil, handoff_dir: nil)
         entries = Array(manifests).each_with_index.map do |manifest, index|
-          manifest_entry(manifest, index, provider)
+          manifest_entry(manifest, index, provider, handoff_dir)
         end
 
         {
@@ -19,9 +19,10 @@ module SloRulesEngine
 
       private
 
-      def manifest_entry(manifest, index, expected_provider)
+      def manifest_entry(manifest, index, expected_provider, handoff_dir)
         provenance = fetch_value(manifest, :review_provenance)
-        findings = provenance_findings(provenance, index, expected_provider || fetch_value(manifest, :provider))
+        handoff = handoff_reference(provenance, handoff_dir)
+        findings = provenance_findings(provenance, index, expected_provider || fetch_value(manifest, :provider), handoff)
         status = status_for(provenance, findings)
         accepted = provenance.is_a?(Hash) ? Array(fetch_value(provenance, :accepted_candidate_uids)) : []
         rejected = provenance.is_a?(Hash) ? Array(fetch_value(provenance, :rejected_candidate_uids)) : []
@@ -39,14 +40,15 @@ module SloRulesEngine
           findings: findings
         }.compact
         entry[:review_provenance] = normalize_hash(provenance) if provenance.is_a?(Hash)
+        entry[:handoff] = handoff if handoff
         entry
       end
 
-      def provenance_findings(provenance, index, expected_provider)
+      def provenance_findings(provenance, index, expected_provider, handoff)
         path = "manifests[#{index}].review_provenance"
         unless provenance.is_a?(Hash)
           return [
-            finding('missing_review_provenance', path, 'reviewed handoff provenance is required before manifest review')
+            finding('missing_review_provenance', path, 'reviewed handoff provenance is required before manifest review', handoff)
           ]
         end
 
@@ -56,23 +58,25 @@ module SloRulesEngine
           findings << finding(
             'missing_accepted_candidate',
             "#{path}.accepted_candidate_uids",
-            'must include at least one accepted candidate'
+            'must include at least one accepted candidate',
+            handoff
           )
         end
 
         label = fetch_value(provenance, :label)
         if label.to_s.empty?
-          findings << finding('missing_provenance_label', "#{path}.label", 'is required')
+          findings << finding('missing_provenance_label', "#{path}.label", 'is required', handoff)
         end
 
         provider = fetch_value(provenance, :provider)
         if provider.to_s.empty?
-          findings << finding('missing_provenance_provider', "#{path}.provider", 'is required')
+          findings << finding('missing_provenance_provider', "#{path}.provider", 'is required', handoff)
         elsif !expected_provider.to_s.empty? && provider.to_s != expected_provider.to_s
           findings << finding(
             'provenance_provider_mismatch',
             "#{path}.provider",
-            "must match manifest provider #{expected_provider.inspect}"
+            "must match manifest provider #{expected_provider.inspect}",
+            handoff
           )
         end
 
@@ -98,11 +102,31 @@ module SloRulesEngine
         }
       end
 
-      def finding(code, path, message)
-        {
+      def finding(code, path, message, handoff = nil)
+        payload = {
           code: code,
           path: path,
           message: message
+        }
+        if handoff
+          payload[:handoff_label] = handoff.fetch(:label)
+          payload[:handoff_file] = handoff.fetch(:path)
+        end
+        payload
+      end
+
+      def handoff_reference(provenance, handoff_dir)
+        return nil unless provenance.is_a?(Hash)
+        return nil if handoff_dir.to_s.empty?
+
+        label = fetch_value(provenance, :label).to_s
+        return nil if label.empty?
+
+        path = File.join(handoff_dir, "#{label}.handoff.json")
+        {
+          label: label,
+          path: path,
+          exists: File.exist?(path)
         }
       end
 

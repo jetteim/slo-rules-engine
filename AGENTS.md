@@ -77,10 +77,14 @@ Implemented by the latest telemetry-first slice:
 - Rerun-safe onboarding summaries now preserve reviewed handoff decisions and expose review summaries plus reviewed provenance
 - `model-report` now exposes reviewed handoff provenance from DSL definitions before provider generation
 - `manifest-review` now checks generated or saved provider manifest queues for reviewed provenance gaps and emits review status rollups
+- `generate --output-dir` now saves `manifest-review/<provider>.json` beside generated manifests
+- `manifest-review --handoff-dir` now links findings back to handoff packet labels and files
+- `manifest-review --output` now writes an explicit saved queue report
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: provenance-aware manifest review queue checks
+- latest checkpoint: saved manifest-review reports and handoff navigation
+- previous checkpoint: provenance-aware manifest review queue checks
 - previous checkpoint: reviewed provenance visibility in onboarding and model reports
 - previous checkpoint: manifest review-evidence gate before live apply
 - previous checkpoint: `feat: add onboarding handoff packets`
@@ -108,8 +112,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Adding saved manifest-review queue reports alongside generated provider manifests
-2. Connecting manifest-review findings back to handoff packet labels for reviewer navigation
+1. Detecting stale manifest provenance against updated handoff packet review state
+2. Surfacing saved manifest-review report paths in generated artifact handoff output
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -122,7 +126,7 @@ Secondary gaps:
 
 Next recommended slice:
 
-- add saved manifest-review queue reports alongside generated provider manifests
+- detect stale manifest provenance against updated handoff packet review state
 
 Rationale:
 
@@ -135,7 +139,9 @@ Rationale:
 - live apply now requires reviewed handoff provenance before provider mutation or file-backed apply
 - review summaries and model reports now make reviewed handoff provenance visible before provider generation
 - manifest-review now checks provider artifact queues for missing or stale provenance before reviewers reach live apply
-- the next value is persisting those queue reports next to generated manifests so reviewers have a durable handoff artifact
+- saved manifest-review reports now persist next to generated manifests and can be written explicitly from saved manifest input
+- handoff packet labels and files are now included in manifest-review findings when available
+- the next value is detecting when a manifest's embedded provenance no longer matches the latest reviewed handoff packet
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

@@ -83,9 +83,11 @@ module RulesCtl
   def generate(argv)
     provider_key = nil
     output_dir = nil
+    handoff_dir = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
       opts.on('--output-dir=DIR', 'Write generated manifests under DIR') { |value| output_dir = value }
+      opts.on('--handoff-dir=DIR', 'Link generated manifest review reports to onboarding handoff packets') { |value| handoff_dir = value }
     end
     parser.parse!(argv)
     abort_usage('missing --provider') unless provider_key
@@ -100,7 +102,7 @@ module RulesCtl
     end
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
     validate_manifests!(manifests)
-    write_provider_manifests(output_dir, manifests) if output_dir
+    write_provider_manifests(output_dir, manifests, provider: provider, handoff_dir: handoff_dir) if output_dir
     puts JSON.pretty_generate(manifests)
   rescue SloRulesEngine::ManifestSchemaError => error
     render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'generate', error: error)
@@ -109,16 +111,25 @@ module RulesCtl
   def manifest_review(argv)
     provider_key = nil
     manifest_path = nil
+    handoff_dir = nil
+    output_path = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
       opts.on('--manifest=FILE', 'Reviewed manifest JSON file to inspect instead of regenerating from definitions') { |value| manifest_path = value }
+      opts.on('--handoff-dir=DIR', 'Link review findings to onboarding handoff packets') { |value| handoff_dir = value }
+      opts.on('--output=FILE', 'Write the manifest review report to FILE') { |value| output_path = value }
     end
     parser.parse!(argv)
     abort_usage('missing --provider') unless provider_key
 
     provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
     manifests = resolve_state_manifests(argv, provider, manifest_path)
-    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(manifests, provider: provider.key)
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+      manifests,
+      provider: provider.key,
+      handoff_dir: handoff_dir
+    )
+    write_json_file(output_path, report) if output_path
     puts JSON.pretty_generate(report)
     exit(report[:valid] ? 0 : 1)
   rescue SloRulesEngine::ManifestSchemaError => error
@@ -852,12 +863,29 @@ module RulesCtl
     }
   end
 
-  def write_provider_manifests(output_dir, manifests)
+  def write_provider_manifests(output_dir, manifests, provider: nil, handoff_dir: nil)
     manifests.each do |manifest|
       path = File.join(output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'manifest.json')
       FileUtils.mkdir_p(File.dirname(path))
       File.write(path, JSON.pretty_generate(manifest))
     end
+    write_manifest_review_report(output_dir, manifests, provider: provider, handoff_dir: handoff_dir) if provider
+  end
+
+  def write_manifest_review_report(output_dir, manifests, provider:, handoff_dir: nil)
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+      manifests,
+      provider: provider.key,
+      handoff_dir: handoff_dir
+    )
+    path = File.join(output_dir, 'manifest-review', "#{provider.key}.json")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, JSON.pretty_generate(report))
+  end
+
+  def write_json_file(path, payload)
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, JSON.pretty_generate(payload))
   end
 
   def validate_manifests!(manifests)
@@ -942,8 +970,8 @@ module RulesCtl
       Usage:
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl validate-handoff <handoff.json>
-        bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] <definitionfile...>
-        bin/rules-ctl manifest-review --provider=<provider> [--manifest=<manifest.json>] <definitionfile...>
+        bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] [--handoff-dir=<dir>] <definitionfile...>
+        bin/rules-ctl manifest-review --provider=<provider> [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--output=<file>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>

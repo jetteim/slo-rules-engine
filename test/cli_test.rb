@@ -95,6 +95,28 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_generate_output_dir_writes_manifest_review_report
+    Dir.mktmpdir do |dir|
+      stdout, _stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'generate',
+        '--provider=datadog',
+        "--output-dir=#{dir}",
+        "#{ROOT}/examples/services/checkout.rb"
+      )
+
+      assert status.success?, stdout
+      report_path = File.join(dir, 'manifest-review', 'datadog.json')
+      assert File.exist?(report_path), "expected #{report_path} to exist"
+
+      report = JSON.parse(File.read(report_path))
+      assert_equal false, report.fetch('valid')
+      assert_equal 1, report.fetch('summary').fetch('missing_provenance_manifests')
+      assert_equal 'missing_review_provenance', report.fetch('manifests').fetch(0).fetch('findings').fetch(0).fetch('code')
+    end
+  end
+
   def test_manifest_review_reports_generated_manifest_provenance_gaps
     stdout, _stderr, status = Open3.capture3(
       'ruby',
@@ -141,6 +163,79 @@ class CLITest < Minitest::Test
       assert_equal 1, payload.fetch('summary').fetch('reviewed_manifests')
       assert_equal 1, payload.fetch('summary').fetch('accepted_candidate_total')
       assert_equal 'reviewed', payload.fetch('manifests').fetch(0).fetch('status')
+    end
+  end
+
+  def test_manifest_review_links_findings_to_handoff_dir
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+    manifest.fetch('review_provenance')['accepted_candidate_uids'] = []
+
+    Tempfile.create(['incomplete-reviewed-manifest', '.json']) do |manifest_file|
+      manifest_file.write(JSON.pretty_generate(manifest))
+      manifest_file.flush
+
+      Dir.mktmpdir do |handoff_dir|
+        handoff_path = File.join(handoff_dir, 'checkout-prod.handoff.json')
+        File.write(handoff_path, JSON.pretty_generate('label' => 'checkout-prod'))
+
+        stdout, _stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'manifest-review',
+          '--provider=datadog',
+          "--manifest=#{manifest_file.path}",
+          "--handoff-dir=#{handoff_dir}"
+        )
+
+        payload = JSON.parse(stdout)
+        refute status.success?
+        manifest_report = payload.fetch('manifests').fetch(0)
+        assert_equal handoff_path, manifest_report.fetch('handoff').fetch('path')
+        assert_equal true, manifest_report.fetch('handoff').fetch('exists')
+        assert_equal handoff_path, manifest_report.fetch('findings').fetch(0).fetch('handoff_file')
+      end
+    end
+  end
+
+  def test_manifest_review_writes_explicit_output_report
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+
+    Tempfile.create(['reviewed-manifest', '.json']) do |manifest_file|
+      manifest_file.write(JSON.pretty_generate(manifest))
+      manifest_file.flush
+
+      Tempfile.create(['manifest-review-report', '.json']) do |report_file|
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'manifest-review',
+          '--provider=datadog',
+          "--manifest=#{manifest_file.path}",
+          "--output=#{report_file.path}"
+        )
+
+        assert status.success?, stderr
+        stdout_payload = JSON.parse(stdout)
+        file_payload = JSON.parse(File.read(report_file.path))
+        assert_equal true, file_payload.fetch('valid')
+        assert_equal stdout_payload, file_payload
+      end
     end
   end
 

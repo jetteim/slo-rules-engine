@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require 'tmpdir'
 require_relative '../lib/slo_rules_engine'
 
 class ManifestReviewQueueTest < Minitest::Test
@@ -48,5 +49,41 @@ class ManifestReviewQueueTest < Minitest::Test
     assert_equal %w[missing_accepted_candidate provenance_provider_mismatch], manifests.fetch(1).fetch(:findings).map { |finding| finding.fetch(:code) }
     assert_equal 'reviewed', manifests.fetch(2).fetch(:status)
     assert_empty manifests.fetch(2).fetch(:findings)
+  end
+
+  def test_report_links_findings_to_handoff_packet_paths
+    Dir.mktmpdir do |dir|
+      handoff_path = File.join(dir, 'payments-prod.handoff.json')
+      File.write(handoff_path, JSON.pretty_generate(label: 'payments-prod'))
+
+      report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+        [
+          {
+            service: 'payments-api',
+            provider: 'datadog',
+            review_provenance: {
+              label: 'payments-prod',
+              provider: 'datadog',
+              accepted_candidate_uids: []
+            }
+          }
+        ],
+        provider: 'datadog',
+        handoff_dir: dir
+      )
+
+      manifest = report.fetch(:manifests).fetch(0)
+      assert_equal(
+        {
+          label: 'payments-prod',
+          path: handoff_path,
+          exists: true
+        },
+        manifest.fetch(:handoff)
+      )
+      finding = manifest.fetch(:findings).fetch(0)
+      assert_equal 'payments-prod', finding.fetch(:handoff_label)
+      assert_equal handoff_path, finding.fetch(:handoff_file)
+    end
   end
 end
