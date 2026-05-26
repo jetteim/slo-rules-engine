@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'digest'
+
 module SloRulesEngine
   module ManifestReviewQueue
     class ReportBuilder
@@ -13,6 +15,7 @@ module SloRulesEngine
           provider: provider,
           total_manifests: entries.length,
           summary: summary(entries),
+          freshness: freshness(manifests, entries),
           manifests: entries
         }.compact
       end
@@ -107,6 +110,25 @@ module SloRulesEngine
           rejected_candidate_total: entries.sum { |entry| entry[:rejected_candidate_count] },
           note_total: entries.sum { |entry| entry[:note_count] }
         }
+      end
+
+      def freshness(manifests, entries)
+        {
+          manifest_fingerprint: fingerprint(Array(manifests)),
+          handoff_fingerprints: entries.filter_map { |entry| handoff_fingerprint(entry[:handoff]) }
+        }
+      end
+
+      def handoff_fingerprint(handoff)
+        return nil unless handoff
+
+        payload = {
+          label: handoff[:label],
+          path: handoff[:path],
+          exists: handoff[:exists]
+        }
+        payload[:fingerprint] = Digest::SHA256.hexdigest(File.binread(handoff[:path])) if handoff[:exists]
+        payload
       end
 
       def finding(code, path, message, handoff = nil)
@@ -227,6 +249,23 @@ module SloRulesEngine
 
       def normalize_notes(value)
         Array(value).map(&:to_s)
+      end
+
+      def fingerprint(value)
+        Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))
+      end
+
+      def canonicalize(value)
+        case value
+        when Hash
+          value.keys.sort_by(&:to_s).each_with_object({}) do |key, canonical|
+            canonical[key.to_s] = canonicalize(value[key])
+          end
+        when Array
+          value.map { |entry| canonicalize(entry) }
+        else
+          value
+        end
       end
 
       def fetch_value(container, key)

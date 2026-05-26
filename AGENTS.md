@@ -82,10 +82,13 @@ Implemented by the latest telemetry-first slice:
 - `manifest-review --output` now writes an explicit saved queue report
 - `manifest-review --handoff-dir` now detects stale manifest provenance against reviewed handoff packets
 - Saved manifest-review reports now include their own report path metadata
+- Manifest-review reports now include deterministic manifest and handoff fingerprints for freshness checks
+- Confirmed `apply --handoff-dir` and `prune --handoff-dir` now block stale handoff evidence before mutation
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: stale provenance detection in manifest review reports
+- latest checkpoint: handoff-aware live mutation gates and report freshness metadata
+- previous checkpoint: stale provenance detection in manifest review reports
 - previous checkpoint: saved manifest-review reports and handoff navigation
 - previous checkpoint: provenance-aware manifest review queue checks
 - previous checkpoint: reviewed provenance visibility in onboarding and model reports
@@ -115,8 +118,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Gating live apply on stale manifest-review evidence when handoff packets are supplied
-2. Adding manifest-review report freshness metadata for generated artifact bundles
+1. Validating saved manifest-review report freshness against current manifests and handoff packets
+2. Surfacing manifest-review freshness findings in artifact handoff summaries
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -129,7 +132,7 @@ Secondary gaps:
 
 Next recommended slice:
 
-- gate live apply on stale manifest-review evidence when handoff packets are supplied
+- validate saved manifest-review report freshness against current manifests and handoff packets
 
 Rationale:
 
@@ -146,7 +149,9 @@ Rationale:
 - handoff packet labels and files are now included in manifest-review findings when available
 - manifest-review now detects when a manifest's embedded provenance no longer matches the latest reviewed handoff packet
 - saved report path metadata now gives handoff tooling a stable pointer to the review artifact
-- the next value is preventing confirmed live apply from bypassing stale-provenance evidence when handoff packets are available
+- confirmed apply and prune now block stale-provenance evidence when handoff packets are available
+- deterministic manifest and handoff fingerprints now provide the basis for saved report freshness checks
+- the next value is validating saved manifest-review reports against current artifacts before reviewers rely on them
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

@@ -327,6 +327,103 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_apply_confirm_with_handoff_dir_blocks_stale_review_evidence
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+
+    Tempfile.create(['datadog-stale-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |handoff_dir|
+        File.write(
+          File.join(handoff_dir, 'checkout-prod.handoff.json'),
+          JSON.pretty_generate(
+            label: 'checkout-prod',
+            provider: 'datadog',
+            review: {
+              status: 'reviewed',
+              accepted_candidate_uids: ['request-errors'],
+              rejected_candidate_uids: ['request-latency'],
+              notes: ['Errors accepted after review.']
+            }
+          )
+        )
+
+        stdout, stderr, status = Open3.capture3(
+          { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'apply',
+          '--provider=datadog',
+          '--confirm',
+          "--manifest=#{file.path}",
+          "--handoff-dir=#{handoff_dir}"
+        )
+
+        refute status.success?, stderr
+        payload = JSON.parse(stdout)
+        assert_equal 'invalid_manifest_review', payload.fetch('error').fetch('code')
+        assert_equal 1, payload.fetch('manifest_review').fetch('summary').fetch('stale_provenance_manifests')
+        assert_equal 'stale_provenance', payload.fetch('manifest_review').fetch('manifests').fetch(0).fetch('status')
+      end
+    end
+  end
+
+  def test_apply_confirm_with_current_handoff_reaches_provider_path
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=datadog',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+
+    Tempfile.create(['datadog-current-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |handoff_dir|
+        File.write(
+          File.join(handoff_dir, 'checkout-prod.handoff.json'),
+          JSON.pretty_generate(
+            label: 'checkout-prod',
+            provider: 'datadog',
+            review: {
+              status: 'reviewed',
+              accepted_candidate_uids: ['request-latency'],
+              rejected_candidate_uids: [],
+              notes: ['Latency accepted.']
+            }
+          )
+        )
+
+        stdout, stderr, status = Open3.capture3(
+          { 'DD_API_KEY' => nil, 'DD_APP_KEY' => nil },
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'apply',
+          '--provider=datadog',
+          '--confirm',
+          "--manifest=#{file.path}",
+          "--handoff-dir=#{handoff_dir}"
+        )
+
+        refute status.success?, stderr
+        assert_equal 'missing_credentials', JSON.parse(stdout).fetch('error').fetch('code')
+      end
+    end
+  end
+
   def test_apply_confirm_requires_manifest_review_evidence
     generate_stdout, generate_stderr, generate_status = Open3.capture3(
       'ruby',
@@ -716,6 +813,62 @@ class CLITest < Minitest::Test
         assert_equal 'live', payload.fetch('mode')
         assert_equal ['delete'], payload.fetch('operations').map { |operation| operation.fetch('action') }
         refute File.exist?(managed_path), "expected #{managed_path} to be deleted"
+      end
+    end
+  end
+
+  def test_prune_confirm_with_handoff_dir_blocks_stale_review_evidence
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=sloth',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+
+    Tempfile.create(['sloth-stale-prune-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        managed_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+        FileUtils.mkdir_p(File.dirname(managed_path))
+        File.write(managed_path, JSON.pretty_generate(manifest))
+
+        handoff_dir = File.join(dir, 'handoff')
+        FileUtils.mkdir_p(handoff_dir)
+        File.write(
+          File.join(handoff_dir, 'checkout-prod.handoff.json'),
+          JSON.pretty_generate(
+            label: 'checkout-prod',
+            provider: 'datadog',
+            review: {
+              status: 'reviewed',
+              accepted_candidate_uids: ['request-errors'],
+              rejected_candidate_uids: ['request-latency'],
+              notes: ['Errors accepted after review.']
+            }
+          )
+        )
+
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'prune',
+          '--provider=sloth',
+          '--confirm',
+          "--output-dir=#{dir}",
+          "--manifest=#{file.path}",
+          "--handoff-dir=#{handoff_dir}"
+        )
+
+        refute status.success?, stderr
+        payload = JSON.parse(stdout)
+        assert_equal 'invalid_manifest_review', payload.fetch('error').fetch('code')
+        assert_equal 'stale_provenance', payload.fetch('manifest_review').fetch('manifests').fetch(0).fetch('status')
+        assert File.exist?(managed_path), "expected stale review evidence not to delete #{managed_path}"
       end
     end
   end

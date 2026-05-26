@@ -162,4 +162,44 @@ class ManifestReviewQueueTest < Minitest::Test
       assert_equal ['missing_handoff_packet'], manifest.fetch(:findings).map { |finding| finding.fetch(:code) }
     end
   end
+
+  def test_report_includes_deterministic_freshness_fingerprints
+    Dir.mktmpdir do |dir|
+      handoff_path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(
+        handoff_path,
+        JSON.pretty_generate(
+          label: 'checkout-prod',
+          provider: 'datadog',
+          review: {
+            status: 'reviewed',
+            accepted_candidate_uids: ['request-latency'],
+            rejected_candidate_uids: [],
+            notes: []
+          }
+        )
+      )
+
+      manifest = {
+        service: 'checkout-api',
+        provider: 'datadog',
+        review_provenance: {
+          label: 'checkout-prod',
+          provider: 'datadog',
+          accepted_candidate_uids: ['request-latency']
+        }
+      }
+      report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build([manifest], provider: 'datadog', handoff_dir: dir)
+      repeated = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build([manifest], provider: 'datadog', handoff_dir: dir)
+
+      assert_equal report.fetch(:freshness), repeated.fetch(:freshness)
+      assert_match(/\A[0-9a-f]{64}\z/, report.fetch(:freshness).fetch(:manifest_fingerprint))
+      assert_equal 1, report.fetch(:freshness).fetch(:handoff_fingerprints).length
+      handoff_fingerprint = report.fetch(:freshness).fetch(:handoff_fingerprints).fetch(0)
+      assert_equal 'checkout-prod', handoff_fingerprint.fetch(:label)
+      assert_equal handoff_path, handoff_fingerprint.fetch(:path)
+      assert_equal true, handoff_fingerprint.fetch(:exists)
+      assert_match(/\A[0-9a-f]{64}\z/, handoff_fingerprint.fetch(:fingerprint))
+    end
+  end
 end

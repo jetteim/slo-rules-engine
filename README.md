@@ -88,10 +88,10 @@ bin/rules-ctl diff --provider datadog --manifest ./generated/checkout-api/datado
 bin/rules-ctl import --provider datadog --manifest ./generated/checkout-api/datadog/manifest.json
 bin/rules-ctl prune --provider datadog --dry-run --manifest ./generated/checkout-api/datadog/manifest.json
 bin/rules-ctl apply --provider prometheus_stack --dry-run --output-dir ./generated examples/services/checkout.rb
-bin/rules-ctl apply --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
+bin/rules-ctl apply --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json --handoff-dir ./handoff
 bin/rules-ctl diff --provider prometheus_stack --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
 bin/rules-ctl import --provider prometheus_stack --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
-bin/rules-ctl prune --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json
+bin/rules-ctl prune --provider prometheus_stack --confirm --output-dir ./managed --manifest ./generated/checkout-api/prometheus_stack/manifest.json --handoff-dir ./handoff
 bin/rules-ctl apply --provider sloth --dry-run --output-dir ./generated examples/services/checkout.rb
 bin/rules-ctl apply --provider sloth --confirm --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl diff --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
@@ -108,8 +108,9 @@ The `onboarding-summary --handoff-dir` command writes per-scope handoff packets,
 Rerunning `onboarding-summary --handoff-dir` preserves reviewed handoff decisions and exposes review summaries plus reviewed provenance in the summary output.
 The `validate-handoff` command checks reviewed packets before handoff, and `draft-from-handoff` emits a Ruby DSL draft from accepted handoff candidates without rerunning backend discovery.
 The `model-report` command includes reviewed handoff provenance from DSL definitions so reviewers can see accepted onboarding context before provider generation.
-The `manifest-review` command reports provider manifest review readiness, including missing, incomplete, or stale reviewed provenance, handoff packet navigation, explicit saved report output, and queue-level review status rollups.
+The `manifest-review` command reports provider manifest review readiness, including missing, incomplete, or stale reviewed provenance, handoff packet navigation, deterministic freshness fingerprints, explicit saved report output, and queue-level review status rollups.
 When `generate --output-dir` is used, the engine also writes `manifest-review/<provider>.json` next to generated provider manifests.
+Confirmed `apply` and `prune` with `--handoff-dir` require current reviewed handoff evidence before mutation.
 Live `apply --confirm --manifest` requires reviewed handoff provenance in every manifest before provider mutation or file-backed apply.
 
 Confirmed `apply` now requires `--manifest` so live state changes always use reviewed provider artifacts instead of regenerating definitions inline.
