@@ -47,6 +47,8 @@ module RulesCtl
       draft_from_handoff(argv)
     when 'onboarding-summary'
       onboarding_summary(argv)
+    when 'onboarding-artifact-index'
+      onboarding_artifact_index(argv)
     when 'review-handoff'
       review_handoff(argv)
     when 'recommend-calculation-basis'
@@ -605,6 +607,35 @@ module RulesCtl
     puts JSON.pretty_generate(summary)
   end
 
+  def onboarding_artifact_index(argv)
+    handoff_dir = nil
+    draft_dir = nil
+    manifest_dir = nil
+    output_path = nil
+    providers = []
+    parser = OptionParser.new do |opts|
+      opts.on('--handoff-dir=DIR', 'Directory containing per-scope onboarding handoff packets') { |value| handoff_dir = value }
+      opts.on('--draft-dir=DIR', 'Directory containing reviewed draft definition files named by scope label') { |value| draft_dir = value }
+      opts.on('--manifest-dir=DIR', 'Directory containing generated provider manifests and manifest-review reports') { |value| manifest_dir = value }
+      opts.on('--provider=PROVIDER', 'Provider manifest/report key to include; may be supplied more than once') { |value| providers << value }
+      opts.on('--output=FILE', 'Write the onboarding artifact index to FILE') { |value| output_path = value }
+    end
+    parser.parse!(argv)
+    index_path = argv.shift
+    abort_usage('missing discovery index path') if index_path.to_s.empty?
+    abort_usage('unexpected arguments') unless argv.empty?
+
+    artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
+      index_path,
+      handoff_dir: handoff_dir,
+      draft_dir: draft_dir,
+      manifest_dir: manifest_dir,
+      providers: providers
+    )
+    write_json_file(output_path, artifact_index) if output_path
+    puts JSON.pretty_generate(artifact_index)
+  end
+
   def review_handoff(argv)
     accepted_candidate_uids = []
     rejected_candidate_uids = []
@@ -1046,6 +1077,7 @@ module RulesCtl
         bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
         bin/rules-ctl draft-from-handoff --service=<name> --owner=<owner> [--environment=<env>] <handoff.json>
         bin/rules-ctl onboarding-summary [--handoff-dir=<dir>] <discovery-index.json>
+        bin/rules-ctl onboarding-artifact-index [--handoff-dir=<dir>] [--draft-dir=<dir>] [--manifest-dir=<dir>] [--provider=<provider>] [--output=<file>] <discovery-index.json>
         bin/rules-ctl review-handoff [--accept=<uid>] [--reject=<uid>] [--note=<text>] <handoff.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>

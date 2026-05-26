@@ -89,6 +89,7 @@ This is the running plan for the long refactor.
 - [x] Gate live prune on stale manifest-review evidence when handoff packets are supplied.
 - [x] Validate saved manifest-review report freshness against current manifests and handoff packets.
 - [x] Surface manifest-review freshness validation commands and stale-finding codes in external-generator handoff plans.
+- [x] Add compact onboarding artifact index tying discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports together.
 
 ## Phase 6: Contract Hardening
 

@@ -1322,6 +1322,83 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_onboarding_artifact_index_writes_saved_handoff_bundle_index
+    Dir.mktmpdir do |dir|
+      discovery_dir = File.join(dir, 'discovery')
+      handoff_dir = File.join(dir, 'handoff')
+      draft_dir = File.join(dir, 'drafts')
+      manifest_dir = File.join(dir, 'generated')
+      [discovery_dir, handoff_dir, draft_dir, manifest_dir].each { |path| FileUtils.mkdir_p(path) }
+
+      File.write(
+        File.join(discovery_dir, 'checkout-prod.json'),
+        JSON.pretty_generate(
+          provider: 'datadog',
+          scope: { label: 'checkout-prod', service: 'checkout-api' },
+          signals: [
+            { kind: 'latency', metric: 'http.server.request.duration', user_visible: true, source: 'datadog' }
+          ],
+          findings: []
+        )
+      )
+      index_path = File.join(discovery_dir, 'index.json')
+      File.write(
+        index_path,
+        JSON.pretty_generate(
+          provider: 'datadog',
+          generated_at: '2026-05-13T09:00:00Z',
+          total_scopes: 1,
+          scopes: [
+            { label: 'checkout-prod', scope: { label: 'checkout-prod', service: 'checkout-api' }, status: 'ok', result_file: 'checkout-prod.json', signal_count: 1, finding_count: 0 }
+          ]
+        )
+      )
+      File.write(
+        File.join(handoff_dir, 'checkout-prod.handoff.json'),
+        JSON.pretty_generate(
+          label: 'checkout-prod',
+          provider: 'datadog',
+          review: {
+            status: 'reviewed',
+            accepted_candidate_uids: ['request-latency'],
+            rejected_candidate_uids: [],
+            notes: []
+          }
+        )
+      )
+      File.write(File.join(draft_dir, 'checkout-prod.rb'), "# reviewed draft\n")
+      manifest_path = File.join(manifest_dir, 'checkout-api', 'datadog', 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(manifest_path))
+      File.write(manifest_path, JSON.pretty_generate(service: 'checkout-api', provider: 'datadog', artifacts: {}))
+      report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
+      FileUtils.mkdir_p(File.dirname(report_path))
+      File.write(report_path, JSON.pretty_generate(valid: true))
+      output_path = File.join(dir, 'handoff-index.json')
+
+      stdout, stderr, status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'onboarding-artifact-index',
+        "--handoff-dir=#{handoff_dir}",
+        "--draft-dir=#{draft_dir}",
+        "--manifest-dir=#{manifest_dir}",
+        '--provider=datadog',
+        "--output=#{output_path}",
+        index_path
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout)
+      assert_equal payload, JSON.parse(File.read(output_path))
+      assert_equal 1, payload.fetch('summary').fetch('complete_scopes')
+      assert_equal 0, payload.fetch('summary').fetch('missing_artifact_count')
+      provider = payload.fetch('scopes').fetch(0).fetch('providers').fetch(0)
+      assert_equal manifest_path, provider.fetch('manifest').fetch('path')
+      assert_equal report_path, provider.fetch('manifest_review_report').fetch('path')
+      assert_includes provider.fetch('manifest_review_command'), '--report='
+    end
+  end
+
   def test_candidates_accept_lookup_result_envelope
     Tempfile.create(['lookup-signals', '.json']) do |file|
       file.write(JSON.generate(

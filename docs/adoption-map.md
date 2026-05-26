@@ -56,6 +56,11 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. add a compact onboarding artifact index that ties discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports into one handoff bundle
-2. document and smoke-test the complete telemetry-first walkthrough against representative saved artifacts
+1. document and smoke-test the complete telemetry-first walkthrough against representative saved artifacts
+2. add a small checked-in representative saved-artifact fixture if the walkthrough needs stable evidence without live backend access
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
+
+## Housekeeping Backlog
+
+1. Review the test suite dependency shape and identify opportunities to compact overlapping coverage without reducing behavioral confidence. This should map unit, CLI, integration-style, and aggregate test dependencies, then recommend consolidation candidates rather than changing tests in the review task.
+2. Review abstraction layering across core model, onboarding, provider generation, provider state, CLI, and documentation handoff code. This should identify abstractions that may belong in a different layer or could be compacted without losing capability, extensibility, or readability, then return recommendations only.

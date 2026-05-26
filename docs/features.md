@@ -46,6 +46,10 @@ Explicit features:
 `rules-ctl generate --output-dir` also writes `manifest-review/<provider>.json` beside generated provider manifests so artifact reviewers have a durable queue report without rerunning review checks. Saved reports include their own report path for handoff tooling.
 Confirmed `apply` and `prune` can use `--handoff-dir` to block mutation when manifest provenance is stale relative to the latest reviewed handoff packet, and `--review-report` to block live mutation when the saved manifest-review report no longer matches the current manifest or handoff fingerprints.
 
+## Onboarding Artifact Index
+
+`rules-ctl onboarding-artifact-index` builds a compact handoff index from a saved discovery `index.json` plus optional handoff, draft, and generated manifest directories. It records per-scope completeness, missing artifact paths, reviewed handoff status, provider manifest links, manifest-review report links, and the freshness validation command reviewers should run before trusting saved provider artifacts.
+
 ## Backend Telemetry Lookup And Sanity Checks
 
 Telemetry-derived SLO generation should work from either a checked-in telemetry inventory fixture or backend lookup output. Lookup adapters normalize provider evidence before it reaches candidate generation, so SLI/SLO review does not depend on backend-specific query syntax.

@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, and live mutation gates. The next telemetry-first slices should build on saved evidence files, handoff packets, generated manifests, and manifest-review reports as one handoff bundle, not reopen the batch orchestration layer.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, and a compact artifact index. The next telemetry-first slices should use the saved artifact index to document and smoke-test the complete walkthrough, not reopen the batch orchestration layer.
 
 ## Non-Negotiable Working Rules
 
@@ -87,10 +87,12 @@ Implemented by the latest telemetry-first slice:
 - `manifest-review --report` now validates a saved manifest-review report against current manifest and handoff fingerprints
 - Confirmed `apply --review-report` and `prune --review-report` now block live mutation when the saved manifest-review report is stale
 - Sloth external-generator handoff plans now include the manifest-review report path, freshness validation command, and stale freshness finding codes
+- `onboarding-artifact-index` now ties saved discovery results, handoff packets, reviewed draft files, provider manifests, and manifest-review reports into one per-scope handoff index
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: saved manifest-review freshness validation and artifact handoff freshness pointers
+- latest checkpoint: compact onboarding artifact index
+- previous checkpoint: saved manifest-review freshness validation and artifact handoff freshness pointers
 - previous checkpoint: handoff-aware live mutation gates and report freshness metadata
 - previous checkpoint: stale provenance detection in manifest review reports
 - previous checkpoint: saved manifest-review reports and handoff navigation
@@ -122,8 +124,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Bundle-level onboarding artifact index tying discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports together
-2. End-to-end telemetry-first walkthrough smoke test and docs for the complete saved-artifact flow
+1. End-to-end telemetry-first walkthrough smoke test and docs for the complete saved-artifact flow
+2. Small representative saved-artifact fixture if the walkthrough needs stable evidence without live backend access
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -131,12 +133,14 @@ Secondary gaps:
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
 2. Optional live Datadog contract verification when credentials and safe backend access are available
 3. Provider breadth after the telemetry-first saved-artifact baseline has a stable handoff bundle
+4. Housekeeping review: map test suite dependencies and recommend compaction opportunities without reducing behavioral confidence
+5. Housekeeping review: assess abstraction layer placement and recommend compaction or relocation opportunities without implementing those changes
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- add a compact onboarding artifact index that ties discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports into one saved handoff bundle
+- document and smoke-test the complete telemetry-first walkthrough using the saved artifact index
 
 Rationale:
 
@@ -157,7 +161,8 @@ Rationale:
 - deterministic manifest and handoff fingerprints now provide the basis for saved report freshness checks
 - saved manifest-review reports can now be validated against current artifacts before reviewers rely on them
 - external-generator handoffs now tell reviewers how to validate manifest-review freshness before downstream generation
-- the next value is reducing operator glue by publishing a single artifact index for the complete onboarding handoff
+- the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
+- the next value is proving the full flow with a stable walkthrough that starts from saved discovery evidence and ends at reviewed provider artifact gates
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
@@ -167,6 +172,7 @@ Use these before claiming a checkpoint:
 ```bash
 ruby -Ilib test/onboarding_summary_test.rb
 ruby -Ilib test/onboarding_handoff_test.rb
+ruby -Ilib test/onboarding_artifact_index_test.rb
 ruby -Ilib test/manifest_review_queue_test.rb
 ruby -Ilib test/apply_test.rb
 ruby -Ilib test/rules_ctl_test.rb

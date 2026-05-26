@@ -72,6 +72,7 @@ bin/rules-ctl discover-telemetry --provider datadog --host checkout-host
 bin/rules-ctl discover-telemetry --provider prometheus_stack --service checkout-api --base-url http://localhost:9090
 bin/rules-ctl discover-telemetry --provider datadog --scope-file ./examples/telemetry/scopes.json --output-dir ./discovery
 bin/rules-ctl onboarding-summary --handoff-dir ./handoff ./discovery/index.json
+bin/rules-ctl onboarding-artifact-index --handoff-dir ./handoff --draft-dir ./drafts --manifest-dir ./generated --provider datadog --output ./handoff/artifact-index.json ./discovery/index.json
 bin/rules-ctl review-handoff --accept=request-latency --reject=request-traffic --note='Latency accepted for draft generation.' ./handoff/checkout-prod.handoff.json
 bin/rules-ctl validate-handoff ./handoff/checkout-prod.handoff.json
 bin/rules-ctl draft-from-handoff --service checkout-api --owner payments-platform ./handoff/checkout-prod.handoff.json
@@ -107,6 +108,7 @@ The `candidates` and `draft-definition` commands accept either a raw telemetry s
 Batch `discover-telemetry --scope-file` writes one normalized evidence file per scope plus an aggregate `index.json` for later review-readiness ranking and draft generation.
 The `onboarding-summary --handoff-dir` command writes per-scope handoff packets, and `review-handoff` records accepted or rejected candidate decisions without changing saved discovery or candidate evidence.
 Rerunning `onboarding-summary --handoff-dir` preserves reviewed handoff decisions and exposes review summaries plus reviewed provenance in the summary output.
+The `onboarding-artifact-index` command ties saved discovery results, handoff packets, reviewed draft files, provider manifests, and manifest-review reports into one compact handoff index with per-scope missing-artifact findings.
 The `validate-handoff` command checks reviewed packets before handoff, and `draft-from-handoff` emits a Ruby DSL draft from accepted handoff candidates without rerunning backend discovery.
 The `model-report` command includes reviewed handoff provenance from DSL definitions so reviewers can see accepted onboarding context before provider generation.
 The `manifest-review` command reports provider manifest review readiness, including missing, incomplete, or stale reviewed provenance, handoff packet navigation, deterministic freshness fingerprints, saved report freshness validation with `--report`, explicit saved report output, and queue-level review status rollups.
