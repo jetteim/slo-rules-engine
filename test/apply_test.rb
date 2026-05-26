@@ -145,6 +145,17 @@ class ApplyTest < Minitest::Test
     assert_equal 'external_generator', plan.operations.fetch(1).target
     assert_includes plan.operations.fetch(1).payload.fetch(:command), 'sloth generate'
     assert_equal '/tmp/generated/checkout-api/sloth/manifest.json', plan.operations.fetch(1).payload.fetch(:input_manifest)
+    assert_equal '/tmp/generated/manifest-review/sloth.json', plan.operations.fetch(1).payload.fetch(:manifest_review_report)
+    assert_equal 'rules-ctl manifest-review --provider=sloth --manifest=/tmp/generated/checkout-api/sloth/manifest.json --report=/tmp/generated/manifest-review/sloth.json',
+                 plan.operations.fetch(1).payload.fetch(:manifest_review_command)
+    assert_equal(
+      {
+        required: true,
+        report: '/tmp/generated/manifest-review/sloth.json',
+        finding_codes: %w[stale_manifest_review_report stale_handoff_review_report]
+      },
+      plan.operations.fetch(1).payload.fetch(:manifest_review_freshness)
+    )
   end
 
   def test_external_generator_plan_keeps_handoff_when_manifest_file_is_noop

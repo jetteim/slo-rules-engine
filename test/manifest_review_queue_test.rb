@@ -202,4 +202,43 @@ class ManifestReviewQueueTest < Minitest::Test
       assert_match(/\A[0-9a-f]{64}\z/, handoff_fingerprint.fetch(:fingerprint))
     end
   end
+
+  def test_freshness_validator_flags_stale_saved_report
+    Dir.mktmpdir do |dir|
+      handoff_path = File.join(dir, 'checkout-prod.handoff.json')
+      File.write(
+        handoff_path,
+        JSON.pretty_generate(
+          label: 'checkout-prod',
+          provider: 'datadog',
+          review: {
+            status: 'reviewed',
+            accepted_candidate_uids: ['request-latency'],
+            rejected_candidate_uids: [],
+            notes: []
+          }
+        )
+      )
+      manifest = {
+        service: 'checkout-api',
+        provider: 'datadog',
+        review_provenance: {
+          label: 'checkout-prod',
+          provider: 'datadog',
+          accepted_candidate_uids: ['request-latency']
+        }
+      }
+      current = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build([manifest], provider: 'datadog', handoff_dir: dir)
+      saved = Marshal.load(Marshal.dump(current))
+      saved.fetch(:freshness)[:manifest_fingerprint] = 'outdated'
+
+      result = SloRulesEngine::ManifestReviewQueue::FreshnessValidator.new.validate(saved, current, path: '/tmp/manifest-review.json')
+
+      refute result.fetch(:fresh)
+      assert_equal '/tmp/manifest-review.json', result.fetch(:path)
+      assert_equal ['stale_manifest_review_report'], result.fetch(:findings).map { |finding| finding.fetch(:code) }
+      assert_equal current.fetch(:freshness).fetch(:manifest_fingerprint), result.fetch(:findings).fetch(0).fetch(:expected)
+      assert_equal 'outdated', result.fetch(:findings).fetch(0).fetch(:actual)
+    end
+  end
 end

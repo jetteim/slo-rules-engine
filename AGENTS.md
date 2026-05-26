@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: batch discovery through `discover-telemetry --scope-file` and service onboarding summary ranking are implemented and pushed. Candidate review now includes confidence and explanations locally, and `onboarding-summary --handoff-dir` writes saved evidence packets with discovery findings, candidate reasoning, and unreviewed review state. The next telemetry-first slices should build on saved evidence files, handoff packets, and the aggregate `index.json`, not reopen the batch orchestration layer.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, and live mutation gates. The next telemetry-first slices should build on saved evidence files, handoff packets, generated manifests, and manifest-review reports as one handoff bundle, not reopen the batch orchestration layer.
 
 ## Non-Negotiable Working Rules
 
@@ -84,10 +84,14 @@ Implemented by the latest telemetry-first slice:
 - Saved manifest-review reports now include their own report path metadata
 - Manifest-review reports now include deterministic manifest and handoff fingerprints for freshness checks
 - Confirmed `apply --handoff-dir` and `prune --handoff-dir` now block stale handoff evidence before mutation
+- `manifest-review --report` now validates a saved manifest-review report against current manifest and handoff fingerprints
+- Confirmed `apply --review-report` and `prune --review-report` now block live mutation when the saved manifest-review report is stale
+- Sloth external-generator handoff plans now include the manifest-review report path, freshness validation command, and stale freshness finding codes
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: handoff-aware live mutation gates and report freshness metadata
+- latest checkpoint: saved manifest-review freshness validation and artifact handoff freshness pointers
+- previous checkpoint: handoff-aware live mutation gates and report freshness metadata
 - previous checkpoint: stale provenance detection in manifest review reports
 - previous checkpoint: saved manifest-review reports and handoff navigation
 - previous checkpoint: provenance-aware manifest review queue checks
@@ -118,21 +122,21 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Validating saved manifest-review report freshness against current manifests and handoff packets
-2. Surfacing manifest-review freshness findings in artifact handoff summaries
+1. Bundle-level onboarding artifact index tying discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports together
+2. End-to-end telemetry-first walkthrough smoke test and docs for the complete saved-artifact flow
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
 
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
-2. Docs/update checkpoint for the new handoff packet command if it is committed
-3. Optional live Datadog contract verification when credentials and safe backend access are available
+2. Optional live Datadog contract verification when credentials and safe backend access are available
+3. Provider breadth after the telemetry-first saved-artifact baseline has a stable handoff bundle
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- validate saved manifest-review report freshness against current manifests and handoff packets
+- add a compact onboarding artifact index that ties discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports into one saved handoff bundle
 
 Rationale:
 
@@ -151,7 +155,9 @@ Rationale:
 - saved report path metadata now gives handoff tooling a stable pointer to the review artifact
 - confirmed apply and prune now block stale-provenance evidence when handoff packets are available
 - deterministic manifest and handoff fingerprints now provide the basis for saved report freshness checks
-- the next value is validating saved manifest-review reports against current artifacts before reviewers rely on them
+- saved manifest-review reports can now be validated against current artifacts before reviewers rely on them
+- external-generator handoffs now tell reviewers how to validate manifest-review freshness before downstream generation
+- the next value is reducing operator glue by publishing a single artifact index for the complete onboarding handoff
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
@@ -161,6 +167,8 @@ Use these before claiming a checkpoint:
 ```bash
 ruby -Ilib test/onboarding_summary_test.rb
 ruby -Ilib test/onboarding_handoff_test.rb
+ruby -Ilib test/manifest_review_queue_test.rb
+ruby -Ilib test/apply_test.rb
 ruby -Ilib test/rules_ctl_test.rb
 ruby -Ilib test/datadog_apply_test.rb
 ruby -Ilib test/cli_test.rb

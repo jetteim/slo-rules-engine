@@ -133,10 +133,25 @@ module SloRulesEngine
           payload: {
             command: "sloth generate -i #{manifest_path(manifest)} -o #{output_dir}",
             input_manifest: manifest_path(manifest),
+            manifest_review_report: manifest_review_report_path(manifest),
+            manifest_review_command: manifest_review_command(manifest),
+            manifest_review_freshness: {
+              required: true,
+              report: manifest_review_report_path(manifest),
+              finding_codes: %w[stale_manifest_review_report stale_handoff_review_report]
+            },
             output_dir: output_dir,
             review_required: true
           }
         )
+      end
+
+      def manifest_review_command(manifest)
+        "rules-ctl manifest-review --provider=#{manifest.fetch(:provider)} --manifest=#{manifest_path(manifest)} --report=#{manifest_review_report_path(manifest)}"
+      end
+
+      def manifest_review_report_path(manifest)
+        File.join(@output_dir, 'manifest-review', "#{manifest.fetch(:provider)}.json")
       end
 
       def missing_manifest_finding(path)

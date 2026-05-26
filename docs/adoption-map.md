@@ -56,6 +56,6 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. validate saved manifest-review report freshness against current manifests and handoff packets
-2. surface manifest-review freshness findings in artifact handoff summaries
+1. add a compact onboarding artifact index that ties discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports into one handoff bundle
+2. document and smoke-test the complete telemetry-first walkthrough against representative saved artifacts
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline

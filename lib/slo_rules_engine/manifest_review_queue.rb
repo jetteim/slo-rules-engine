@@ -4,6 +4,85 @@ require 'digest'
 
 module SloRulesEngine
   module ManifestReviewQueue
+    class FreshnessValidator
+      def validate(saved_report, current_report, path: nil)
+        saved_freshness = fetch_value(saved_report, :freshness) || {}
+        current_freshness = fetch_value(current_report, :freshness) || {}
+        findings = []
+
+        saved_manifest = fetch_value(saved_freshness, :manifest_fingerprint)
+        current_manifest = fetch_value(current_freshness, :manifest_fingerprint)
+        if saved_manifest != current_manifest
+          findings << finding(
+            'stale_manifest_review_report',
+            'freshness.manifest_fingerprint',
+            'saved manifest-review report does not match current manifest input',
+            expected: current_manifest,
+            actual: saved_manifest
+          )
+        end
+
+        findings.concat(handoff_findings(saved_freshness, current_freshness))
+
+        {
+          fresh: findings.empty?,
+          path: path,
+          findings: findings
+        }.compact
+      end
+
+      private
+
+      def handoff_findings(saved_freshness, current_freshness)
+        saved = handoff_fingerprints(fetch_value(saved_freshness, :handoff_fingerprints))
+        current = handoff_fingerprints(fetch_value(current_freshness, :handoff_fingerprints))
+        labels = (saved.keys + current.keys).uniq.sort
+        labels.each_with_object([]) do |label, findings|
+          saved_entry = saved[label]
+          current_entry = current[label]
+          next if saved_entry == current_entry
+
+          findings << finding(
+            'stale_handoff_review_report',
+            "freshness.handoff_fingerprints[#{label}]",
+            'saved manifest-review report does not match current handoff packet',
+            expected: current_entry,
+            actual: saved_entry
+          )
+        end
+      end
+
+      def handoff_fingerprints(values)
+        Array(values).each_with_object({}) do |entry, indexed|
+          label = fetch_value(entry, :label).to_s
+          next if label.empty?
+
+          indexed[label] = {
+            path: fetch_value(entry, :path),
+            exists: fetch_value(entry, :exists),
+            fingerprint: fetch_value(entry, :fingerprint)
+          }.compact
+        end
+      end
+
+      def finding(code, path, message, expected:, actual:)
+        {
+          code: code,
+          path: path,
+          message: message,
+          expected: expected,
+          actual: actual
+        }
+      end
+
+      def fetch_value(container, key)
+        return container[key] if container.is_a?(Hash) && container.key?(key)
+        return container[key.to_s] if container.is_a?(Hash) && container.key?(key.to_s)
+
+        nil
+      end
+    end
+
     class ReportBuilder
       def build(manifests, provider: nil, handoff_dir: nil)
         entries = Array(manifests).each_with_index.map do |manifest, index|
