@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. The next slices should focus on review-only housekeeping recommendations unless new backend evidence exposes a provider-state gap.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. The review-only housekeeping checkpoint is complete; the next slices should start with low-risk test support extraction before CLI or Datadog abstraction refactors unless new backend evidence exposes a provider-state gap.
 
 ## Non-Negotiable Working Rules
 
@@ -89,10 +89,13 @@ Implemented by the latest telemetry-first slice:
 - Sloth external-generator handoff plans now include the manifest-review report path, freshness validation command, and stale freshness finding codes
 - `onboarding-artifact-index` now ties saved discovery results, handoff packets, reviewed draft files, provider manifests, and manifest-review reports into one per-scope handoff index
 - `docs/telemetry-first-walkthrough.md` and `test/telemetry_first_walkthrough_test.rb` now cover the saved-artifact flow through reviewed provider gates without live backend credentials
+- `docs/housekeeping/test-suite-compaction-review.md` maps test-suite dependency shape and recommends compaction steps without changing test behavior
+- `docs/housekeeping/abstraction-layer-review.md` maps abstraction layer pressure points and recommends extraction order without changing production code
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: telemetry-first saved-artifact walkthrough smoke test
+- latest checkpoint: housekeeping review recommendations for test compaction and abstraction layering
+- previous checkpoint: telemetry-first saved-artifact walkthrough smoke test
 - previous checkpoint: compact onboarding artifact index
 - previous checkpoint: saved manifest-review freshness validation and artifact handoff freshness pointers
 - previous checkpoint: handoff-aware live mutation gates and report freshness metadata
@@ -126,8 +129,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Review-only test suite dependency map and compaction recommendations
-2. Review-only abstraction layer placement and compaction recommendations
+1. Pilot low-risk test support extraction for CLI and onboarding fixtures
+2. Use extracted test support before CLI command extraction or Datadog applier/client abstraction splits
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -135,14 +138,12 @@ Secondary gaps:
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
 2. Optional live Datadog contract verification when credentials and safe backend access are available
 3. Provider breadth after the telemetry-first saved-artifact baseline has a stable handoff bundle
-4. Housekeeping review: map test suite dependencies and recommend compaction opportunities without reducing behavioral confidence
-5. Housekeeping review: assess abstraction layer placement and recommend compaction or relocation opportunities without implementing those changes
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- run the test-suite dependency review and recommend compaction opportunities without changing behavior
+- pilot low-risk test support extraction for CLI and onboarding fixtures without changing behavior
 
 Rationale:
 
@@ -165,7 +166,8 @@ Rationale:
 - external-generator handoffs now tell reviewers how to validate manifest-review freshness before downstream generation
 - the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
 - the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
-- the next value is housekeeping: reduce future maintenance cost by identifying test overlap and compaction opportunities before adding more behavior
+- housekeeping reviews now identify concrete compaction and layering follow-ups
+- the next value is reducing future maintenance cost with support helpers before heavier CLI or Datadog abstraction refactors
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

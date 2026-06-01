@@ -56,11 +56,20 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. run the test-suite dependency review and recommend compaction opportunities without changing behavior
-2. run the abstraction-layer review and recommend relocation or compaction opportunities without changing behavior
+1. pilot low-risk test support extraction for CLI and onboarding fixtures, preserving existing behavior and subprocess coverage
+2. use the extracted test support as a guardrail before CLI command extraction or Datadog applier/client abstraction work
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
 
 ## Housekeeping Backlog
 
-1. Review the test suite dependency shape and identify opportunities to compact overlapping coverage without reducing behavioral confidence. This should map unit, CLI, integration-style, and aggregate test dependencies, then recommend consolidation candidates rather than changing tests in the review task.
-2. Review abstraction layering across core model, onboarding, provider generation, provider state, CLI, and documentation handoff code. This should identify abstractions that may belong in a different layer or could be compacted without losing capability, extensibility, or readability, then return recommendations only.
+Completed recommendation reviews:
+
+1. Test suite dependency and compaction review: `docs/housekeeping/test-suite-compaction-review.md`
+2. Abstraction layer placement and compaction review: `docs/housekeeping/abstraction-layer-review.md`
+
+Recommended housekeeping sequence:
+
+1. Extract a small `test/support/cli_helpers.rb` pilot for a few manifest-review or onboarding CLI tests.
+2. Extract public-safe onboarding handoff and discovery fixtures into `test/support/onboarding_fixtures.rb`.
+3. Extract Datadog fake client/response helpers before splitting `test/datadog_apply_test.rb`.
+4. Only after those guardrails exist, consider CLI command extraction and Datadog applier/client internal splits.
