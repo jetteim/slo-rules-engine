@@ -56,10 +56,11 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. resume the postponed housekeeping pilot: low-risk test support extraction for CLI and onboarding fixtures, preserving existing behavior and subprocess coverage
-2. use the extracted test support as a guardrail before CLI command extraction or Datadog applier/client abstraction work
-3. continue provider breadth only after housekeeping guardrails exist or when another provider has a concrete reviewed handoff gap
-4. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
+1. split `test/datadog_apply_test.rb` by behavior using the extracted Datadog fake fixtures as guardrails
+2. only after the Datadog test split, consider Datadog applier/client internal extraction
+3. continue additional CLI command extraction incrementally, using `lib/slo_rules_engine/cli/onboarding_commands.rb` as the first pattern
+4. continue provider breadth only when another provider has a concrete reviewed handoff gap
+5. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
 
 ## Housekeeping Backlog
 
@@ -70,7 +71,15 @@ Completed recommendation reviews:
 
 Recommended housekeeping sequence:
 
-1. Extract a small `test/support/cli_helpers.rb` pilot for a few manifest-review or onboarding CLI tests.
-2. Extract public-safe onboarding handoff and discovery fixtures into `test/support/onboarding_fixtures.rb`.
-3. Extract Datadog fake client/response helpers before splitting `test/datadog_apply_test.rb`.
-4. Only after those guardrails exist, consider CLI command extraction and Datadog applier/client internal splits.
+Completed guardrails:
+
+1. CLI helper pilot: `test/support/cli_helpers.rb`
+2. Public-safe onboarding handoff and discovery fixtures: `test/support/onboarding_fixtures.rb`
+3. Datadog fake client/response helpers: `test/support/datadog_fakes.rb`
+4. First guarded CLI command extraction: `lib/slo_rules_engine/cli/onboarding_commands.rb`
+
+Recommended remaining housekeeping sequence:
+
+1. Split `test/datadog_apply_test.rb` by behavior while preserving assertions.
+2. Extract another focused CLI command module only if the next command family changes.
+3. Split Datadog applier/client internals after the Datadog tests are easier to navigate.

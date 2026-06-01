@@ -92,10 +92,13 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 - `docs/housekeeping/test-suite-compaction-review.md` maps test-suite dependency shape and recommends compaction steps without changing test behavior
 - `docs/housekeeping/abstraction-layer-review.md` maps abstraction layer pressure points and recommends extraction order without changing production code
 - Sloth external-generator apply now writes native Sloth `prometheus/v1` YAML input files, includes them in plans/diffs/prune operations, and points handoff commands at those files while preserving the reviewed engine manifest as provenance
+- Test support guardrails now include CLI helpers, onboarding handoff/discovery fixtures, and shared Datadog fake client/response fixtures
+- Onboarding-related CLI commands now live in `lib/slo_rules_engine/cli/onboarding_commands.rb` instead of `bin/rules-ctl`
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: Sloth native external-generator input files for provider breadth
+- latest checkpoint: CLI/onboarding/Datadog test guardrails plus onboarding CLI command extraction
+- previous checkpoint: Sloth native external-generator input files for provider breadth
 - previous checkpoint: housekeeping review recommendations for test compaction and abstraction layering
 - previous checkpoint: telemetry-first saved-artifact walkthrough smoke test
 - previous checkpoint: compact onboarding artifact index
@@ -131,21 +134,22 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 
 Highest-value remaining gaps:
 
-1. Resume postponed housekeeping with low-risk test support extraction for CLI and onboarding fixtures
-2. Use extracted test support before CLI command extraction or Datadog applier/client abstraction splits
+1. Split `test/datadog_apply_test.rb` by behavior using extracted Datadog fakes as guardrails
+2. Use the split Datadog tests before Datadog applier/client abstraction splits
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
 
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
 2. Optional live Datadog contract verification when credentials and safe backend access are available
-3. Additional provider breadth after housekeeping guardrails exist
+3. Additional CLI command extraction as command families change
+4. Additional provider breadth when a concrete reviewed handoff gap appears
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- resume the postponed housekeeping pilot: low-risk test support extraction for CLI and onboarding fixtures without changing behavior
+- split `test/datadog_apply_test.rb` by behavior without changing assertions
 
 Rationale:
 
@@ -170,7 +174,9 @@ Rationale:
 - the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
 - housekeeping reviews now identify concrete compaction and layering follow-ups
 - Sloth external-generator handoff now writes native provider input files instead of relying on the engine manifest as generator input
-- the next value is reducing future maintenance cost with support helpers before heavier CLI, Datadog, or additional provider-breadth refactors
+- CLI, onboarding, and Datadog fake test guardrails now exist
+- onboarding CLI command extraction proves the CLI can be split safely in small command-family modules
+- the next value is making the oversized Datadog characterization suite easier to navigate before Datadog applier/client internals are split
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

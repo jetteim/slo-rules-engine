@@ -102,6 +102,7 @@ This is the running plan for the long refactor.
 
 - [x] Review test-suite dependency shape and recommend compaction opportunities without changing behavior.
 - [x] Review abstraction layer placement and recommend compaction or relocation opportunities without changing behavior.
-- [ ] Pilot low-risk test support helpers for CLI and onboarding fixtures.
-- [ ] Extract CLI command modules after test support guardrails exist.
+- [x] Pilot low-risk test support helpers for CLI and onboarding fixtures.
+- [x] Extract shared Datadog fake client and response test fixtures.
+- [x] Extract onboarding CLI command module after test support guardrails exist.
 - [ ] Split Datadog applier/client internals after Datadog tests are easier to navigate.
