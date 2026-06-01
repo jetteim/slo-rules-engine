@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. The review-only housekeeping checkpoint is complete; the next slices should start with low-risk test support extraction before CLI or Datadog abstraction refactors unless new backend evidence exposes a provider-state gap.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping is ready to resume next with low-risk test support extraction before CLI or Datadog abstraction refactors unless new backend evidence exposes a provider-state gap.
 
 ## Non-Negotiable Working Rules
 
@@ -65,7 +65,7 @@ Implemented and already pushed:
 - `onboarding-summary <discovery-index.json>` ranks saved discovery scopes as `ready`, `partial`, `insufficient`, or `failed`
 - `.forbidden-terms` has been removed from repo history and is now local-only and gitignored
 
-Implemented by the latest telemetry-first slice:
+Implemented by the latest telemetry-first and provider-breadth slices:
 
 - Candidate review output includes confidence scores, reasons, caveats, and explanations for telemetry-derived drafts
 - `onboarding-summary --handoff-dir` writes per-scope handoff packets preserving discovery evidence, candidate reasoning, and review state placeholders
@@ -91,10 +91,12 @@ Implemented by the latest telemetry-first slice:
 - `docs/telemetry-first-walkthrough.md` and `test/telemetry_first_walkthrough_test.rb` now cover the saved-artifact flow through reviewed provider gates without live backend credentials
 - `docs/housekeeping/test-suite-compaction-review.md` maps test-suite dependency shape and recommends compaction steps without changing test behavior
 - `docs/housekeeping/abstraction-layer-review.md` maps abstraction layer pressure points and recommends extraction order without changing production code
+- Sloth external-generator apply now writes native Sloth `prometheus/v1` YAML input files, includes them in plans/diffs/prune operations, and points handoff commands at those files while preserving the reviewed engine manifest as provenance
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: housekeeping review recommendations for test compaction and abstraction layering
+- latest checkpoint: Sloth native external-generator input files for provider breadth
+- previous checkpoint: housekeeping review recommendations for test compaction and abstraction layering
 - previous checkpoint: telemetry-first saved-artifact walkthrough smoke test
 - previous checkpoint: compact onboarding artifact index
 - previous checkpoint: saved manifest-review freshness validation and artifact handoff freshness pointers
@@ -129,7 +131,7 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. Pilot low-risk test support extraction for CLI and onboarding fixtures
+1. Resume postponed housekeeping with low-risk test support extraction for CLI and onboarding fixtures
 2. Use extracted test support before CLI command extraction or Datadog applier/client abstraction splits
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
@@ -137,13 +139,13 @@ Secondary gaps:
 
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
 2. Optional live Datadog contract verification when credentials and safe backend access are available
-3. Provider breadth after the telemetry-first saved-artifact baseline has a stable handoff bundle
+3. Additional provider breadth after housekeeping guardrails exist
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- pilot low-risk test support extraction for CLI and onboarding fixtures without changing behavior
+- resume the postponed housekeeping pilot: low-risk test support extraction for CLI and onboarding fixtures without changing behavior
 
 Rationale:
 
@@ -167,7 +169,8 @@ Rationale:
 - the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
 - the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
 - housekeeping reviews now identify concrete compaction and layering follow-ups
-- the next value is reducing future maintenance cost with support helpers before heavier CLI or Datadog abstraction refactors
+- Sloth external-generator handoff now writes native provider input files instead of relying on the engine manifest as generator input
+- the next value is reducing future maintenance cost with support helpers before heavier CLI, Datadog, or additional provider-breadth refactors
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

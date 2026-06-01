@@ -56,9 +56,10 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. pilot low-risk test support extraction for CLI and onboarding fixtures, preserving existing behavior and subprocess coverage
+1. resume the postponed housekeeping pilot: low-risk test support extraction for CLI and onboarding fixtures, preserving existing behavior and subprocess coverage
 2. use the extracted test support as a guardrail before CLI command extraction or Datadog applier/client abstraction work
-3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
+3. continue provider breadth only after housekeeping guardrails exist or when another provider has a concrete reviewed handoff gap
+4. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
 
 ## Housekeeping Backlog
 

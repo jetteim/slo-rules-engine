@@ -6,6 +6,7 @@ require 'open3'
 require 'fileutils'
 require 'tempfile'
 require 'tmpdir'
+require 'yaml'
 
 class CLITest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
@@ -720,13 +721,19 @@ class CLITest < Minitest::Test
         assert status.success?, stderr
         payload = JSON.parse(stdout).fetch(0)
         manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+        spec_path = File.join(dir, 'checkout-api', 'sloth', 'generated', 'sloth.yaml')
         assert_equal 'sloth', payload.fetch('provider')
         assert_equal 'live', payload.fetch('mode')
-        assert_equal %w[write handoff], payload.fetch('operations').map { |operation| operation.fetch('action') }
+        assert_equal %w[write write handoff], payload.fetch('operations').map { |operation| operation.fetch('action') }
         assert File.exist?(manifest_path), "expected #{manifest_path} to exist"
+        assert File.exist?(spec_path), "expected #{spec_path} to exist"
         manifest = JSON.parse(File.read(manifest_path))
+        spec = YAML.safe_load(File.read(spec_path), permitted_classes: [], aliases: false)
         assert_equal 'checkout-api', manifest.fetch('service')
         assert_equal 'sloth', manifest.fetch('provider')
+        assert_equal 'prometheus/v1', spec.fetch('version')
+        assert_equal 'checkout-api', spec.fetch('service')
+        assert_equal spec_path, payload.fetch('operations').fetch(2).fetch('payload').fetch('input_spec')
       end
     end
   end
@@ -990,8 +997,10 @@ class CLITest < Minitest::Test
 
       Dir.mktmpdir do |dir|
         managed_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
-        FileUtils.mkdir_p(File.dirname(managed_path))
+        spec_path = File.join(dir, 'checkout-api', 'sloth', 'generated', 'sloth.yaml')
+        FileUtils.mkdir_p(File.dirname(spec_path))
         File.write(managed_path, JSON.pretty_generate(manifest))
+        File.write(spec_path, YAML.dump(manifest.fetch('artifacts').fetch('sloth_specs').fetch(0)))
 
         stdout, stderr, status = Open3.capture3(
           'ruby',
@@ -1007,8 +1016,9 @@ class CLITest < Minitest::Test
         payload = JSON.parse(stdout).fetch(0)
         assert_equal 'sloth', payload.fetch('provider')
         assert_equal 'live', payload.fetch('mode')
-        assert_equal ['delete'], payload.fetch('operations').map { |operation| operation.fetch('action') }
+        assert_equal %w[delete delete], payload.fetch('operations').map { |operation| operation.fetch('action') }
         refute File.exist?(managed_path), "expected #{managed_path} to be deleted"
+        refute File.exist?(spec_path), "expected #{spec_path} to be deleted"
       end
     end
   end

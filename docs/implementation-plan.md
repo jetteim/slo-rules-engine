@@ -50,6 +50,7 @@ This is the running plan for the long refactor.
 - [x] Add Datadog create-and-wait SLO apply and stale monitor recreate strategy.
 - [x] Expand calculation-basis findings across every SLI instance and SLO.
 - [x] Record Sloth external-generator handoff details in apply plans.
+- [x] Write native Sloth spec files for external-generator apply, diff, and prune handoff.
 
 ## Phase 4: Provider State Management
 

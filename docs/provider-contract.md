@@ -172,6 +172,14 @@ Expected artifacts:
 
 The Sloth provider does not execute the Sloth CLI or apply generated rules. It produces reviewable spec artifacts and an external-generator handoff plan.
 
+Expected state behavior:
+
+- dry-run plans include the reviewed engine manifest, native Sloth spec input files, and the external-generator handoff command
+- confirmed file apply writes the engine manifest plus deterministic Sloth `prometheus/v1` YAML input files under the provider output directory
+- diff and prune account for both the engine manifest and generated Sloth input files
+- external-generator handoff commands point at the native Sloth spec files while retaining the reviewed engine manifest as provenance
+- no live backend mutation or Sloth CLI execution happens inside the engine
+
 Expected telemetry behavior:
 
 - reuse the Prometheus-compatible lookup and discovery baseline for onboarding and sanity checks

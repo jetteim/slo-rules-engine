@@ -92,12 +92,14 @@ Explicit features:
 - **Traffic-floor inference for Datadog time-slice SLOs:** reviewed threshold-based counter bindings can infer Datadog `sum:...as_count()` query expressions from metric name and selector scope when explicit provider query text is absent.
 - **Selector-aware Datadog dashboard evidence:** generated Datadog dashboard timeseries queries merge reviewed selector scope into provider query expressions so dashboard evidence stays aligned with the reviewed SLI instance rather than drifting to backend-binding-only scope.
 - **Dashboard payload contract:** generated Datadog dashboards validate the expected template variables (`service`, `sli`, `sli_instance`, `slo`) and the generated note/timeseries widget structure before live mutation.
-- **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but initially manage files and handoff plans rather than mutating live backends.
+- **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but manage deterministic files and handoff plans rather than mutating live backends. Sloth apply writes both the reviewed engine manifest and native Sloth `prometheus/v1` generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 
 ## Sloth Provider Generation
 
 `rules-ctl generate --provider sloth` emits Sloth `prometheus/v1` SLO specs from reviewed service definitions. The provider uses Prometheus-compatible query bindings and keeps OpenSLO as a future interchange/export path, not as a backend provider.
+
+`rules-ctl apply --provider sloth --confirm --manifest=<reviewed-manifest> --output-dir=<dir>` writes the reviewed engine manifest plus native Sloth YAML input files under `<dir>/<service>/sloth/generated/`. The apply plan records the external `sloth generate` command pointed at those native input files; the engine still does not execute the Sloth CLI or mutate downstream Prometheus resources.
 
 ## Change
 

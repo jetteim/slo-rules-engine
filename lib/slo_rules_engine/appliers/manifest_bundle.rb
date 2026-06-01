@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'json'
+require 'yaml'
 
 module SloRulesEngine
   module Appliers
@@ -11,21 +13,8 @@ module SloRulesEngine
 
       def plan(manifest, mode: 'dry_run')
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        path = manifest_path(manifest)
-        actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
-        changes = actual ? SloRulesEngine::StateDiff.changed_paths(manifest, actual) : ['manifest']
-        action = actual && changes.empty? ? 'noop' : 'write'
-        operations = [
-          ApplyOperation.new(
-            action: action,
-            target: 'manifest_file',
-            name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
-            source: 'manifest',
-            payload: { path: path, manifest: manifest },
-            actual: actual,
-            changes: changes
-          )
-        ]
+        operations = [managed_manifest_operation(manifest, plan_action: true)]
+        operations.concat(external_generator_input_operations(manifest, plan_action: true))
         operations << handoff_operation(manifest) if manifest.fetch(:provider) == 'sloth'
 
         ApplyPlan.new(
@@ -43,37 +32,24 @@ module SloRulesEngine
 
             path = operation.payload.fetch(:path)
             FileUtils.mkdir_p(File.dirname(path))
-            File.write(path, JSON.pretty_generate(operation.payload.fetch(:manifest)))
+            case operation.target
+            when 'manifest_file'
+              File.write(path, JSON.pretty_generate(operation.payload.fetch(:manifest)))
+            when 'external_generator_input'
+              File.write(path, YAML.dump(json_safe(operation.payload.fetch(:spec))))
+            end
           end
         end
       end
 
       def diff(manifest)
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        path = manifest_path(manifest)
-        actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
-        changes = actual ? SloRulesEngine::StateDiff.changed_paths(manifest, actual) : ['manifest']
-        action = if actual.nil?
-                   'create'
-                 elsif changes.empty?
-                   'noop'
-                 else
-                   'update'
-                 end
-
         ApplyPlan.new(
           provider: manifest.fetch(:provider),
           mode: 'diff',
           operations: [
-            ApplyOperation.new(
-              action: action,
-              target: 'manifest_file',
-              name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
-              source: 'manifest',
-              payload: { path: path, manifest: manifest },
-              actual: actual,
-              changes: changes
-            )
+            managed_manifest_operation(manifest, plan_action: false),
+            *external_generator_input_operations(manifest, plan_action: false)
           ]
         )
       end
@@ -95,35 +71,119 @@ module SloRulesEngine
 
       def prune(manifest, mode: 'dry_run')
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        path = manifest_path(manifest)
-        exists = File.exist?(path)
-        operation = ApplyOperation.new(
-          action: exists ? 'delete' : 'noop',
-          target: 'manifest_file',
-          name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
-          source: 'manifest',
-          payload: { path: path }
-        )
+        operations = prune_operations(manifest)
 
         ApplyPlan.new(
           provider: manifest.fetch(:provider),
           mode: mode,
-          operations: [operation]
+          operations: operations
         ).tap do |plan|
-          next unless mode == 'live' && exists
+          next unless mode == 'live'
 
-          File.delete(path)
+          plan.operations.each do |operation|
+            next unless operation.action == 'delete'
+
+            File.delete(operation.payload.fetch(:path))
+          end
         end
       end
 
       private
 
+      def managed_manifest_operation(manifest, plan_action:)
+        path = manifest_path(manifest)
+        actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
+        changes = actual ? SloRulesEngine::StateDiff.changed_paths(manifest, actual) : ['manifest']
+
+        ApplyOperation.new(
+          action: file_action(actual, changes, plan_action: plan_action),
+          target: 'manifest_file',
+          name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
+          source: 'manifest',
+          payload: { path: path, manifest: manifest },
+          actual: actual,
+          changes: changes
+        )
+      end
+
+      def external_generator_input_operations(manifest, plan_action:)
+        return [] unless manifest.fetch(:provider) == 'sloth'
+
+        sloth_specs(manifest).each_with_index.map do |spec, index|
+          path = sloth_spec_path(manifest, index)
+          desired = json_safe(spec)
+          actual = File.exist?(path) ? YAML.safe_load(File.read(path), permitted_classes: [], aliases: false) : nil
+          changes = actual ? SloRulesEngine::StateDiff.changed_paths(desired, actual) : ['external_generator_input']
+
+          ApplyOperation.new(
+            action: file_action(actual, changes, plan_action: plan_action),
+            target: 'external_generator_input',
+            name: "#{manifest.fetch(:service)} sloth generator input #{index + 1}",
+            source: "artifacts.sloth_specs[#{index}]",
+            payload: { path: path, spec: spec },
+            actual: actual,
+            changes: changes
+          )
+        end
+      end
+
+      def file_action(actual, changes, plan_action:)
+        return 'write' if plan_action && (actual.nil? || !changes.empty?)
+        return 'noop' if plan_action
+        return 'create' if actual.nil?
+        return 'noop' if changes.empty?
+
+        'update'
+      end
+
+      def prune_operations(manifest)
+        paths = [
+          {
+            path: manifest_path(manifest),
+            target: 'manifest_file',
+            name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} manifest",
+            source: 'manifest'
+          }
+        ]
+        paths.concat(sloth_specs(manifest).each_index.map do |index|
+          {
+            path: sloth_spec_path(manifest, index),
+            target: 'external_generator_input',
+            name: "#{manifest.fetch(:service)} sloth generator input #{index + 1}",
+            source: "artifacts.sloth_specs[#{index}]"
+          }
+        end)
+
+        paths.map do |entry|
+          exists = File.exist?(entry.fetch(:path))
+          ApplyOperation.new(
+            action: exists ? 'delete' : 'noop',
+            target: entry.fetch(:target),
+            name: entry.fetch(:name),
+            source: entry.fetch(:source),
+            payload: { path: entry.fetch(:path) }
+          )
+        end
+      end
+
       def manifest_path(manifest)
         File.join(@output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'manifest.json')
       end
 
+      def sloth_specs(manifest)
+        artifacts = manifest.fetch(:artifacts)
+        Array(artifacts[:sloth_specs] || artifacts['sloth_specs'])
+      end
+
+      def sloth_spec_path(manifest, index)
+        filename = sloth_specs(manifest).length == 1 ? 'sloth.yaml' : "sloth-#{index + 1}.yaml"
+        File.join(@output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'generated', filename)
+      end
+
       def handoff_operation(manifest)
         output_dir = File.join(@output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'generated')
+        input_specs = sloth_specs(manifest).each_index.map { |index| sloth_spec_path(manifest, index) }
+        commands = input_specs.map { |path| "sloth generate -i #{path} -o #{output_dir}" }
 
         ApplyOperation.new(
           action: 'handoff',
@@ -131,8 +191,11 @@ module SloRulesEngine
           name: "#{manifest.fetch(:service)} #{manifest.fetch(:provider)} external generation handoff",
           source: 'manifest',
           payload: {
-            command: "sloth generate -i #{manifest_path(manifest)} -o #{output_dir}",
+            command: commands.empty? ? "sloth generate -i #{manifest_path(manifest)} -o #{output_dir}" : commands.join(' && '),
+            commands: commands,
             input_manifest: manifest_path(manifest),
+            input_spec: input_specs.fetch(0, nil),
+            input_specs: input_specs,
             manifest_review_report: manifest_review_report_path(manifest),
             manifest_review_command: manifest_review_command(manifest),
             manifest_review_freshness: {
@@ -144,6 +207,10 @@ module SloRulesEngine
             review_required: true
           }
         )
+      end
+
+      def json_safe(value)
+        JSON.parse(JSON.generate(value))
       end
 
       def manifest_review_command(manifest)
