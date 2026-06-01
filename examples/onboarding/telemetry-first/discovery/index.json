@@ -1,0 +1,20 @@
+{
+  "provider": "datadog",
+  "generated_at": "2026-05-13T09:00:00Z",
+  "total_scopes": 1,
+  "successful_scopes": 1,
+  "failed_scopes": 0,
+  "scopes": [
+    {
+      "label": "checkout-prod",
+      "scope": {
+        "label": "checkout-prod",
+        "service": "checkout-api"
+      },
+      "status": "ok",
+      "result_file": "checkout-prod.json",
+      "signal_count": 2,
+      "finding_count": 0
+    }
+  ]
+}

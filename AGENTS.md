@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, and a compact artifact index. The next telemetry-first slices should use the saved artifact index to document and smoke-test the complete walkthrough, not reopen the batch orchestration layer.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. The next slices should focus on review-only housekeeping recommendations unless new backend evidence exposes a provider-state gap.
 
 ## Non-Negotiable Working Rules
 
@@ -88,10 +88,12 @@ Implemented by the latest telemetry-first slice:
 - Confirmed `apply --review-report` and `prune --review-report` now block live mutation when the saved manifest-review report is stale
 - Sloth external-generator handoff plans now include the manifest-review report path, freshness validation command, and stale freshness finding codes
 - `onboarding-artifact-index` now ties saved discovery results, handoff packets, reviewed draft files, provider manifests, and manifest-review reports into one per-scope handoff index
+- `docs/telemetry-first-walkthrough.md` and `test/telemetry_first_walkthrough_test.rb` now cover the saved-artifact flow through reviewed provider gates without live backend credentials
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: compact onboarding artifact index
+- latest checkpoint: telemetry-first saved-artifact walkthrough smoke test
+- previous checkpoint: compact onboarding artifact index
 - previous checkpoint: saved manifest-review freshness validation and artifact handoff freshness pointers
 - previous checkpoint: handoff-aware live mutation gates and report freshness metadata
 - previous checkpoint: stale provenance detection in manifest review reports
@@ -124,8 +126,8 @@ Implemented by the latest telemetry-first slice:
 
 Highest-value remaining gaps:
 
-1. End-to-end telemetry-first walkthrough smoke test and docs for the complete saved-artifact flow
-2. Small representative saved-artifact fixture if the walkthrough needs stable evidence without live backend access
+1. Review-only test suite dependency map and compaction recommendations
+2. Review-only abstraction layer placement and compaction recommendations
 3. Remaining Datadog resource semantics not yet validated against the real backend contract, especially any provider-owned fields still treated heuristically
 
 Secondary gaps:
@@ -140,7 +142,7 @@ Secondary gaps:
 
 Next recommended slice:
 
-- document and smoke-test the complete telemetry-first walkthrough using the saved artifact index
+- run the test-suite dependency review and recommend compaction opportunities without changing behavior
 
 Rationale:
 
@@ -162,7 +164,8 @@ Rationale:
 - saved manifest-review reports can now be validated against current artifacts before reviewers rely on them
 - external-generator handoffs now tell reviewers how to validate manifest-review freshness before downstream generation
 - the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
-- the next value is proving the full flow with a stable walkthrough that starts from saved discovery evidence and ends at reviewed provider artifact gates
+- the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
+- the next value is housekeeping: reduce future maintenance cost by identifying test overlap and compaction opportunities before adding more behavior
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands
@@ -173,6 +176,7 @@ Use these before claiming a checkpoint:
 ruby -Ilib test/onboarding_summary_test.rb
 ruby -Ilib test/onboarding_handoff_test.rb
 ruby -Ilib test/onboarding_artifact_index_test.rb
+ruby -Ilib test/telemetry_first_walkthrough_test.rb
 ruby -Ilib test/manifest_review_queue_test.rb
 ruby -Ilib test/apply_test.rb
 ruby -Ilib test/rules_ctl_test.rb

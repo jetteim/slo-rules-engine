@@ -132,5 +132,6 @@ scripts/verify.sh
 
 Provider contributors should start with the [Provider Contribution Guide](docs/provider-contribution-guide.md) and the [Provider Contract](docs/provider-contract.md).
 Teams planning telemetry-first rollout should start with the [Telemetry-First Adoption Map](docs/adoption-map.md).
+The full saved-artifact onboarding path is documented in the [Telemetry-First Walkthrough](docs/telemetry-first-walkthrough.md).
 
 No external Ruby dependencies are required for the initial skeleton.

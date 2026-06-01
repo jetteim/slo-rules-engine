@@ -50,6 +50,8 @@ Confirmed `apply` and `prune` can use `--handoff-dir` to block mutation when man
 
 `rules-ctl onboarding-artifact-index` builds a compact handoff index from a saved discovery `index.json` plus optional handoff, draft, and generated manifest directories. It records per-scope completeness, missing artifact paths, reviewed handoff status, provider manifest links, manifest-review report links, and the freshness validation command reviewers should run before trusting saved provider artifacts.
 
+The repository includes a public-safe telemetry-first fixture and walkthrough under `examples/onboarding/telemetry-first` and `docs/telemetry-first-walkthrough.md`. The walkthrough smoke test exercises saved discovery evidence, handoff review, draft generation, provider-bound manifest generation, saved report freshness validation, artifact indexing, and the pre-mutation review gate without requiring live backend credentials.
+
 ## Backend Telemetry Lookup And Sanity Checks
 
 Telemetry-derived SLO generation should work from either a checked-in telemetry inventory fixture or backend lookup output. Lookup adapters normalize provider evidence before it reaches candidate generation, so SLI/SLO review does not depend on backend-specific query syntax.

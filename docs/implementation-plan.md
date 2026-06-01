@@ -90,6 +90,7 @@ This is the running plan for the long refactor.
 - [x] Validate saved manifest-review report freshness against current manifests and handoff packets.
 - [x] Surface manifest-review freshness validation commands and stale-finding codes in external-generator handoff plans.
 - [x] Add compact onboarding artifact index tying discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports together.
+- [x] Add a representative saved-artifact fixture and smoke-test the telemetry-first walkthrough through reviewed provider gates.
 
 ## Phase 6: Contract Hardening
 

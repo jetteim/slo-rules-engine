@@ -1,0 +1,25 @@
+{
+  "provider": "datadog",
+  "scope": {
+    "label": "checkout-prod",
+    "service": "checkout-api"
+  },
+  "signals": [
+    {
+      "kind": "latency",
+      "metric": "http.server.request.duration",
+      "user_visible": true,
+      "source": "datadog",
+      "observations_per_second": 25,
+      "failed_observations_to_alert": 120,
+      "objective": 0.99
+    },
+    {
+      "kind": "traffic",
+      "metric": "http.server.requests",
+      "user_visible": true,
+      "source": "datadog"
+    }
+  ],
+  "findings": []
+}

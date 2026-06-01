@@ -56,8 +56,8 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. document and smoke-test the complete telemetry-first walkthrough against representative saved artifacts
-2. add a small checked-in representative saved-artifact fixture if the walkthrough needs stable evidence without live backend access
+1. run the test-suite dependency review and recommend compaction opportunities without changing behavior
+2. run the abstraction-layer review and recommend relocation or compaction opportunities without changing behavior
 3. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
 
 ## Housekeeping Backlog
