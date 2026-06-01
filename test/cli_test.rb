@@ -7,20 +7,12 @@ require 'fileutils'
 require 'tempfile'
 require 'tmpdir'
 require 'yaml'
+require_relative 'support/cli_helpers'
 
 class CLITest < Minitest::Test
-  ROOT = File.expand_path('..', __dir__)
+  include CliHelpers
 
-  def with_review_provenance(manifest)
-    manifest.merge(
-      'review_provenance' => {
-        'label' => 'checkout-prod',
-        'provider' => 'datadog',
-        'accepted_candidate_uids' => ['request-latency'],
-        'notes' => ['Latency accepted.']
-      }
-    )
-  end
+  ROOT = File.expand_path('..', __dir__)
 
   def test_providers_list_includes_automation_metadata
     stdout, _stderr, status = Open3.capture3('ruby', "#{ROOT}/bin/rules-ctl", 'providers', 'list')
@@ -137,23 +129,8 @@ class CLITest < Minitest::Test
   end
 
   def test_manifest_review_accepts_reviewed_manifest_input
-    generate_stdout, generate_stderr, generate_status = Open3.capture3(
-      'ruby',
-      "#{ROOT}/bin/rules-ctl",
-      'generate',
-      '--provider=datadog',
-      "#{ROOT}/examples/services/checkout.rb"
-    )
-    assert generate_status.success?, generate_stderr
-    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
-
-    Tempfile.create(['reviewed-manifest', '.json']) do |file|
-      file.write(JSON.pretty_generate(manifest))
-      file.flush
-
-      stdout, stderr, status = Open3.capture3(
-        'ruby',
-        "#{ROOT}/bin/rules-ctl",
+    with_temp_json('reviewed-manifest', reviewed_manifest) do |file|
+      stdout, stderr, status = rules_ctl(
         'manifest-review',
         '--provider=datadog',
         "--manifest=#{file.path}"
@@ -169,28 +146,15 @@ class CLITest < Minitest::Test
   end
 
   def test_manifest_review_links_findings_to_handoff_dir
-    generate_stdout, generate_stderr, generate_status = Open3.capture3(
-      'ruby',
-      "#{ROOT}/bin/rules-ctl",
-      'generate',
-      '--provider=datadog',
-      "#{ROOT}/examples/services/checkout.rb"
-    )
-    assert generate_status.success?, generate_stderr
-    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+    manifest = reviewed_manifest
     manifest.fetch('review_provenance')['accepted_candidate_uids'] = []
 
-    Tempfile.create(['incomplete-reviewed-manifest', '.json']) do |manifest_file|
-      manifest_file.write(JSON.pretty_generate(manifest))
-      manifest_file.flush
-
+    with_temp_json('incomplete-reviewed-manifest', manifest) do |manifest_file|
       Dir.mktmpdir do |handoff_dir|
         handoff_path = File.join(handoff_dir, 'checkout-prod.handoff.json')
         File.write(handoff_path, JSON.pretty_generate('label' => 'checkout-prod'))
 
-        stdout, _stderr, status = Open3.capture3(
-          'ruby',
-          "#{ROOT}/bin/rules-ctl",
+        stdout, _stderr, status = rules_ctl(
           'manifest-review',
           '--provider=datadog',
           "--manifest=#{manifest_file.path}",
@@ -208,24 +172,9 @@ class CLITest < Minitest::Test
   end
 
   def test_manifest_review_writes_explicit_output_report
-    generate_stdout, generate_stderr, generate_status = Open3.capture3(
-      'ruby',
-      "#{ROOT}/bin/rules-ctl",
-      'generate',
-      '--provider=datadog',
-      "#{ROOT}/examples/services/checkout.rb"
-    )
-    assert generate_status.success?, generate_stderr
-    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
-
-    Tempfile.create(['reviewed-manifest', '.json']) do |manifest_file|
-      manifest_file.write(JSON.pretty_generate(manifest))
-      manifest_file.flush
-
+    with_temp_json('reviewed-manifest', reviewed_manifest) do |manifest_file|
       Tempfile.create(['manifest-review-report', '.json']) do |report_file|
-        stdout, stderr, status = Open3.capture3(
-          'ruby',
-          "#{ROOT}/bin/rules-ctl",
+        stdout, stderr, status = rules_ctl(
           'manifest-review',
           '--provider=datadog',
           "--manifest=#{manifest_file.path}",
@@ -242,24 +191,9 @@ class CLITest < Minitest::Test
   end
 
   def test_manifest_review_output_includes_saved_report_path
-    generate_stdout, generate_stderr, generate_status = Open3.capture3(
-      'ruby',
-      "#{ROOT}/bin/rules-ctl",
-      'generate',
-      '--provider=datadog',
-      "#{ROOT}/examples/services/checkout.rb"
-    )
-    assert generate_status.success?, generate_stderr
-    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
-
-    Tempfile.create(['reviewed-manifest', '.json']) do |manifest_file|
-      manifest_file.write(JSON.pretty_generate(manifest))
-      manifest_file.flush
-
+    with_temp_json('reviewed-manifest', reviewed_manifest) do |manifest_file|
       Tempfile.create(['manifest-review-report', '.json']) do |report_file|
-        stdout, stderr, status = Open3.capture3(
-          'ruby',
-          "#{ROOT}/bin/rules-ctl",
+        stdout, stderr, status = rules_ctl(
           'manifest-review',
           '--provider=datadog',
           "--manifest=#{manifest_file.path}",
