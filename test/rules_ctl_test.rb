@@ -3,9 +3,12 @@
 require 'json'
 require 'minitest/autorun'
 require 'tempfile'
+require_relative 'support/onboarding_fixtures'
 load File.expand_path('../bin/rules-ctl', __dir__)
 
 class RulesCtlTest < Minitest::Test
+  include OnboardingFixtures
+
   ROOT = File.expand_path('..', __dir__)
 
   def setup
@@ -244,33 +247,10 @@ class RulesCtlTest < Minitest::Test
 
   def test_onboarding_summary_renders_ranked_scope_queue
     Dir.mktmpdir do |dir|
-      File.write(
-        File.join(dir, 'checkout-prod.json'),
-        JSON.pretty_generate(
-          provider: 'datadog',
-          scope: { label: 'checkout-prod', service: 'checkout-api' },
-          signals: [
-            { kind: 'latency', metric: 'http.server.request.duration', user_visible: true, source: 'datadog' }
-          ],
-          findings: []
-        )
-      )
-      File.write(
-        File.join(dir, 'index.json'),
-        JSON.pretty_generate(
-          provider: 'datadog',
-          generated_at: '2026-05-13T09:00:00Z',
-          total_scopes: 1,
-          successful_scopes: 1,
-          failed_scopes: 0,
-          scopes: [
-            { label: 'checkout-prod', scope: { label: 'checkout-prod', service: 'checkout-api' }, status: 'ok', result_file: 'checkout-prod.json', signal_count: 1, finding_count: 0 }
-          ]
-        )
-      )
+      index_path = write_discovery_fixture(dir)
 
       stdout, _stderr = capture_io do
-        RulesCtl.onboarding_summary([File.join(dir, 'index.json')])
+        RulesCtl.onboarding_summary([index_path])
       end
 
       payload = JSON.parse(stdout)
@@ -282,34 +262,11 @@ class RulesCtlTest < Minitest::Test
 
   def test_onboarding_summary_writes_handoff_packets
     Dir.mktmpdir do |dir|
-      File.write(
-        File.join(dir, 'checkout-prod.json'),
-        JSON.pretty_generate(
-          provider: 'datadog',
-          scope: { label: 'checkout-prod', service: 'checkout-api' },
-          signals: [
-            { kind: 'latency', metric: 'http.server.request.duration', user_visible: true, source: 'datadog' }
-          ],
-          findings: []
-        )
-      )
-      File.write(
-        File.join(dir, 'index.json'),
-        JSON.pretty_generate(
-          provider: 'datadog',
-          generated_at: '2026-05-13T09:00:00Z',
-          total_scopes: 1,
-          successful_scopes: 1,
-          failed_scopes: 0,
-          scopes: [
-            { label: 'checkout-prod', scope: { label: 'checkout-prod', service: 'checkout-api' }, status: 'ok', result_file: 'checkout-prod.json', signal_count: 1, finding_count: 0 }
-          ]
-        )
-      )
+      index_path = write_discovery_fixture(dir)
 
       handoff_dir = File.join(dir, 'handoff')
       stdout, _stderr = capture_io do
-        RulesCtl.onboarding_summary(['--handoff-dir', handoff_dir, File.join(dir, 'index.json')])
+        RulesCtl.onboarding_summary(['--handoff-dir', handoff_dir, index_path])
       end
 
       payload = JSON.parse(stdout)
@@ -464,76 +421,4 @@ class RulesCtlTest < Minitest::Test
     end
   end
 
-  def handoff_packet
-    {
-      label: 'checkout-prod',
-      provider: 'datadog',
-      scope: { label: 'checkout-prod', service: 'checkout-api' },
-      discovery: {
-        signals: [{ kind: 'latency', metric: 'http.server.request.duration', user_visible: true }],
-        findings: [],
-        finding_codes: []
-      },
-      candidate_review: {
-        candidates: [
-          { sli_uid: 'request-latency', metric: 'http.server.request.duration', confidence: { level: 'high' } },
-          { sli_uid: 'request-traffic', metric: 'http.server.requests', confidence: { level: 'medium' } }
-        ],
-        findings: []
-      },
-      review: {
-        status: 'unreviewed',
-        accepted_candidate_uids: [],
-        rejected_candidate_uids: [],
-        notes: []
-      }
-    }
-  end
-
-  def reviewed_handoff_packet
-    packet = handoff_packet
-    packet[:candidate_review] = {
-      candidates: [
-        handoff_candidate(
-          sli_uid: 'request-latency',
-          signal: 'latency',
-          metric: 'http.server.request.duration',
-          slo_uid: 'fast-enough'
-        ),
-        handoff_candidate(
-          sli_uid: 'request-traffic',
-          signal: 'traffic',
-          metric: 'http.server.requests',
-          slo_uid: 'healthy-enough'
-        )
-      ],
-      findings: []
-    }
-    packet[:review] = {
-      status: 'reviewed',
-      accepted_candidate_uids: ['request-latency'],
-      rejected_candidate_uids: ['request-traffic'],
-      notes: ['Latency is accepted for the first onboarding draft.']
-    }
-    packet
-  end
-
-  def handoff_candidate(sli_uid:, signal:, metric:, slo_uid:)
-    {
-      sli_uid: sli_uid,
-      signal: signal,
-      metric: metric,
-      rationale: 'Measured telemetry is close to user-visible service quality.',
-      confidence: { level: 'high', score: 85, reasons: [], caveats: [] },
-      explanation: "Metric #{metric} is proposed as #{sli_uid}.",
-      evidence: { source: 'datadog' },
-      calculation_basis_recommendation: nil,
-      proposed_slo: {
-        uid: slo_uid,
-        objective: 0.99,
-        success_condition: 'Observation meets the reviewed service quality threshold.',
-        calculation_basis: 'observations'
-      }
-    }
-  end
 end

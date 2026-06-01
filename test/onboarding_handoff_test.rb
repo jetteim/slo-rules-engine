@@ -5,8 +5,11 @@ require 'minitest/autorun'
 require 'tempfile'
 require 'tmpdir'
 require_relative '../lib/sre'
+require_relative 'support/onboarding_fixtures'
 
 class OnboardingHandoffTest < Minitest::Test
+  include OnboardingFixtures
+
   def test_review_records_acceptance_without_changing_candidate_evidence
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'checkout-prod.handoff.json')
@@ -152,79 +155,6 @@ class OnboardingHandoffTest < Minitest::Test
   end
 
   private
-
-  def handoff_packet
-    {
-      label: 'checkout-prod',
-      provider: 'datadog',
-      scope: { label: 'checkout-prod', service: 'checkout-api' },
-      discovery: {
-        signals: [{ kind: 'latency', metric: 'http.server.request.duration', user_visible: true }],
-        findings: [],
-        finding_codes: []
-      },
-      candidate_review: {
-        candidates: [
-          { sli_uid: 'request-latency', metric: 'http.server.request.duration', confidence: { level: 'high' } },
-          { sli_uid: 'request-traffic', metric: 'http.server.requests', confidence: { level: 'medium' } }
-        ],
-        findings: []
-      },
-      review: {
-        status: 'unreviewed',
-        accepted_candidate_uids: [],
-        rejected_candidate_uids: [],
-        notes: []
-      }
-    }
-  end
-
-  def reviewed_handoff_packet
-    packet = handoff_packet
-    packet[:candidate_review] = {
-      candidates: [
-        candidate(
-          sli_uid: 'request-latency',
-          signal: 'latency',
-          metric: 'http.server.request.duration',
-          slo_uid: 'fast-enough'
-        ),
-        candidate(
-          sli_uid: 'request-traffic',
-          signal: 'traffic',
-          metric: 'http.server.requests',
-          slo_uid: 'healthy-enough'
-        )
-      ],
-      findings: []
-    }
-    packet[:review] = {
-      status: 'reviewed',
-      accepted_candidate_uids: ['request-latency'],
-      rejected_candidate_uids: ['request-traffic'],
-      notes: ['Latency is accepted for the first onboarding draft.']
-    }
-    packet
-  end
-
-  def candidate(sli_uid:, signal:, metric:, slo_uid:)
-    {
-      sli_uid: sli_uid,
-      signal: signal,
-      metric: metric,
-      rationale: 'Measured telemetry is close to user-visible service quality.',
-      confidence: { level: 'high', score: 85, reasons: [], caveats: [] },
-      explanation: "Metric #{metric} is proposed as #{sli_uid}.",
-      evidence: { source: 'datadog' },
-      calculation_basis_recommendation: nil,
-      proposed_slo: {
-        uid: slo_uid,
-        objective: 0.99,
-        success_condition: 'Observation meets the reviewed service quality threshold.',
-        calculation_basis: 'observations'
-      }
-    }
-  end
 
   def symbolize(value)
     case value
