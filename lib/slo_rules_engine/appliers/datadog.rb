@@ -57,8 +57,9 @@ module SloRulesEngine
         { bucket: :slos, target: 'datadog.slo' }
       ].freeze
 
-      def initialize(client: SloRulesEngine::Datadog::Client.new)
+      def initialize(client: SloRulesEngine::Datadog::Client.new, risk_policy: SloRulesEngine::Datadog::RiskPolicy.new)
         @client = client
+        @risk_policy = risk_policy
       end
 
       def plan(manifest, mode: 'dry_run')
@@ -223,9 +224,9 @@ module SloRulesEngine
           actual: actual_payload,
           changes: changes,
           match_identity: fetch_value(backend_state, :match_identity),
-          risk: merge_risks(
-            datadog_operation_risk(action: action, target: spec.fetch(:target)),
-            weak_identity_risk(fetch_value(backend_state, :match_identity))
+          risk: @risk_policy.merge(
+            @risk_policy.operation_risk(action: action, target: spec.fetch(:target)),
+            @risk_policy.weak_identity_risk(fetch_value(backend_state, :match_identity))
           )
         )
       end
@@ -342,7 +343,7 @@ module SloRulesEngine
               source: "managed_state.#{spec.fetch(:bucket)}[#{index}]",
               backend_id: fetch_value(entry, :id),
               match_identity: match_identity,
-              risk: datadog_operation_risk(action: 'delete', target: spec.fetch(:target))
+              risk: @risk_policy.operation_risk(action: 'delete', target: spec.fetch(:target))
             )
           end.compact
         end
@@ -358,36 +359,6 @@ module SloRulesEngine
           @client.delete_dashboard(operation.backend_id)
         else
           raise SloRulesEngine::UnsupportedApplyAction, "unsupported Datadog prune target #{operation.target.inspect}"
-        end
-      end
-
-      def datadog_operation_risk(action:, target:)
-        case [action, target]
-        when ['recreate', 'datadog.monitor'], ['recreate_and_wait', 'datadog.monitor']
-          {
-            level: 'high',
-            reasons: ['recreate_deletes_existing_monitor', 'alert_coverage_may_drop']
-          }
-        when ['recreate', 'datadog.dashboard'], ['recreate_and_wait', 'datadog.dashboard']
-          {
-            level: 'medium',
-            reasons: ['recreate_deletes_existing_dashboard']
-          }
-        when ['delete', 'datadog.monitor']
-          {
-            level: 'high',
-            reasons: ['prune_deletes_managed_monitor', 'alert_coverage_removed']
-          }
-        when ['delete', 'datadog.slo']
-          {
-            level: 'high',
-            reasons: ['prune_force_deletes_managed_slo', 'slo_coverage_removed']
-          }
-        when ['delete', 'datadog.dashboard']
-          {
-            level: 'medium',
-            reasons: ['prune_deletes_managed_dashboard']
-          }
         end
       end
 
@@ -413,37 +384,10 @@ module SloRulesEngine
         end
       end
 
-      def weak_identity_risk(match_identity)
-        return unless weak_match_identity?(match_identity)
-
-        {
-          level: 'medium',
-          reasons: ['matched_without_source_ref']
-        }
-      end
-
       def weak_match_identity?(match_identity)
         return false unless match_identity
 
         fetch_value(match_identity, :confidence) != 'high'
-      end
-
-      def merge_risks(*risks)
-        present = risks.compact
-        return if present.empty?
-
-        {
-          level: present.max_by { |risk| risk_priority(fetch_value(risk, :level)) }.then { |risk| fetch_value(risk, :level) },
-          reasons: present.flat_map { |risk| Array(fetch_value(risk, :reasons, [])) }.uniq
-        }
-      end
-
-      def risk_priority(level)
-        {
-          'low' => 1,
-          'medium' => 2,
-          'high' => 3
-        }.fetch(level, 0)
       end
 
       def desired_state(manifest)
