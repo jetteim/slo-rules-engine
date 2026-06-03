@@ -56,11 +56,11 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. split `test/datadog_apply_test.rb` by behavior using the extracted Datadog fake fixtures as guardrails
-2. only after the Datadog test split, consider Datadog applier/client internal extraction
-3. continue additional CLI command extraction incrementally, using `lib/slo_rules_engine/cli/onboarding_commands.rb` as the first pattern
+1. continue Datadog applier/client internal splits only where the split behavior tests expose a clean seam
+2. prioritize Datadog payload translation or state-planning collaborators before touching live client transport
+3. continue additional CLI command extraction incrementally only when a command family changes
 4. continue provider breadth only when another provider has a concrete reviewed handoff gap
-5. revisit provider-state only when new backend evidence exposes a concrete safety gap or another live provider is ready to follow the Datadog baseline
+5. revisit provider-state hardening only when new backend evidence exposes a concrete safety gap
 
 ## Housekeeping Backlog
 
@@ -76,10 +76,13 @@ Completed guardrails:
 1. CLI helper pilot: `test/support/cli_helpers.rb`
 2. Public-safe onboarding handoff and discovery fixtures: `test/support/onboarding_fixtures.rb`
 3. Datadog fake client/response helpers: `test/support/datadog_fakes.rb`
-4. First guarded CLI command extraction: `lib/slo_rules_engine/cli/onboarding_commands.rb`
+4. Datadog apply coverage split by behavior: `test/datadog_applier_state_test.rb`, `test/datadog_payload_translation_test.rb`, `test/datadog_client_state_test.rb`, and `test/datadog_client_http_test.rb`
+5. First guarded CLI command extraction: `lib/slo_rules_engine/cli/onboarding_commands.rb`
+6. Catalog CLI command extraction: `lib/slo_rules_engine/cli/catalog_commands.rb`
+7. Datadog risk policy extraction: `lib/slo_rules_engine/datadog/risk_policy.rb`
 
 Recommended remaining housekeeping sequence:
 
-1. Split `test/datadog_apply_test.rb` by behavior while preserving assertions.
+1. Extract Datadog payload translation or state-planning internals behind the current applier facade.
 2. Extract another focused CLI command module only if the next command family changes.
-3. Split Datadog applier/client internals after the Datadog tests are easier to navigate.
+3. Split Datadog client transport/state-reader concerns after applier internals are smaller.

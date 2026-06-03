@@ -105,4 +105,7 @@ This is the running plan for the long refactor.
 - [x] Pilot low-risk test support helpers for CLI and onboarding fixtures.
 - [x] Extract shared Datadog fake client and response test fixtures.
 - [x] Extract onboarding CLI command module after test support guardrails exist.
-- [ ] Split Datadog applier/client internals after Datadog tests are easier to navigate.
+- [x] Split Datadog apply coverage by behavior while preserving assertions.
+- [x] Extract Datadog risk policy from the Datadog applier.
+- [x] Extract catalog CLI command module after command-family coverage exists.
+- [ ] Continue Datadog applier/client internal splits only where the split tests expose a clean seam.
