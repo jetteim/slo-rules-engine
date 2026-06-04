@@ -110,4 +110,7 @@ This is the running plan for the long refactor.
 - [x] Extract catalog CLI command module after command-family coverage exists.
 - [x] Extract Datadog payload translator from the Datadog applier.
 - [x] Extract telemetry CLI command module after command-family coverage exists.
-- [ ] Continue Datadog applier/client internal splits only where the split tests expose a clean seam.
+- [x] Extract Datadog state planner from the Datadog applier.
+- [x] Split Datadog backend state reader from client transport concerns.
+- [x] Extract report CLI command module after command-family coverage exists.
+- [ ] Continue Datadog client transport/retry/mutation splits only where the split tests expose a clean seam.
