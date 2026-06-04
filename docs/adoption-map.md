@@ -56,9 +56,9 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. continue Datadog applier/client internal splits only where the split behavior tests expose a clean seam
-2. prioritize Datadog payload translation or state-planning collaborators before touching live client transport
-3. continue additional CLI command extraction incrementally only when a command family changes
+1. extract Datadog state-planning internals behind the current applier facade where split tests expose a clean seam
+2. split Datadog client transport/state-reader concerns only after applier planning internals are smaller
+3. continue additional CLI command extraction only when another command family changes
 4. continue provider breadth only when another provider has a concrete reviewed handoff gap
 5. revisit provider-state hardening only when new backend evidence exposes a concrete safety gap
 
@@ -80,9 +80,11 @@ Completed guardrails:
 5. First guarded CLI command extraction: `lib/slo_rules_engine/cli/onboarding_commands.rb`
 6. Catalog CLI command extraction: `lib/slo_rules_engine/cli/catalog_commands.rb`
 7. Datadog risk policy extraction: `lib/slo_rules_engine/datadog/risk_policy.rb`
+8. Datadog payload translation extraction: `lib/slo_rules_engine/datadog/payload_translator.rb`
+9. Telemetry CLI command extraction: `lib/slo_rules_engine/cli/telemetry_commands.rb`
 
 Recommended remaining housekeeping sequence:
 
-1. Extract Datadog payload translation or state-planning internals behind the current applier facade.
-2. Extract another focused CLI command module only if the next command family changes.
-3. Split Datadog client transport/state-reader concerns after applier internals are smaller.
+1. Extract Datadog state-planning internals behind the current applier facade.
+2. Split Datadog client transport/state-reader concerns after applier internals are smaller.
+3. Extract another focused CLI command module only if another command family changes.

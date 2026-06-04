@@ -108,4 +108,6 @@ This is the running plan for the long refactor.
 - [x] Split Datadog apply coverage by behavior while preserving assertions.
 - [x] Extract Datadog risk policy from the Datadog applier.
 - [x] Extract catalog CLI command module after command-family coverage exists.
+- [x] Extract Datadog payload translator from the Datadog applier.
+- [x] Extract telemetry CLI command module after command-family coverage exists.
 - [ ] Continue Datadog applier/client internal splits only where the split tests expose a clean seam.
