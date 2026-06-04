@@ -6,11 +6,13 @@ require 'fileutils'
 require_relative '../lib/sre'
 require_relative '../lib/slo_rules_engine/cli/catalog_commands'
 require_relative '../lib/slo_rules_engine/cli/onboarding_commands'
+require_relative '../lib/slo_rules_engine/cli/report_commands'
 require_relative '../lib/slo_rules_engine/cli/telemetry_commands'
 
 module RulesCtl
   extend SloRulesEngine::CLI::CatalogCommands
   extend SloRulesEngine::CLI::OnboardingCommands
+  extend SloRulesEngine::CLI::ReportCommands
   extend SloRulesEngine::CLI::TelemetryCommands
 
   module_function
@@ -449,19 +451,6 @@ module RulesCtl
     manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
     validate_manifests!(manifests)
     manifests
-  end
-
-  def migration_report(argv)
-    abort_usage('missing file') if argv.empty?
-
-    report = SloRulesEngine::MigrationReport.scan_files(argv)
-    puts JSON.pretty_generate(report.to_h)
-    exit(report.valid? ? 0 : 1)
-  end
-
-  def model_report(argv)
-    definitions = load_definitions(argv)
-    puts JSON.pretty_generate(SloRulesEngine::ReliabilityModel::ReportBuilder.new.build(definitions))
   end
 
   def load_definitions(paths)
