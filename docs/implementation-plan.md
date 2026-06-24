@@ -113,4 +113,5 @@ This is the running plan for the long refactor.
 - [x] Extract Datadog state planner from the Datadog applier.
 - [x] Split Datadog backend state reader from client transport concerns.
 - [x] Extract report CLI command module after command-family coverage exists.
-- [ ] Continue Datadog client transport/retry/mutation splits only where the split tests expose a clean seam.
+- [x] Extract Datadog request transport and retry behavior from the Datadog client.
+- [ ] Pause further housekeeping unless a future behavior change exposes a clean seam without reducing readability.

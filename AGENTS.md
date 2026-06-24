@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, and onboarding/catalog/telemetry/report CLI command families. Further Datadog client transport splits should stay evidence-driven and should not outrank telemetry-first or backend-evidence work.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, Datadog request transport, and onboarding/catalog/telemetry/report CLI command families. Further housekeeping is paused unless a future change exposes a clean seam without reducing readability.
 
 ## Non-Negotiable Working Rules
 
@@ -102,10 +102,12 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 - Datadog desired-state, diff, prune, and import-finding planning now lives in `SloRulesEngine::Datadog::StatePlanner`
 - Datadog backend state discovery now lives in `SloRulesEngine::Datadog::StateReader`, leaving the client focused on credentials, HTTP retry/transport, deletes, and create-and-wait mutations
 - Migration and model report CLI commands now live in `lib/slo_rules_engine/cli/report_commands.rb`
+- Datadog request transport and retry behavior now lives in `SloRulesEngine::Datadog::RequestTransport`, leaving the client focused on credentials, state-reader delegation, deletes, and create-and-wait mutations
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: Datadog state planner extraction, Datadog state reader split, and report CLI command extraction
+- latest checkpoint: Datadog request transport extraction and housekeeping pause decision
+- previous checkpoint: Datadog state planner extraction, Datadog state reader split, and report CLI command extraction
 - previous checkpoint: Datadog payload translator extraction and telemetry CLI command extraction
 - previous checkpoint: Datadog coverage split, Datadog risk policy extraction, and catalog CLI command extraction
 - previous checkpoint: CLI/onboarding/Datadog test guardrails plus onboarding CLI command extraction
@@ -145,21 +147,21 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 
 Highest-value remaining gaps:
 
-1. Continue Datadog client transport/retry/mutation splits only where the split behavior tests expose a clean seam
-2. Validate remaining Datadog resource semantics against the real backend contract only when safe backend evidence is available
-3. Keep provider-state hardening evidence-driven rather than roadmap-leading
+1. Validate remaining Datadog resource semantics against the real backend contract only when safe backend evidence is available
+2. Keep provider-state hardening evidence-driven rather than roadmap-leading
+3. Avoid further housekeeping unless a concrete command or backend change exposes a clean seam
 
 Secondary gaps:
 
 1. Broader state-management parity for future providers after the Datadog baseline is stronger
-2. Additional CLI command extraction only as command families change; onboarding, catalog, telemetry, and report command families are already split
+2. Additional CLI command extraction only as command families change; onboarding, catalog, telemetry, and report command families are already split, and the remaining state/generate/review commands still share provider-manifest/review helpers
 3. Additional provider breadth when a concrete reviewed handoff gap appears
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- extract a small Datadog request transport/retry collaborator only if the existing client HTTP tests expose a clean seam, otherwise pause housekeeping and return to telemetry-first or backend-evidence work
+- pause housekeeping and return to telemetry-first, provider-breadth, or backend-evidence work unless a command-family change or live backend finding creates a clean, behavior-tested seam
 
 Rationale:
 
@@ -193,6 +195,8 @@ Rationale:
 - telemetry CLI commands now follow the same small command-family module pattern as onboarding and catalog
 - Datadog state planning and backend state reading now sit behind focused collaborators
 - report CLI commands now follow the same small command-family module pattern
+- Datadog request transport and retry behavior now sit behind a focused collaborator
+- the remaining CLI state/generate/review commands are coupled through shared provider-manifest and review helpers, so extracting them now would reduce clarity more than it improves structure
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
 ## Verification Commands

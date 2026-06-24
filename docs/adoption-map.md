@@ -56,11 +56,11 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. extract Datadog request transport/retry internals only where the client HTTP tests expose a clean seam
-2. pause further housekeeping if the next split would blur capability boundaries or weaken readability
-3. continue additional CLI command extraction only when another command family changes
-4. continue provider breadth only when another provider has a concrete reviewed handoff gap
-5. revisit provider-state hardening only when new backend evidence exposes a concrete safety gap
+1. pause further housekeeping unless a future behavior change exposes a clean seam without reducing readability
+2. revisit provider-state hardening only when new backend evidence exposes a concrete safety gap
+3. continue provider breadth only when another provider has a concrete reviewed handoff gap
+4. continue additional CLI command extraction only when another command family changes
+5. revisit test-suite compaction after the current collaborator and command-module count settles
 
 ## Housekeeping Backlog
 
@@ -85,9 +85,10 @@ Completed guardrails:
 10. Datadog state planning extraction: `lib/slo_rules_engine/datadog/state_planner.rb`
 11. Datadog state reader split: `lib/slo_rules_engine/datadog/state_reader.rb`
 12. Report CLI command extraction: `lib/slo_rules_engine/cli/report_commands.rb`
+13. Datadog request transport extraction: `lib/slo_rules_engine/datadog/request_transport.rb`
 
 Recommended remaining housekeeping sequence:
 
-1. Extract Datadog request transport/retry internals only if the client HTTP tests expose a clean seam.
+1. Pause further housekeeping unless a future change exposes a clean, behavior-tested seam.
 2. Extract another focused CLI command module only if another command family changes.
 3. Revisit test-suite compaction after the current collaborator and command-module count settles.
