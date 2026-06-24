@@ -16,7 +16,7 @@ module SloRulesEngine
           calculation_basis_distribution: distribution(slos.map(&:calculation_basis)),
           objectives: slos.map(&:objective).compact.sort,
           observability_handoff_requests: slos.flat_map { |slo| slo.observability_handoff&.requests || [] }.uniq.sort,
-          review_provenance: definitions.filter_map { |definition| review_provenance(definition) },
+          review_provenance: definitions.map { |definition| review_provenance(definition) }.compact,
           private_identifiers: []
         }
       end

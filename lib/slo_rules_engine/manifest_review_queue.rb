@@ -194,7 +194,7 @@ module SloRulesEngine
       def freshness(manifests, entries)
         {
           manifest_fingerprint: fingerprint(Array(manifests)),
-          handoff_fingerprints: entries.filter_map { |entry| handoff_fingerprint(entry[:handoff]) }
+          handoff_fingerprints: entries.map { |entry| handoff_fingerprint(entry[:handoff]) }.compact
         }
       end
 
