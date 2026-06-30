@@ -165,7 +165,8 @@ Secondary gaps:
 
 Next recommended slice:
 
-- pause housekeeping and return to telemetry-first, provider-breadth, or backend-evidence work unless a command-family change or live backend finding creates a clean, behavior-tested seam
+- continue telemetry-first saved-artifact handoff only if the next reviewer gap can be derived from existing discovery, handoff, manifest, and manifest-review files without backend calls; the most likely next slice is to surface saved manifest-review freshness/staleness status directly in `onboarding-artifact-index`
+- otherwise pause housekeeping and return only to provider-breadth or backend-evidence work when a concrete reviewed handoff gap or live backend finding creates a clean, behavior-tested seam
 
 Rationale:
 
@@ -189,6 +190,7 @@ Rationale:
 - the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
 - artifact indexes now show the next reviewer actions needed to advance incomplete saved handoff bundles
 - artifact indexes now expose whether saved manifest-review reports are valid or still blocking provider handoff
+- artifact indexes still point reviewers at manifest-review freshness validation commands; a future slice may inline saved-report freshness/staleness status if it can be computed from saved artifacts without rerunning telemetry discovery or contacting backends
 - the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
 - housekeeping reviews now identify concrete compaction and layering follow-ups
 - Sloth external-generator handoff now writes native provider input files instead of relying on the engine manifest as generator input
@@ -234,4 +236,6 @@ If a new session needs to resume quickly:
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
 5. Inspect `lib/slo_rules_engine/onboarding/summary_builder.rb`
-6. Continue the highest-priority open slice listed above
+6. Inspect `lib/slo_rules_engine/onboarding/artifact_index_builder.rb`, `lib/slo_rules_engine/manifest_review_queue.rb`, and `test/onboarding_artifact_index_test.rb`
+7. If the user says `proceed`, first check `git status --short --branch`; if clean, continue the recommended saved-artifact freshness/status slice above using TDD
+8. Do not resume housekeeping by default; only do it if a concrete command-family or backend-evidence change exposes a clean seam
