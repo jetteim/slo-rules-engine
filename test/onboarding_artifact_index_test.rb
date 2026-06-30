@@ -57,10 +57,29 @@ class OnboardingArtifactIndexTest < Minitest::Test
       File.write(draft_path, "# reviewed draft\n")
       manifest_path = File.join(manifest_dir, 'checkout-api', 'datadog', 'manifest.json')
       FileUtils.mkdir_p(File.dirname(manifest_path))
-      write_json(manifest_path, service: 'checkout-api', provider: 'datadog', artifacts: {})
+      manifest = {
+        service: 'checkout-api',
+        provider: 'datadog',
+        review_provenance: {
+          label: 'checkout-prod',
+          provider: 'datadog',
+          accepted_candidate_uids: ['request-latency'],
+          rejected_candidate_uids: [],
+          notes: ['Latency accepted.']
+        },
+        artifacts: {}
+      }
+      write_json(manifest_path, manifest)
       report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
       FileUtils.mkdir_p(File.dirname(report_path))
-      write_json(report_path, valid: true)
+      write_json(
+        report_path,
+        SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+          [manifest],
+          provider: 'datadog',
+          handoff_dir: handoff_dir
+        )
+      )
 
       artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
         index_path,
@@ -95,6 +114,7 @@ class OnboardingArtifactIndexTest < Minitest::Test
       assert_equal true, provider.fetch(:manifest).fetch(:exists)
       assert_equal report_path, provider.fetch(:manifest_review_report).fetch(:path)
       assert_equal true, provider.fetch(:manifest_review_report).fetch(:exists)
+      assert_equal true, provider.fetch(:manifest_review_report).fetch(:fresh)
       assert_equal(
         "rules-ctl manifest-review --provider=datadog --manifest=#{manifest_path} --handoff-dir=#{handoff_dir} --report=#{report_path}",
         provider.fetch(:manifest_review_command)
@@ -242,29 +262,17 @@ class OnboardingArtifactIndexTest < Minitest::Test
       File.write(File.join(draft_dir, 'checkout-prod.rb'), "# reviewed draft\n")
       manifest_path = File.join(manifest_dir, 'checkout-api', 'datadog', 'manifest.json')
       FileUtils.mkdir_p(File.dirname(manifest_path))
-      write_json(manifest_path, service: 'checkout-api', provider: 'datadog', artifacts: {})
+      manifest = { service: 'checkout-api', provider: 'datadog', artifacts: {} }
+      write_json(manifest_path, manifest)
       report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
       FileUtils.mkdir_p(File.dirname(report_path))
       write_json(
         report_path,
-        valid: false,
-        summary: {
-          reviewed_manifests: 0,
-          missing_provenance_manifests: 1,
-          ready_for_apply_manifests: 0
-        },
-        manifests: [
-          {
-            status: 'missing_provenance',
-            findings: [
-              {
-                code: 'missing_review_provenance',
-                path: 'manifests[0].review_provenance',
-                message: 'reviewed handoff provenance is required before manifest review'
-              }
-            ]
-          }
-        ]
+        SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+          [manifest],
+          provider: 'datadog',
+          handoff_dir: handoff_dir
+        )
       )
 
       artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
@@ -285,6 +293,7 @@ class OnboardingArtifactIndexTest < Minitest::Test
       report = provider.fetch(:manifest_review_report)
       assert_equal true, report.fetch(:exists)
       assert_equal false, report.fetch(:valid)
+      assert_equal true, report.fetch(:fresh)
       assert_equal ['missing_review_provenance'], report.fetch(:finding_codes)
       assert_equal 0, report.fetch(:ready_for_apply_manifests)
 
@@ -294,6 +303,107 @@ class OnboardingArtifactIndexTest < Minitest::Test
       assert_equal report_path, action.fetch(:path)
       assert_equal(
         "rules-ctl manifest-review --provider=datadog --manifest=#{manifest_path} --handoff-dir=#{handoff_dir} --report=#{report_path}",
+        action.fetch(:command)
+      )
+    end
+  end
+
+  def test_build_reports_stale_manifest_review_report_as_blocking_next_action
+    Dir.mktmpdir do |dir|
+      discovery_dir = File.join(dir, 'discovery')
+      handoff_dir = File.join(dir, 'handoff')
+      draft_dir = File.join(dir, 'drafts')
+      manifest_dir = File.join(dir, 'generated')
+      [discovery_dir, handoff_dir, draft_dir, manifest_dir].each { |path| FileUtils.mkdir_p(path) }
+
+      discovery_result = File.join(discovery_dir, 'checkout-prod.json')
+      write_json(
+        discovery_result,
+        provider: 'datadog',
+        scope: { label: 'checkout-prod', service: 'checkout-api' },
+        signals: [{ kind: 'latency', metric: 'http.server.request.duration', user_visible: true }],
+        findings: []
+      )
+      index_path = File.join(discovery_dir, 'index.json')
+      write_json(
+        index_path,
+        provider: 'datadog',
+        generated_at: '2026-05-13T09:00:00Z',
+        total_scopes: 1,
+        scopes: [
+          {
+            label: 'checkout-prod',
+            scope: { label: 'checkout-prod', service: 'checkout-api' },
+            status: 'ok',
+            result_file: 'checkout-prod.json',
+            signal_count: 1,
+            finding_count: 0
+          }
+        ]
+      )
+      handoff_path = File.join(handoff_dir, 'checkout-prod.handoff.json')
+      write_json(
+        handoff_path,
+        label: 'checkout-prod',
+        provider: 'datadog',
+        review: {
+          status: 'reviewed',
+          accepted_candidate_uids: ['request-latency'],
+          rejected_candidate_uids: [],
+          notes: []
+        }
+      )
+      File.write(File.join(draft_dir, 'checkout-prod.rb'), "# reviewed draft\n")
+      manifest_path = File.join(manifest_dir, 'checkout-api', 'datadog', 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(manifest_path))
+      manifest = {
+        service: 'checkout-api',
+        provider: 'datadog',
+        review_provenance: {
+          label: 'checkout-prod',
+          provider: 'datadog',
+          accepted_candidate_uids: ['request-latency'],
+          rejected_candidate_uids: [],
+          notes: []
+        }
+      }
+      write_json(manifest_path, manifest)
+      report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
+      FileUtils.mkdir_p(File.dirname(report_path))
+      report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+        [manifest],
+        provider: 'datadog',
+        handoff_dir: handoff_dir
+      )
+      write_json(report_path, report)
+      write_json(manifest_path, manifest.merge(metadata: { refreshed_after_report: true }))
+
+      artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
+        index_path,
+        handoff_dir: handoff_dir,
+        draft_dir: draft_dir,
+        manifest_dir: manifest_dir,
+        providers: ['datadog']
+      )
+
+      assert_equal 0, artifact_index.fetch(:summary).fetch(:fresh_manifest_review_reports)
+      assert_equal 1, artifact_index.fetch(:summary).fetch(:stale_manifest_review_reports)
+      assert_equal({ refresh_manifest_review_report: 1 }, artifact_index.fetch(:summary).fetch(:next_action_counts))
+
+      scope = artifact_index.fetch(:scopes).fetch(0)
+      assert_equal 'partial', scope.fetch(:status)
+      report = scope.fetch(:providers).fetch(0).fetch(:manifest_review_report)
+      assert_equal true, report.fetch(:exists)
+      assert_equal true, report.fetch(:valid)
+      assert_equal false, report.fetch(:fresh)
+      assert_equal ['stale_manifest_review_report'], report.fetch(:freshness_finding_codes)
+
+      action = scope.fetch(:next_actions).fetch(0)
+      assert_equal :refresh_manifest_review_report, action.fetch(:code)
+      assert_equal 'datadog', action.fetch(:provider)
+      assert_equal report_path, action.fetch(:path)
+      assert_equal(
+        "rules-ctl manifest-review --provider=datadog --manifest=#{manifest_path} --handoff-dir=#{handoff_dir} --output=#{report_path}",
         action.fetch(:command)
       )
     end

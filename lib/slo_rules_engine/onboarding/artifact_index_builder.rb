@@ -130,13 +130,18 @@ module SloRulesEngine
               path: manifest_path,
               exists: manifest_path ? File.exist?(manifest_path) : false
             }.compact,
-            manifest_review_report: manifest_review_report_entry(report_path),
+            manifest_review_report: manifest_review_report_entry(
+              report_path,
+              provider: provider,
+              manifest_path: manifest_path,
+              handoff_dir: handoff_dir
+            ),
             manifest_review_command: manifest_review_command(provider, manifest_path, report_path, handoff_dir)
           }.compact
         end
       end
 
-      def manifest_review_report_entry(path)
+      def manifest_review_report_entry(path, provider:, manifest_path:, handoff_dir:)
         exists = File.exist?(path)
         payload = json_payload(path)
         summary = payload[:summary].is_a?(Hash) ? payload[:summary] : {}
@@ -148,8 +153,31 @@ module SloRulesEngine
           entry[:valid] = payload[:valid] unless payload[:valid].nil?
           entry[:ready_for_apply_manifests] = summary[:ready_for_apply_manifests] if summary.key?(:ready_for_apply_manifests)
           entry[:finding_codes] = manifest_review_finding_codes(payload)
+          freshness = saved_report_freshness(
+            payload,
+            provider: provider,
+            manifest_path: manifest_path,
+            handoff_dir: handoff_dir,
+            report_path: path
+          )
+          if freshness
+            entry[:fresh] = freshness[:fresh]
+            entry[:freshness_finding_codes] = Array(freshness[:findings]).map { |finding| finding[:code] }.compact.uniq
+          end
         end
         entry
+      end
+
+      def saved_report_freshness(saved_report, provider:, manifest_path:, handoff_dir:, report_path:)
+        return nil if manifest_path.to_s.empty? || !File.exist?(manifest_path)
+
+        current_manifest = json_payload(manifest_path)
+        current_report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+          [current_manifest],
+          provider: provider,
+          handoff_dir: handoff_dir
+        )
+        SloRulesEngine::ManifestReviewQueue::FreshnessValidator.new.validate(saved_report, current_report, path: report_path)
       end
 
       def manifest_review_finding_codes(payload)
@@ -161,9 +189,19 @@ module SloRulesEngine
       def manifest_review_command(provider, manifest_path, report_path, handoff_dir)
         return nil if manifest_path.to_s.empty?
 
+        manifest_review_command_with_option(provider, manifest_path, report_path, handoff_dir, option: 'report')
+      end
+
+      def manifest_review_refresh_command(provider, manifest_path, report_path, handoff_dir)
+        return nil if manifest_path.to_s.empty?
+
+        manifest_review_command_with_option(provider, manifest_path, report_path, handoff_dir, option: 'output')
+      end
+
+      def manifest_review_command_with_option(provider, manifest_path, report_path, handoff_dir, option:)
         command = "rules-ctl manifest-review --provider=#{provider} --manifest=#{manifest_path}"
         command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
-        "#{command} --report=#{report_path}"
+        "#{command} --#{option}=#{report_path}"
       end
 
       def missing_artifacts(discovery, handoff, draft, provider_artifacts)
@@ -250,6 +288,16 @@ module SloRulesEngine
             )
           end
           if report[:exists]
+            if report[:fresh] == false
+              actions << next_action(
+                :refresh_manifest_review_report,
+                "refresh the #{provider_key} manifest-review report for #{label}",
+                provider: provider_key,
+                path: report[:path],
+                command: manifest_review_refresh_command(provider_key, manifest[:path], report[:path], handoff_dir)
+              )
+              next
+            end
             next unless report[:valid] == false
 
             actions << next_action(
@@ -292,9 +340,14 @@ module SloRulesEngine
       def scope_status(entry, missing, provider_artifacts)
         return 'failed' if entry[:status].to_s != 'ok'
         return 'partial' unless missing.empty?
+        return 'partial' if provider_artifacts_with_stale_reports?(provider_artifacts)
         return 'partial' if provider_artifacts_with_invalid_reports?(provider_artifacts)
 
         'complete'
+      end
+
+      def provider_artifacts_with_stale_reports?(provider_artifacts)
+        provider_artifacts.any? { |provider| provider.dig(:manifest_review_report, :fresh) == false }
       end
 
       def provider_artifacts_with_invalid_reports?(provider_artifacts)
@@ -313,6 +366,8 @@ module SloRulesEngine
           draft_files: scopes.count { |scope| scope.dig(:draft, :exists) },
           provider_manifest_files: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest, :exists) } },
           manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :exists) } },
+          fresh_manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :fresh) == true } },
+          stale_manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :fresh) == false } },
           valid_manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :valid) == true } },
           invalid_manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :valid) == false } }
         }

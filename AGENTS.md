@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index with next-action and saved-report-validity guidance, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, Datadog request transport, and onboarding/catalog/telemetry/report CLI command families. Further housekeeping is paused unless a future change exposes a clean seam without reducing readability.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index with next-action, saved-report-validity, and saved-report-freshness guidance, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, Datadog request transport, and onboarding/catalog/telemetry/report CLI command families. Further housekeeping is paused unless a future change exposes a clean seam without reducing readability.
 
 ## Non-Negotiable Working Rules
 
@@ -90,6 +90,7 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 - `onboarding-artifact-index` now ties saved discovery results, handoff packets, reviewed draft files, provider manifests, and manifest-review reports into one per-scope handoff index
 - Onboarding artifact indexes now include per-scope next actions and aggregate next-action counts for incomplete saved handoff bundles
 - Onboarding artifact indexes now surface saved manifest-review report validity, finding codes, and blocking next actions when reports exist but are not apply-ready
+- Onboarding artifact indexes now validate saved manifest-review report freshness against current manifest and handoff artifacts, surface stale report finding codes, and point reviewers at the refresh command
 - `docs/telemetry-first-walkthrough.md` and `test/telemetry_first_walkthrough_test.rb` now cover the saved-artifact flow through reviewed provider gates without live backend credentials
 - `docs/housekeeping/test-suite-compaction-review.md` maps test-suite dependency shape and recommends compaction steps without changing test behavior
 - `docs/housekeeping/abstraction-layer-review.md` maps abstraction layer pressure points and recommends extraction order without changing production code
@@ -108,7 +109,8 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: onboarding artifact index saved report validity and blocking next-action guidance
+- latest checkpoint: onboarding artifact index saved report freshness/staleness guidance
+- previous checkpoint: onboarding artifact index saved report validity and blocking next-action guidance
 - previous checkpoint: onboarding artifact index next-action guidance for incomplete saved handoff bundles
 - previous checkpoint: Datadog request transport extraction and housekeeping pause decision
 - previous checkpoint: Datadog state planner extraction, Datadog state reader split, and report CLI command extraction
@@ -165,7 +167,7 @@ Secondary gaps:
 
 Next recommended slice:
 
-- continue telemetry-first saved-artifact handoff only if the next reviewer gap can be derived from existing discovery, handoff, manifest, and manifest-review files without backend calls; the most likely next slice is to surface saved manifest-review freshness/staleness status directly in `onboarding-artifact-index`
+- continue telemetry-first saved-artifact handoff only if the next reviewer gap can be derived from existing discovery, handoff, manifest, and manifest-review files without backend calls
 - otherwise pause housekeeping and return only to provider-breadth or backend-evidence work when a concrete reviewed handoff gap or live backend finding creates a clean, behavior-tested seam
 
 Rationale:
@@ -190,7 +192,7 @@ Rationale:
 - the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
 - artifact indexes now show the next reviewer actions needed to advance incomplete saved handoff bundles
 - artifact indexes now expose whether saved manifest-review reports are valid or still blocking provider handoff
-- artifact indexes still point reviewers at manifest-review freshness validation commands; a future slice may inline saved-report freshness/staleness status if it can be computed from saved artifacts without rerunning telemetry discovery or contacting backends
+- artifact indexes now inline saved manifest-review freshness/staleness status and stale finding codes from current saved artifacts without rerunning telemetry discovery or contacting backends
 - the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
 - housekeeping reviews now identify concrete compaction and layering follow-ups
 - Sloth external-generator handoff now writes native provider input files instead of relying on the engine manifest as generator input

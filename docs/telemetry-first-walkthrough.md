@@ -95,6 +95,8 @@ bin/rules-ctl onboarding-artifact-index \
   "$fixture/discovery/index.json"
 ```
 
+The artifact index includes the saved manifest-review report's `valid` and `fresh` status, stale finding codes when the report no longer matches the current manifest or handoff packet, and the next refresh command for stale reports.
+
 Finally, prove the reviewed artifact gates run before live backend mutation. Without Datadog credentials, the command should stop at `missing_credentials` after review and freshness gates pass:
 
 ```bash

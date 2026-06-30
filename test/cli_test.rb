@@ -1313,10 +1313,35 @@ class CLITest < Minitest::Test
       File.write(File.join(draft_dir, 'checkout-prod.rb'), "# reviewed draft\n")
       manifest_path = File.join(manifest_dir, 'checkout-api', 'datadog', 'manifest.json')
       FileUtils.mkdir_p(File.dirname(manifest_path))
-      File.write(manifest_path, JSON.pretty_generate(service: 'checkout-api', provider: 'datadog', artifacts: {}))
+      manifest = {
+        service: 'checkout-api',
+        provider: 'datadog',
+        review_provenance: {
+          label: 'checkout-prod',
+          provider: 'datadog',
+          accepted_candidate_uids: ['request-latency'],
+          rejected_candidate_uids: [],
+          notes: []
+        },
+        artifacts: {
+          slos: [],
+          monitors: [],
+          telemetry_gap_monitors: [],
+          dashboards: []
+        }
+      }
+      File.write(manifest_path, JSON.pretty_generate(manifest))
       report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
-      FileUtils.mkdir_p(File.dirname(report_path))
-      File.write(report_path, JSON.pretty_generate(valid: true))
+      _review_stdout, review_stderr, review_status = Open3.capture3(
+        'ruby',
+        "#{ROOT}/bin/rules-ctl",
+        'manifest-review',
+        '--provider=datadog',
+        "--manifest=#{manifest_path}",
+        "--handoff-dir=#{handoff_dir}",
+        "--output=#{report_path}"
+      )
+      assert review_status.success?, review_stderr
       output_path = File.join(dir, 'handoff-index.json')
 
       stdout, stderr, status = Open3.capture3(
@@ -1338,11 +1363,14 @@ class CLITest < Minitest::Test
       assert_equal 0, payload.fetch('summary').fetch('missing_artifact_count')
       assert_equal 1, payload.fetch('summary').fetch('valid_manifest_review_reports')
       assert_equal 0, payload.fetch('summary').fetch('invalid_manifest_review_reports')
+      assert_equal 1, payload.fetch('summary').fetch('fresh_manifest_review_reports')
+      assert_equal 0, payload.fetch('summary').fetch('stale_manifest_review_reports')
       assert_equal({}, payload.fetch('summary').fetch('next_action_counts'))
       provider = payload.fetch('scopes').fetch(0).fetch('providers').fetch(0)
       assert_equal manifest_path, provider.fetch('manifest').fetch('path')
       assert_equal report_path, provider.fetch('manifest_review_report').fetch('path')
       assert_equal true, provider.fetch('manifest_review_report').fetch('valid')
+      assert_equal true, provider.fetch('manifest_review_report').fetch('fresh')
       assert_includes provider.fetch('manifest_review_command'), '--report='
     end
   end

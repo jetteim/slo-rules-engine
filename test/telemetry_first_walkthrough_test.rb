@@ -83,6 +83,9 @@ class TelemetryFirstWalkthroughTest < Minitest::Test
       )
       assert_equal 1, artifact_index.fetch('summary').fetch('complete_scopes')
       assert_equal 0, artifact_index.fetch('summary').fetch('missing_artifact_count')
+      assert_equal 1, artifact_index.fetch('summary').fetch('fresh_manifest_review_reports')
+      assert_equal 0, artifact_index.fetch('summary').fetch('stale_manifest_review_reports')
+      assert_equal true, artifact_index.fetch('scopes').fetch(0).fetch('providers').fetch(0).fetch('manifest_review_report').fetch('fresh')
       assert_equal artifact_index, JSON.parse(File.read(artifact_index_path))
 
       gated = json_command(

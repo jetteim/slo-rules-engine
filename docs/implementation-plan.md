@@ -93,6 +93,7 @@ This is the running plan for the long refactor.
 - [x] Add compact onboarding artifact index tying discovery evidence, handoff packets, reviewed drafts, provider manifests, and manifest-review reports together.
 - [x] Add next-action guidance to onboarding artifact indexes for incomplete saved handoff bundles.
 - [x] Surface saved manifest-review report validity and blocking findings in onboarding artifact indexes.
+- [x] Surface saved manifest-review report freshness and stale-report refresh guidance in onboarding artifact indexes.
 - [x] Add a representative saved-artifact fixture and smoke-test the telemetry-first walkthrough through reviewed provider gates.
 
 ## Phase 6: Contract Hardening
