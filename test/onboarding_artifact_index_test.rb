@@ -409,6 +409,104 @@ class OnboardingArtifactIndexTest < Minitest::Test
     end
   end
 
+  def test_build_checks_provider_level_report_freshness_against_all_provider_manifests
+    Dir.mktmpdir do |dir|
+      discovery_dir = File.join(dir, 'discovery')
+      handoff_dir = File.join(dir, 'handoff')
+      draft_dir = File.join(dir, 'drafts')
+      manifest_dir = File.join(dir, 'generated')
+      [discovery_dir, handoff_dir, draft_dir, manifest_dir].each { |path| FileUtils.mkdir_p(path) }
+
+      scopes = [
+        { label: 'checkout-prod', service: 'checkout-api', accepted: 'checkout-latency' },
+        { label: 'payments-prod', service: 'payments-api', accepted: 'payments-errors' }
+      ]
+      scopes.each do |scope|
+        write_json(
+          File.join(discovery_dir, "#{scope.fetch(:label)}.json"),
+          provider: 'datadog',
+          scope: { label: scope.fetch(:label), service: scope.fetch(:service) },
+          signals: [{ kind: 'latency', metric: 'http.server.request.duration', user_visible: true }],
+          findings: []
+        )
+        write_json(
+          File.join(handoff_dir, "#{scope.fetch(:label)}.handoff.json"),
+          label: scope.fetch(:label),
+          provider: 'datadog',
+          review: {
+            status: 'reviewed',
+            accepted_candidate_uids: [scope.fetch(:accepted)],
+            rejected_candidate_uids: [],
+            notes: []
+          }
+        )
+        File.write(File.join(draft_dir, "#{scope.fetch(:label)}.rb"), "# reviewed draft\n")
+      end
+      index_path = File.join(discovery_dir, 'index.json')
+      write_json(
+        index_path,
+        provider: 'datadog',
+        generated_at: '2026-05-13T09:00:00Z',
+        total_scopes: scopes.length,
+        scopes: scopes.map do |scope|
+          {
+            label: scope.fetch(:label),
+            scope: { label: scope.fetch(:label), service: scope.fetch(:service) },
+            status: 'ok',
+            result_file: "#{scope.fetch(:label)}.json",
+            signal_count: 1,
+            finding_count: 0
+          }
+        end
+      )
+
+      manifests = scopes.map do |scope|
+        manifest = {
+          service: scope.fetch(:service),
+          provider: 'datadog',
+          review_provenance: {
+            label: scope.fetch(:label),
+            provider: 'datadog',
+            accepted_candidate_uids: [scope.fetch(:accepted)],
+            rejected_candidate_uids: [],
+            notes: []
+          }
+        }
+        manifest_path = File.join(manifest_dir, scope.fetch(:service), 'datadog', 'manifest.json')
+        FileUtils.mkdir_p(File.dirname(manifest_path))
+        write_json(manifest_path, manifest)
+        manifest
+      end
+      report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
+      FileUtils.mkdir_p(File.dirname(report_path))
+      write_json(
+        report_path,
+        SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+          manifests,
+          provider: 'datadog',
+          handoff_dir: handoff_dir
+        )
+      )
+
+      artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
+        index_path,
+        handoff_dir: handoff_dir,
+        draft_dir: draft_dir,
+        manifest_dir: manifest_dir,
+        providers: ['datadog']
+      )
+
+      assert_equal 2, artifact_index.fetch(:summary).fetch(:complete_scopes)
+      assert_equal 2, artifact_index.fetch(:summary).fetch(:fresh_manifest_review_reports)
+      assert_equal 0, artifact_index.fetch(:summary).fetch(:stale_manifest_review_reports)
+      assert_equal({}, artifact_index.fetch(:summary).fetch(:next_action_counts))
+      artifact_index.fetch(:scopes).each do |scope|
+        assert_equal 'complete', scope.fetch(:status)
+        assert_equal true, scope.fetch(:providers).fetch(0).fetch(:manifest_review_report).fetch(:fresh)
+      end
+    end
+  end
+
   private
 
   def write_json(path, payload)

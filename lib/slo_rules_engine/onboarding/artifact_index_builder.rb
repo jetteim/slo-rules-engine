@@ -134,6 +134,7 @@ module SloRulesEngine
               report_path,
               provider: provider,
               manifest_path: manifest_path,
+              manifest_dir: manifest_dir,
               handoff_dir: handoff_dir
             ),
             manifest_review_command: manifest_review_command(provider, manifest_path, report_path, handoff_dir)
@@ -141,7 +142,7 @@ module SloRulesEngine
         end
       end
 
-      def manifest_review_report_entry(path, provider:, manifest_path:, handoff_dir:)
+      def manifest_review_report_entry(path, provider:, manifest_path:, manifest_dir:, handoff_dir:)
         exists = File.exist?(path)
         payload = json_payload(path)
         summary = payload[:summary].is_a?(Hash) ? payload[:summary] : {}
@@ -157,6 +158,7 @@ module SloRulesEngine
             payload,
             provider: provider,
             manifest_path: manifest_path,
+            manifest_dir: manifest_dir,
             handoff_dir: handoff_dir,
             report_path: path
           )
@@ -168,16 +170,28 @@ module SloRulesEngine
         entry
       end
 
-      def saved_report_freshness(saved_report, provider:, manifest_path:, handoff_dir:, report_path:)
-        return nil if manifest_path.to_s.empty? || !File.exist?(manifest_path)
+      def saved_report_freshness(saved_report, provider:, manifest_path:, manifest_dir:, handoff_dir:, report_path:)
+        manifests = current_provider_manifests(provider, manifest_dir)
+        if manifests.empty?
+          return nil if manifest_path.to_s.empty? || !File.exist?(manifest_path)
 
-        current_manifest = json_payload(manifest_path)
+          manifests = [json_payload(manifest_path)]
+        end
+
         current_report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
-          [current_manifest],
+          manifests,
           provider: provider,
           handoff_dir: handoff_dir
         )
         SloRulesEngine::ManifestReviewQueue::FreshnessValidator.new.validate(saved_report, current_report, path: report_path)
+      end
+
+      def current_provider_manifests(provider, manifest_dir)
+        return [] if manifest_dir.to_s.empty?
+
+        Dir.glob(File.join(manifest_dir, '*', provider, 'manifest.json')).sort.map do |path|
+          json_payload(path)
+        end
       end
 
       def manifest_review_finding_codes(payload)
