@@ -48,7 +48,7 @@ Confirmed `apply` and `prune` can use `--handoff-dir` to block mutation when man
 
 ## Onboarding Artifact Index
 
-`rules-ctl onboarding-artifact-index` builds a compact handoff index from a saved discovery `index.json` plus optional handoff, draft, and generated manifest directories. It records per-scope completeness, missing artifact paths, reviewed handoff status, provider manifest links, manifest-review report links, and the freshness validation command reviewers should run before trusting saved provider artifacts.
+`rules-ctl onboarding-artifact-index` builds a compact handoff index from a saved discovery `index.json` plus optional handoff, draft, and generated manifest directories. It records per-scope completeness, missing artifact paths, reviewed handoff status, provider manifest links, manifest-review report links, next-action guidance for incomplete handoff bundles, and the freshness validation command reviewers should run before trusting saved provider artifacts.
 
 The repository includes a public-safe telemetry-first fixture and walkthrough under `examples/onboarding/telemetry-first` and `docs/telemetry-first-walkthrough.md`. The walkthrough smoke test exercises saved discovery evidence, handoff review, draft generation, provider-bound manifest generation, saved report freshness validation, artifact indexing, and the pre-mutation review gate without requiring live backend credentials.
 

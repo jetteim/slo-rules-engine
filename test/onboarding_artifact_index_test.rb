@@ -103,6 +103,98 @@ class OnboardingArtifactIndexTest < Minitest::Test
     end
   end
 
+  def test_build_reports_next_actions_for_incomplete_handoff_bundle
+    Dir.mktmpdir do |dir|
+      discovery_dir = File.join(dir, 'discovery')
+      handoff_dir = File.join(dir, 'handoff')
+      draft_dir = File.join(dir, 'drafts')
+      manifest_dir = File.join(dir, 'generated')
+      [discovery_dir, handoff_dir, draft_dir, manifest_dir].each { |path| FileUtils.mkdir_p(path) }
+
+      discovery_result = File.join(discovery_dir, 'checkout-prod.json')
+      write_json(
+        discovery_result,
+        provider: 'datadog',
+        scope: { label: 'checkout-prod', service: 'checkout-api' },
+        signals: [{ kind: 'latency', metric: 'http.server.request.duration', user_visible: true }],
+        findings: []
+      )
+      index_path = File.join(discovery_dir, 'index.json')
+      write_json(
+        index_path,
+        provider: 'datadog',
+        generated_at: '2026-05-13T09:00:00Z',
+        total_scopes: 1,
+        scopes: [
+          {
+            label: 'checkout-prod',
+            scope: { label: 'checkout-prod', service: 'checkout-api' },
+            status: 'ok',
+            result_file: 'checkout-prod.json',
+            signal_count: 1,
+            finding_count: 0
+          }
+        ]
+      )
+      handoff_path = File.join(handoff_dir, 'checkout-prod.handoff.json')
+      write_json(
+        handoff_path,
+        label: 'checkout-prod',
+        provider: 'datadog',
+        review: {
+          status: 'unreviewed',
+          accepted_candidate_uids: [],
+          rejected_candidate_uids: [],
+          notes: []
+        }
+      )
+
+      artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
+        index_path,
+        handoff_dir: handoff_dir,
+        draft_dir: draft_dir,
+        manifest_dir: manifest_dir,
+        providers: ['datadog']
+      )
+
+      assert_equal(
+        {
+          review_handoff: 1,
+          generate_reviewed_draft: 1,
+          generate_provider_manifest: 1,
+          write_manifest_review_report: 1
+        },
+        artifact_index.fetch(:summary).fetch(:next_action_counts)
+      )
+
+      scope = artifact_index.fetch(:scopes).fetch(0)
+      assert_equal(
+        [
+          :review_handoff,
+          :generate_reviewed_draft,
+          :generate_provider_manifest,
+          :write_manifest_review_report
+        ],
+        scope.fetch(:next_actions).map { |action| action.fetch(:code) }
+      )
+      assert_equal(
+        %w[
+          review_handoff
+          generate_reviewed_draft
+          generate_provider_manifest
+          write_manifest_review_report
+        ],
+        JSON.parse(JSON.generate(scope)).fetch('next_actions').map { |action| action.fetch('code') }
+      )
+      assert_equal(
+        "rules-ctl review-handoff --accept=<candidate_uid> #{handoff_path}",
+        scope.fetch(:next_actions).fetch(0).fetch(:command)
+      )
+      assert_equal handoff_path, scope.fetch(:next_actions).fetch(0).fetch(:path)
+      assert_equal 'datadog', scope.fetch(:next_actions).fetch(2).fetch(:provider)
+    end
+  end
+
   private
 
   def write_json(path, payload)

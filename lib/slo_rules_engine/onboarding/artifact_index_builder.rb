@@ -9,6 +9,7 @@ module SloRulesEngine
         scopes = Array(index[:scopes]).map do |entry|
           scope_entry(
             entry,
+            index_path: index_path,
             base_dir: File.dirname(index_path),
             handoff_dir: handoff_dir,
             draft_dir: draft_dir,
@@ -46,7 +47,7 @@ module SloRulesEngine
         }.compact
       end
 
-      def scope_entry(entry, base_dir:, handoff_dir:, draft_dir:, manifest_dir:, providers:)
+      def scope_entry(entry, index_path:, base_dir:, handoff_dir:, draft_dir:, manifest_dir:, providers:)
         label = entry[:label].to_s
         service = entry.dig(:scope, :service)
         discovery = discovery_entry(entry, base_dir)
@@ -55,6 +56,16 @@ module SloRulesEngine
         provider_artifacts = provider_entries(service, providers, manifest_dir, handoff_dir)
         missing = missing_artifacts(discovery, handoff, draft, provider_artifacts)
         status = scope_status(entry, missing)
+        next_actions = next_actions(
+          entry,
+          discovery: discovery,
+          handoff: handoff,
+          draft: draft,
+          providers: provider_artifacts,
+          index_path: index_path,
+          handoff_dir: handoff_dir,
+          manifest_dir: manifest_dir
+        )
 
         {
           label: label,
@@ -64,7 +75,8 @@ module SloRulesEngine
           handoff: handoff,
           draft: draft,
           providers: provider_artifacts,
-          missing_artifacts: missing
+          missing_artifacts: missing,
+          next_actions: next_actions
         }.compact
       end
 
@@ -157,6 +169,97 @@ module SloRulesEngine
         }.compact
       end
 
+      def next_actions(entry, discovery:, handoff:, draft:, providers:, index_path:, handoff_dir:, manifest_dir:)
+        actions = []
+        label = entry[:label].to_s
+        service = entry.dig(:scope, :service)
+
+        if discovery[:status].to_s != 'ok' || (discovery[:path] && !discovery[:exists])
+          actions << next_action(
+            :rerun_discovery,
+            "refresh telemetry discovery evidence for #{label}",
+            path: discovery[:path]
+          )
+        end
+
+        if handoff && !handoff[:exists]
+          actions << next_action(
+            :create_handoff_packet,
+            "write the onboarding handoff packet for #{label}",
+            path: handoff[:path],
+            command: "rules-ctl onboarding-summary --handoff-dir=#{handoff_dir} #{index_path}"
+          )
+        elsif handoff && handoff[:review_status].to_s != 'reviewed'
+          actions << next_action(
+            :review_handoff,
+            "accept or reject candidate SLOs for #{label}",
+            path: handoff[:path],
+            command: "rules-ctl review-handoff --accept=<candidate_uid> #{handoff[:path]}"
+          )
+        end
+
+        if draft && !draft[:exists]
+          command = nil
+          if handoff && handoff[:path]
+            command = "rules-ctl draft-from-handoff --service=#{service} --owner=<owner> #{handoff[:path]} > #{draft[:path]}"
+          end
+          actions << next_action(
+            :generate_reviewed_draft,
+            "generate a reviewed draft definition for #{label}",
+            path: draft[:path],
+            command: command
+          )
+        end
+
+        providers.each do |provider|
+          provider_key = provider.fetch(:provider)
+          manifest = provider.fetch(:manifest)
+          report = provider.fetch(:manifest_review_report)
+          unless manifest[:exists]
+            command = nil
+            if draft && draft[:path]
+              command = "rules-ctl generate --provider=#{provider_key} --output-dir=#{manifest_dir}"
+              command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
+              command += " #{draft[:path]}"
+            end
+            actions << next_action(
+              :generate_provider_manifest,
+              "generate the #{provider_key} provider manifest for #{label}",
+              provider: provider_key,
+              path: manifest[:path],
+              command: command
+            )
+          end
+          next if report[:exists]
+
+          command = nil
+          unless manifest[:path].to_s.empty?
+            command = "rules-ctl manifest-review --provider=#{provider_key} --manifest=#{manifest[:path]}"
+            command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
+            command += " --output=#{report[:path]}"
+          end
+          actions << next_action(
+            :write_manifest_review_report,
+            "write the #{provider_key} manifest-review report for #{label}",
+            provider: provider_key,
+            path: report[:path],
+            command: command
+          )
+        end
+
+        actions
+      end
+
+      def next_action(code, message, provider: nil, path: nil, command: nil)
+        {
+          code: code,
+          provider: provider,
+          message: message,
+          path: path,
+          command: command
+        }.compact
+      end
+
       def scope_status(entry, missing)
         return 'failed' if entry[:status].to_s != 'ok'
         return 'partial' unless missing.empty?
@@ -171,11 +274,22 @@ module SloRulesEngine
           partial_scopes: scopes.count { |scope| scope[:status] == 'partial' },
           failed_scopes: scopes.count { |scope| scope[:status] == 'failed' },
           missing_artifact_count: scopes.sum { |scope| Array(scope[:missing_artifacts]).length },
+          next_action_counts: next_action_counts(scopes),
           reviewed_handoffs: scopes.count { |scope| scope.dig(:handoff, :review_status) == 'reviewed' },
           draft_files: scopes.count { |scope| scope.dig(:draft, :exists) },
           provider_manifest_files: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest, :exists) } },
           manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :exists) } }
         }
+      end
+
+      def next_action_counts(scopes)
+        counts = Hash.new(0)
+        scopes.each do |scope|
+          Array(scope[:next_actions]).each do |action|
+            counts[action.fetch(:code)] += 1
+          end
+        end
+        counts
       end
 
       def json_payload(path)
