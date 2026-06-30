@@ -1336,9 +1336,13 @@ class CLITest < Minitest::Test
       assert_equal payload, JSON.parse(File.read(output_path))
       assert_equal 1, payload.fetch('summary').fetch('complete_scopes')
       assert_equal 0, payload.fetch('summary').fetch('missing_artifact_count')
+      assert_equal 1, payload.fetch('summary').fetch('valid_manifest_review_reports')
+      assert_equal 0, payload.fetch('summary').fetch('invalid_manifest_review_reports')
+      assert_equal({}, payload.fetch('summary').fetch('next_action_counts'))
       provider = payload.fetch('scopes').fetch(0).fetch('providers').fetch(0)
       assert_equal manifest_path, provider.fetch('manifest').fetch('path')
       assert_equal report_path, provider.fetch('manifest_review_report').fetch('path')
+      assert_equal true, provider.fetch('manifest_review_report').fetch('valid')
       assert_includes provider.fetch('manifest_review_command'), '--report='
     end
   end

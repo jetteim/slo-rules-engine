@@ -55,7 +55,7 @@ module SloRulesEngine
         draft = draft_entry(label, draft_dir)
         provider_artifacts = provider_entries(service, providers, manifest_dir, handoff_dir)
         missing = missing_artifacts(discovery, handoff, draft, provider_artifacts)
-        status = scope_status(entry, missing)
+        status = scope_status(entry, missing, provider_artifacts)
         next_actions = next_actions(
           entry,
           discovery: discovery,
@@ -130,13 +130,32 @@ module SloRulesEngine
               path: manifest_path,
               exists: manifest_path ? File.exist?(manifest_path) : false
             }.compact,
-            manifest_review_report: {
-              path: report_path,
-              exists: File.exist?(report_path)
-            },
+            manifest_review_report: manifest_review_report_entry(report_path),
             manifest_review_command: manifest_review_command(provider, manifest_path, report_path, handoff_dir)
           }.compact
         end
+      end
+
+      def manifest_review_report_entry(path)
+        exists = File.exist?(path)
+        payload = json_payload(path)
+        summary = payload[:summary].is_a?(Hash) ? payload[:summary] : {}
+        entry = {
+          path: path,
+          exists: exists
+        }
+        if exists
+          entry[:valid] = payload[:valid] unless payload[:valid].nil?
+          entry[:ready_for_apply_manifests] = summary[:ready_for_apply_manifests] if summary.key?(:ready_for_apply_manifests)
+          entry[:finding_codes] = manifest_review_finding_codes(payload)
+        end
+        entry
+      end
+
+      def manifest_review_finding_codes(payload)
+        Array(payload[:manifests]).flat_map do |manifest|
+          Array(manifest[:findings]).map { |finding| finding[:code] }
+        end.compact.uniq
       end
 
       def manifest_review_command(provider, manifest_path, report_path, handoff_dir)
@@ -230,21 +249,31 @@ module SloRulesEngine
               command: command
             )
           end
-          next if report[:exists]
+          if report[:exists]
+            next unless report[:valid] == false
 
-          command = nil
-          unless manifest[:path].to_s.empty?
-            command = "rules-ctl manifest-review --provider=#{provider_key} --manifest=#{manifest[:path]}"
-            command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
-            command += " --output=#{report[:path]}"
+            actions << next_action(
+              :resolve_manifest_review_findings,
+              "resolve the #{provider_key} manifest-review findings for #{label}",
+              provider: provider_key,
+              path: report[:path],
+              command: provider[:manifest_review_command]
+            )
+          else
+            command = nil
+            unless manifest[:path].to_s.empty?
+              command = "rules-ctl manifest-review --provider=#{provider_key} --manifest=#{manifest[:path]}"
+              command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
+              command += " --output=#{report[:path]}"
+            end
+            actions << next_action(
+              :write_manifest_review_report,
+              "write the #{provider_key} manifest-review report for #{label}",
+              provider: provider_key,
+              path: report[:path],
+              command: command
+            )
           end
-          actions << next_action(
-            :write_manifest_review_report,
-            "write the #{provider_key} manifest-review report for #{label}",
-            provider: provider_key,
-            path: report[:path],
-            command: command
-          )
         end
 
         actions
@@ -260,11 +289,16 @@ module SloRulesEngine
         }.compact
       end
 
-      def scope_status(entry, missing)
+      def scope_status(entry, missing, provider_artifacts)
         return 'failed' if entry[:status].to_s != 'ok'
         return 'partial' unless missing.empty?
+        return 'partial' if provider_artifacts_with_invalid_reports?(provider_artifacts)
 
         'complete'
+      end
+
+      def provider_artifacts_with_invalid_reports?(provider_artifacts)
+        provider_artifacts.any? { |provider| provider.dig(:manifest_review_report, :valid) == false }
       end
 
       def summary(scopes)
@@ -278,7 +312,9 @@ module SloRulesEngine
           reviewed_handoffs: scopes.count { |scope| scope.dig(:handoff, :review_status) == 'reviewed' },
           draft_files: scopes.count { |scope| scope.dig(:draft, :exists) },
           provider_manifest_files: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest, :exists) } },
-          manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :exists) } }
+          manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :exists) } },
+          valid_manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :valid) == true } },
+          invalid_manifest_review_reports: scopes.sum { |scope| scope.fetch(:providers).count { |provider| provider.dig(:manifest_review_report, :valid) == false } }
         }
       end
 
