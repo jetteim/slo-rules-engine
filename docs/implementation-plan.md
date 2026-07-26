@@ -130,7 +130,7 @@ This is the running plan for the long refactor.
 - [x] Emit deterministic Grafana dashboard and Alertmanager routing bundle files while preserving reviewed manifest provenance.
 - [x] Include every native Prometheus Stack bundle file in `plan`, `apply`, `diff`, `import`, and `prune`.
 - [x] Validate native Prometheus Stack resource shape before confirmed file mutation.
-- [ ] Add a public-safe end-to-end Prometheus Stack bundle walkthrough and verification fixture.
+- [x] Add a public-safe end-to-end Prometheus Stack bundle walkthrough and verification fixture.
 
 ## Phase 9: First-Class Onboarding And Release Bundle
 
