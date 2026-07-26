@@ -3,6 +3,7 @@
 require 'json'
 require 'fileutils'
 require 'minitest/autorun'
+require 'shellwords'
 require 'tmpdir'
 require_relative '../lib/slo_rules_engine'
 
@@ -411,10 +412,11 @@ class OnboardingArtifactIndexTest < Minitest::Test
 
   def test_build_checks_provider_level_report_freshness_against_all_provider_manifests
     Dir.mktmpdir do |dir|
-      discovery_dir = File.join(dir, 'discovery')
-      handoff_dir = File.join(dir, 'handoff')
-      draft_dir = File.join(dir, 'drafts')
-      manifest_dir = File.join(dir, 'generated')
+      artifact_dir = File.join(dir, 'saved artifacts')
+      discovery_dir = File.join(artifact_dir, 'discovery')
+      handoff_dir = File.join(artifact_dir, 'handoff')
+      draft_dir = File.join(artifact_dir, 'drafts')
+      manifest_dir = File.join(artifact_dir, 'generated')
       [discovery_dir, handoff_dir, draft_dir, manifest_dir].each { |path| FileUtils.mkdir_p(path) }
 
       scopes = [
@@ -479,6 +481,30 @@ class OnboardingArtifactIndexTest < Minitest::Test
       end
       report_path = File.join(manifest_dir, 'manifest-review', 'datadog.json')
       FileUtils.mkdir_p(File.dirname(report_path))
+      manifest_options = scopes.map do |scope|
+        path = File.join(manifest_dir, scope.fetch(:service), 'datadog', 'manifest.json')
+        "--manifest=#{Shellwords.escape(path)}"
+      end.join(' ')
+
+      artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
+        index_path,
+        handoff_dir: handoff_dir,
+        draft_dir: draft_dir,
+        manifest_dir: manifest_dir,
+        providers: ['datadog']
+      )
+
+      assert_equal({ write_manifest_review_report: 2 }, artifact_index.fetch(:summary).fetch(:next_action_counts))
+      artifact_index.fetch(:scopes).each do |scope|
+        action = scope.fetch(:next_actions).fetch(0)
+        assert_equal :write_manifest_review_report, action.fetch(:code)
+        assert_equal(
+          "rules-ctl manifest-review --provider=datadog #{manifest_options} " \
+            "--handoff-dir=#{Shellwords.escape(handoff_dir)} --output=#{Shellwords.escape(report_path)}",
+          action.fetch(:command)
+        )
+      end
+
       write_json(
         report_path,
         SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
@@ -500,15 +526,13 @@ class OnboardingArtifactIndexTest < Minitest::Test
       assert_equal 2, artifact_index.fetch(:summary).fetch(:fresh_manifest_review_reports)
       assert_equal 0, artifact_index.fetch(:summary).fetch(:stale_manifest_review_reports)
       assert_equal({}, artifact_index.fetch(:summary).fetch(:next_action_counts))
-      manifest_options = scopes.map do |scope|
-        "--manifest=#{File.join(manifest_dir, scope.fetch(:service), 'datadog', 'manifest.json')}"
-      end.join(' ')
       artifact_index.fetch(:scopes).each do |scope|
         assert_equal 'complete', scope.fetch(:status)
         provider = scope.fetch(:providers).fetch(0)
         assert_equal true, provider.fetch(:manifest_review_report).fetch(:fresh)
         assert_equal(
-          "rules-ctl manifest-review --provider=datadog #{manifest_options} --handoff-dir=#{handoff_dir} --report=#{report_path}",
+          "rules-ctl manifest-review --provider=datadog #{manifest_options} " \
+            "--handoff-dir=#{Shellwords.escape(handoff_dir)} --report=#{Shellwords.escape(report_path)}",
           provider.fetch(:manifest_review_command)
         )
       end
@@ -530,7 +554,8 @@ class OnboardingArtifactIndexTest < Minitest::Test
         action = scope.fetch(:next_actions).fetch(0)
         assert_equal :refresh_manifest_review_report, action.fetch(:code)
         assert_equal(
-          "rules-ctl manifest-review --provider=datadog #{manifest_options} --handoff-dir=#{handoff_dir} --output=#{report_path}",
+          "rules-ctl manifest-review --provider=datadog #{manifest_options} " \
+            "--handoff-dir=#{Shellwords.escape(handoff_dir)} --output=#{Shellwords.escape(report_path)}",
           action.fetch(:command)
         )
       end

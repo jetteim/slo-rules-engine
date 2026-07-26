@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'shellwords'
+
 module SloRulesEngine
   module Onboarding
     class ArtifactIndexBuilder
@@ -216,15 +218,19 @@ module SloRulesEngine
       end
 
       def manifest_review_command_with_option(provider, manifest_paths, report_path, handoff_dir, option:)
-        manifest_options = manifest_paths.map { |path| "--manifest=#{path}" }.join(' ')
+        manifest_options = manifest_paths.map { |path| shell_option('manifest', path) }.join(' ')
         command = "rules-ctl manifest-review --provider=#{provider} #{manifest_options}"
-        command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
-        "#{command} --#{option}=#{report_path}"
+        command += " #{shell_option('handoff-dir', handoff_dir)}" unless handoff_dir.to_s.empty?
+        "#{command} #{shell_option(option, report_path)}"
       end
 
       def provider_manifest_paths(provider, manifest_dir, fallback_path)
         paths = current_provider_manifest_paths(provider, manifest_dir)
         paths.empty? ? [fallback_path].compact : paths
+      end
+
+      def shell_option(name, value)
+        "--#{name}=#{Shellwords.escape(value.to_s)}"
       end
 
       def missing_artifacts(discovery, handoff, draft, provider_artifacts)
@@ -334,9 +340,13 @@ module SloRulesEngine
           else
             command = nil
             unless manifest[:path].to_s.empty?
-              command = "rules-ctl manifest-review --provider=#{provider_key} --manifest=#{manifest[:path]}"
-              command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
-              command += " --output=#{report[:path]}"
+              review_manifest_paths = provider_manifest_paths(provider_key, manifest_dir, manifest[:path])
+              command = manifest_review_refresh_command(
+                provider_key,
+                review_manifest_paths,
+                report[:path],
+                handoff_dir
+              )
             end
             actions << next_action(
               :write_manifest_review_report,
