@@ -76,7 +76,13 @@ class ApplyTest < Minitest::Test
   def test_manifest_bundle_diff_reports_update_when_existing_manifest_differs
     manifest = valid_prometheus_manifest
     manifest[:artifacts][:recording_rules] = [
-      { record: 'slo:checkout-api:availability', expr: 'new_expr', labels: { service: 'checkout-api' } }
+      {
+        kind: 'slo',
+        metric: 'success_ratio',
+        record: 'slo:checkout_api:availability',
+        expr: 'new_expr',
+        labels: { service: 'checkout-api' }
+      }
     ]
 
     Dir.mktmpdir do |dir|
@@ -86,7 +92,13 @@ class ApplyTest < Minitest::Test
         valid_prometheus_manifest.merge(
           artifacts: valid_prometheus_manifest[:artifacts].merge(
             recording_rules: [
-              { record: 'slo:checkout-api:availability', expr: 'old_expr', labels: { service: 'checkout-api' } }
+              {
+                kind: 'slo',
+                metric: 'success_ratio',
+                record: 'slo:checkout_api:availability',
+                expr: 'old_expr',
+                labels: { service: 'checkout-api' }
+              }
             ]
           )
         )

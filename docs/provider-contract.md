@@ -138,7 +138,9 @@ Automation mode: `manifest_bundle`.
 
 Expected artifacts:
 
-- Prometheus-compatible recording rules
+- one base Prometheus-compatible observation recording rule per SLI instance
+- derived success-ratio, error-ratio, objective-ratio, and error-budget-ratio recording rules per SLO
+- SLO-specific burn-rate recording rules
 - Prometheus-compatible alert rules
 - Alertmanager routing labels and webhook route references
 - Grafana dashboards
@@ -149,6 +151,14 @@ Expected state behavior:
 - dry-run manifest write plan
 - confirmed file write into an output directory
 - direct backend mutation only through a future dedicated adapter
+
+Recording-rule behavior:
+
+- record names must satisfy the Prometheus metric-name contract even when neutral service, SLI, instance, or SLO identifiers contain hyphens
+- SLI observation rules must not be duplicated when one SLI instance has multiple SLOs
+- reviewed SLO identity remains in labels and derived series
+- threshold SLOs must use numeric thresholds and `time_slice` calculation basis
+- unsupported threshold semantics must fail provider validation instead of producing a non-ratio series named as a success ratio
 
 Expected telemetry behavior:
 

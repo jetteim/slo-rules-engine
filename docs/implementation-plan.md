@@ -121,3 +121,58 @@ This is the running plan for the long refactor.
 - [x] Extract report CLI command module after command-family coverage exists.
 - [x] Extract Datadog request transport and retry behavior from the Datadog client.
 - [ ] Pause further housekeeping unless a future behavior change exposes a clean seam without reducing readability.
+
+## Phase 8: Prometheus Stack Provider Completion
+
+- [x] Generate base recording rules for every Prometheus-bound SLI instance independently of the number of attached SLOs.
+- [x] Generate derived SLO success-ratio, error-ratio, objective, error-budget, and burn-rate recording rules for every reviewed SLO.
+- [ ] Emit deterministic native PrometheusRule resources for recording, burn-rate, missing-telemetry, and alert rules.
+- [ ] Emit deterministic Grafana dashboard and Alertmanager routing bundle files while preserving reviewed manifest provenance.
+- [ ] Include every native Prometheus Stack bundle file in `plan`, `apply`, `diff`, `import`, and `prune`.
+- [ ] Validate native Prometheus Stack resource shape before confirmed file mutation.
+- [ ] Add a public-safe end-to-end Prometheus Stack bundle walkthrough and verification fixture.
+
+## Phase 9: First-Class Onboarding And Release Bundle
+
+- [ ] Define a versioned bundle schema with stable bundle identity and lifecycle states.
+- [ ] Package discovery evidence, handoff decisions, reviewed definitions, provider manifests, review reports, and change plans into one bundle.
+- [ ] Record reviewer identity, review timestamp, decisions, notes, fingerprints, and provider targets without embedding credentials.
+- [ ] Add `bundle create`, `bundle status`, `bundle plan`, `bundle apply`, and `bundle verify` commands.
+- [ ] Make bundle transitions deterministic and reject stale or incomplete predecessor artifacts.
+- [ ] Support multi-scope and multi-provider bundles with provider-level change and risk summaries.
+
+## Phase 10: Provider-Neutral State-Manager Hardening
+
+- [ ] Define provider-neutral desired-state, observed-state, change, result, and finding contracts.
+- [ ] Add operation journaling, partial-failure reporting, and resumable execution.
+- [ ] Add provider-specific post-apply verification evidence and managed resource identifiers.
+- [ ] Define compensating rollback plans for reversible mutations and explicit findings for irreversible operations.
+- [ ] Prove the shared state contracts across Datadog and Prometheus Stack without weakening provider-specific safety policy.
+
+## Phase 11: Production-Grade Datadog Reconciliation
+
+- [ ] Validate remaining Datadog SLO, monitor, and dashboard resource semantics using safe real-backend evidence.
+- [ ] Complete provider-schema payload translation for supported create and update operations.
+- [ ] Complete import and adoption behavior for managed resources with explicit identity confidence.
+- [ ] Reconcile update, recreate, and prune behavior against current backend state without accepting weak ownership evidence.
+- [ ] Capture resulting backend identifiers and provider verification evidence after every confirmed mutation.
+- [ ] Add public-safe contract fixtures for every verified Datadog request and response shape.
+
+## Phase 12: Apply-Exact-Plan Workflow
+
+- [ ] Persist immutable provider change plans with desired-state, observed-state, manifest, review, and handoff fingerprints.
+- [ ] Add explicit plan review and confirmation metadata without storing credentials.
+- [ ] Recheck backend or managed-file state immediately before execution and reject stale plans.
+- [ ] Execute only the operations recorded in the approved plan.
+- [ ] Add idempotency and concurrency protection for conflicting applies against the same managed scope.
+- [ ] Resume safely from operation journals after partial failure.
+- [ ] Verify final provider state against the approved plan and emit rollback guidance when convergence fails.
+
+## Phase 13: Live SLO And Error-Budget Status
+
+- [ ] Define a provider-neutral live SLO status model for objective attainment, error-budget remaining, burn rate, and telemetry freshness.
+- [ ] Add Datadog and Prometheus-compatible status readers without moving provider query syntax into the neutral model.
+- [ ] Add a `status` command for one manifest, one bundle, or a portfolio scope.
+- [ ] Distinguish healthy, at-risk, exhausted, missing-telemetry, and unverifiable states with machine-readable findings.
+- [ ] Link status output to reviewed SLO identity, owner, dashboard, playbook, and current provider resource identifiers.
+- [ ] Persist optional status reports with source timestamps and freshness metadata for later bundle review.

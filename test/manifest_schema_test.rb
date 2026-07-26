@@ -56,6 +56,21 @@ class ManifestSchemaTest < Minitest::Test
     assert result.errors.any? { |error| error.path == 'review_provenance.accepted_candidate_uids' }
   end
 
+  def test_prometheus_recording_rules_require_semantic_identity_and_valid_metric_names
+    manifest = SloRulesEngine.default_provider_registry.fetch('prometheus_stack').generate(@definition).to_h.merge(service: @definition.service)
+    rule = manifest.fetch(:artifacts).fetch(:recording_rules).fetch(0)
+    rule.delete(:kind)
+    rule.delete(:metric)
+    rule[:record] = 'invalid-record-name'
+
+    result = SloRulesEngine::ManifestSchemaValidator.validate(manifest)
+
+    refute result.valid?
+    assert result.errors.any? { |error| error.path == 'artifacts.recording_rules[0].kind' }
+    assert result.errors.any? { |error| error.path == 'artifacts.recording_rules[0].metric' }
+    assert result.errors.any? { |error| error.path == 'artifacts.recording_rules[0].record' && error.message.include?('Prometheus metric name') }
+  end
+
   def test_manifest_review_evidence_requires_review_provenance
     manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h.merge(service: @definition.service)
 

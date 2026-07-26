@@ -92,7 +92,9 @@ class ProvidersTest < Minitest::Test
     manifest = SloRulesEngine.default_provider_registry.fetch('prometheus_stack').generate(@definition).to_h
 
     assert_equal 'prometheus_stack', manifest[:provider]
-    assert_equal 1, manifest[:artifacts][:recording_rules].length
+    assert_equal 5, manifest[:artifacts][:recording_rules].length
+    assert_equal 1, manifest[:artifacts][:recording_rules].count { |rule| rule[:kind] == 'sli' }
+    assert_equal 4, manifest[:artifacts][:recording_rules].count { |rule| rule[:kind] == 'slo' }
     assert_equal 2, manifest[:artifacts][:burn_rate_rules].length
     assert_equal [14.4, 6.0], manifest[:artifacts][:burn_rate_rules].map { |rule| rule[:threshold] }
     assert_equal 1, manifest[:artifacts][:missing_telemetry_rules].length

@@ -11,6 +11,8 @@ module SloRulesEngine
   end
 
   module ManifestSchemaValidator
+    PROMETHEUS_METRIC_NAME = /\A[a-zA-Z_:][a-zA-Z0-9_:]*\z/
+
     module_function
 
     def validate(manifest)
@@ -86,7 +88,13 @@ module SloRulesEngine
     def validate_prometheus_stack(result, artifacts)
       validate_collection(result, artifacts, :recording_rules).each_with_index do |rule, index|
         path = "artifacts.recording_rules[#{index}]"
-        validate_presence(result, "#{path}.record", fetch_value(rule, :record))
+        record = fetch_value(rule, :record)
+        validate_presence(result, "#{path}.kind", fetch_value(rule, :kind))
+        validate_presence(result, "#{path}.metric", fetch_value(rule, :metric))
+        validate_presence(result, "#{path}.record", record)
+        if !blank?(record) && !record.to_s.match?(PROMETHEUS_METRIC_NAME)
+          result.error("#{path}.record", 'must be a valid Prometheus metric name')
+        end
         validate_presence(result, "#{path}.expr", fetch_value(rule, :expr))
         validate_hash(result, "#{path}.labels", fetch_value(rule, :labels))
       end

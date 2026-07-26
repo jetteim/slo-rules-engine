@@ -101,6 +101,12 @@ Explicit features:
 
 `rules-ctl apply --provider sloth --confirm --manifest=<reviewed-manifest> --output-dir=<dir>` writes the reviewed engine manifest plus native Sloth YAML input files under `<dir>/<service>/sloth/generated/`. The apply plan records the external `sloth generate` command pointed at those native input files; the engine still does not execute the Sloth CLI or mutate downstream Prometheus resources.
 
+## Prometheus Stack Provider Generation
+
+`rules-ctl generate --provider prometheus_stack` emits one base observation recording rule for every SLI instance and derived success-ratio, error-ratio, objective-ratio, and error-budget-ratio recording rules for every reviewed SLO. Burn-rate recording rules remain SLO-specific. Record names are normalized to valid Prometheus metric identifiers while reviewed service, owner, SLI, instance, SLO, objective, and calculation-basis identity remains available as labels.
+
+Selector-based SLOs calculate success ratios from scoped counter rates. Threshold-based SLOs generate boolean time-slice ratios and require a numeric threshold plus `time_slice` calculation basis; unsupported threshold intent is rejected during provider validation rather than emitted as a misleading success ratio.
+
 ## Change
 
 - Provider abstraction means complete observability backend bundle.
