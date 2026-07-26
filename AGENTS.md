@@ -223,20 +223,20 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `a769eea feat: add release bundle create and status`
+- latest verified feature checkpoint: `5296945 feat: add provider state contracts`
 - expected startup state: `git status --short --branch` should show clean `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree at `a769eea`
+- target: local `main` worktree at `5296945`
 - command: `./scripts/verify.sh`
-- timestamp: `2026-07-26T10:26:20Z`
+- timestamp: `2026-07-26T11:18:28Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 304 tests, 1,633 assertions, 0 failures, 0 errors
-- metric/log/trace names: none; this slice made no backend calls
-- blast radius: explicitly requested release-bundle JSON output plus local source-file reads
-- rollback path: revert `a769eea` and `cbf271c`; no provider or managed-file rollback is required
+- result: exit 0, `verification ok`, 318 tests, 1,770 assertions, 0 failures, 0 errors
+- metric/log/trace names: none; verification used local files and fake backend clients only
+- blast radius: additive plan/import JSON state contracts plus Sloth native-input import reads; live provider and file mutation behavior is unchanged
+- rollback path: revert `5296945` for provider-state contracts and `fa0d6e1` for bundle planning/usage; no provider or managed-file rollback is required
 
 When the user types `proceed` in a fresh session:
 
