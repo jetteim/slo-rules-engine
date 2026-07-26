@@ -5,12 +5,14 @@ require 'optparse'
 require 'fileutils'
 require_relative '../lib/sre'
 require_relative '../lib/slo_rules_engine/cli/catalog_commands'
+require_relative '../lib/slo_rules_engine/cli/bundle_commands'
 require_relative '../lib/slo_rules_engine/cli/onboarding_commands'
 require_relative '../lib/slo_rules_engine/cli/report_commands'
 require_relative '../lib/slo_rules_engine/cli/telemetry_commands'
 
 module RulesCtl
   extend SloRulesEngine::CLI::CatalogCommands
+  extend SloRulesEngine::CLI::BundleCommands
   extend SloRulesEngine::CLI::OnboardingCommands
   extend SloRulesEngine::CLI::ReportCommands
   extend SloRulesEngine::CLI::TelemetryCommands
@@ -38,6 +40,8 @@ module RulesCtl
       import_existing(argv)
     when 'prune'
       prune(argv)
+    when 'bundle'
+      bundle(argv)
     when 'lookup-telemetry'
       lookup_telemetry(argv)
     when 'discover-telemetry'
@@ -646,6 +650,8 @@ module RulesCtl
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
+        bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
+        bin/rules-ctl bundle status <bundle.json>
         bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
         bin/rules-ctl providers list
         bin/rules-ctl integrations list

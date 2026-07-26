@@ -99,6 +99,8 @@ bin/rules-ctl apply --provider sloth --confirm --output-dir ./managed --manifest
 bin/rules-ctl diff --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl import --provider sloth --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
 bin/rules-ctl prune --provider sloth --confirm --output-dir ./managed --manifest ./generated/checkout-api/sloth/manifest.json
+bin/rules-ctl bundle create --artifact-index ./handoff/artifact-index.json --reviewer team/payments-sre --reviewed-at 2026-07-26T09:30:00Z --output ./release-bundle.json
+bin/rules-ctl bundle status ./release-bundle.json
 bin/rules-ctl model-report examples/services/checkout.rb
 bin/rules-ctl providers list
 bin/rules-ctl integrations list
@@ -113,6 +115,7 @@ The `validate-handoff` command checks reviewed packets before handoff, and `draf
 The `model-report` command includes reviewed handoff provenance from DSL definitions so reviewers can see accepted onboarding context before provider generation.
 The `manifest-review` command reports provider manifest review readiness, including missing, incomplete, or stale reviewed provenance, handoff packet navigation, deterministic freshness fingerprints, saved report freshness validation with `--report`, explicit saved report output, and queue-level review status rollups.
 When `generate --output-dir` is used, the engine also writes `manifest-review/<provider>.json` next to generated provider manifests.
+The `bundle create` command packages reviewed saved artifacts into a versioned content-addressed release bundle. Repeatable `--plan=<service/provider>=<plan.json>` options package current dry-run plans and advance complete bundles from `review_ready` to `apply_ready`. `bundle status` validates schema, embedded fingerprints, bundle identity, and current source freshness without contacting providers.
 Confirmed `apply` and `prune` with `--handoff-dir` require current reviewed handoff evidence before mutation, and `--review-report` requires the saved manifest-review report to match current manifest and handoff fingerprints.
 Live `apply --confirm --manifest` requires reviewed handoff provenance in every manifest before provider mutation or file-backed apply.
 

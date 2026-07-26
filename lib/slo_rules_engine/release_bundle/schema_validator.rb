@@ -77,7 +77,7 @@ module SloRulesEngine
         artifacts = validate_array(result, 'artifacts', fetch_value(bundle, :artifacts))
         targets = validate_array(result, 'targets', fetch_value(bundle, :targets))
         validate_artifacts(result, artifacts)
-        validate_targets(result, targets, artifacts)
+        validate_targets(result, targets, artifacts, require_references: lifecycle != 'incomplete')
         validate_array(result, 'findings', fetch_value(bundle, :findings))
         validate_hash(result, 'summary', fetch_value(bundle, :summary))
 
@@ -145,7 +145,7 @@ module SloRulesEngine
         end
       end
 
-      def validate_targets(result, targets, artifacts)
+      def validate_targets(result, targets, artifacts, require_references:)
         result.error('targets', 'must contain at least one provider target') if targets.empty?
         artifact_uids = artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         seen = {}
@@ -159,7 +159,10 @@ module SloRulesEngine
           validate_presence(result, "#{path}.provider", fetch_value(target, :provider))
           validate_presence(result, "#{path}.automation_mode", fetch_value(target, :automation_mode))
           %i[manifest_artifact_uid review_report_artifact_uid].each do |reference|
-            validate_artifact_reference(result, "#{path}.#{reference}", fetch_value(target, reference), artifact_uids)
+            reference_uid = fetch_value(target, reference)
+            if require_references || reference_uid
+              validate_artifact_reference(result, "#{path}.#{reference}", reference_uid, artifact_uids)
+            end
           end
           plan_uid = fetch_value(target, :change_plan_artifact_uid)
           validate_artifact_reference(result, "#{path}.change_plan_artifact_uid", plan_uid, artifact_uids) if plan_uid

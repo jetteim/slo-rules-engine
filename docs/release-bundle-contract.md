@@ -79,3 +79,34 @@ Status evaluation checks:
 - persisted incomplete or stale findings
 
 Source deletion or source-content drift makes the effective lifecycle `stale`. Embedded-content or identity tampering makes it `invalid`. Neither state is eligible for future bundle apply behavior.
+
+## Commands
+
+Create a review-ready bundle:
+
+```bash
+bin/rules-ctl bundle create \
+  --artifact-index ./artifact-index.json \
+  --reviewer team/payments-sre \
+  --reviewed-at 2026-07-26T09:30:00Z \
+  --output ./release-bundle.json
+```
+
+Package a current dry-run provider plan:
+
+```bash
+bin/rules-ctl bundle create \
+  --artifact-index ./artifact-index.json \
+  --reviewer team/payments-sre \
+  --reviewed-at 2026-07-26T09:30:00Z \
+  --plan checkout-api/prometheus_stack=./prometheus-stack-plan.json \
+  --output ./release-bundle.json
+```
+
+Inspect schema, identity, embedded fingerprints, and current source freshness:
+
+```bash
+bin/rules-ctl bundle status ./release-bundle.json
+```
+
+Creation is fail-closed. Stale or incomplete predecessors, invalid dry-run plans, credential-like structured keys, and invalid bundle schemas produce nonzero status and do not write the requested output file.
