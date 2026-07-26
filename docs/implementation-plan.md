@@ -134,9 +134,9 @@ This is the running plan for the long refactor.
 
 ## Phase 9: First-Class Onboarding And Release Bundle
 
-- [ ] Define a versioned bundle schema with stable bundle identity and lifecycle states.
-- [ ] Package discovery evidence, handoff decisions, reviewed definitions, provider manifests, review reports, and change plans into one bundle.
-- [ ] Record reviewer identity, review timestamp, decisions, notes, fingerprints, and provider targets without embedding credentials.
+- [x] Define a versioned bundle schema with stable bundle identity and lifecycle states.
+- [x] Package discovery evidence, handoff decisions, reviewed definitions, provider manifests, review reports, and change plans into one bundle.
+- [x] Record reviewer identity, review timestamp, decisions, notes, fingerprints, and provider targets without embedding credentials.
 - [ ] Add `bundle create`, `bundle status`, `bundle plan`, `bundle apply`, and `bundle verify` commands.
 - [ ] Make bundle transitions deterministic and reject stale or incomplete predecessor artifacts.
 - [ ] Support multi-scope and multi-provider bundles with provider-level change and risk summaries.
