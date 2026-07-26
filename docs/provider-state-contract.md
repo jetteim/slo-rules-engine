@@ -96,7 +96,55 @@ Existing `ApplyPlan#to_h` and `ImportedState#to_h` fields remain available. The 
 - findings
 - verification evidence
 
-The value contract exists, but current apply commands do not emit it yet. Operation journaling, partial-failure capture, provider post-apply verification, and resumable execution remain separate Phase 10 work.
+The value contract exists, but current apply commands do not emit it yet.
+
+### Operation Journal
+
+The durable initial journal uses a separate lifecycle schema:
+
+```text
+slo-rules-engine/provider-operation-journal/v1
+```
+
+`ProviderOperationJournal` records:
+
+- deterministic journal ID
+- provider and service identity
+- provider-state plan fingerprint
+- desired-state and observed-state fingerprints
+- one ordered entry per normalized provider change
+- initial journal status and entry-state summary
+- non-resumable-operation findings
+
+Journal entry states are `pending`, `running`, `succeeded`, `failed`, and
+`skipped`. Initial actionable entries are `pending`; `noop` entries are
+`skipped`.
+
+Each entry preserves the provider change payload, changed paths, resource ID,
+match identity, and risk evidence. It also records:
+
+- whether retry may be considered
+- whether provider or managed-file state must be refreshed first
+- a conservative resume classification
+- provider-specific verification requirements
+- an initially empty attempt list
+
+Current resume classification is deliberately conservative:
+
+- `update` and `write` may be retried only after state recheck
+- `create`, `create_and_wait`, `recreate`, `recreate_and_wait`, `delete`, and
+  `handoff` require manual verification after an uncertain failure
+- `noop` requires no execution
+
+`JournalEvaluator` derives effective `pending`, `running`, `succeeded`,
+`partial`, or `failed` state from entries and reports `partial_failure`,
+`resume_blocked`, or `resume_state_recheck_required` findings. This is an
+assessment contract only; current commands do not write execution transitions.
+
+`journal create` verifies the saved provider-state snapshots and plan
+fingerprint before writing the initial journal atomically. Recreating the same
+journal at the same path is idempotent. Existing different content is never
+overwritten.
 
 ## Provider Evidence
 
@@ -155,11 +203,17 @@ The engine does not execute the Sloth CLI or claim downstream generated Promethe
 - Credentials are not part of the state contract.
 - Existing apply, prune, and ownership gates are unchanged.
 - Release-bundle plans now package the state contract inside each generated change-plan artifact.
+- Journal creation accepts exactly one `dry_run` plan and revalidates all
+  content fingerprints before persistence.
+- Journal identity excludes mutable entry status and attempts while covering
+  provider, service, plan, operation, resume-policy, and verification identity.
+- Journal commands do not contact providers or managed-file targets.
 
 ## Not Yet Implemented
 
-- operation journal schema and durable writes
-- partial-failure and resume behavior
+- live execution writes to operation journals
+- automatic operation-state transitions
+- actual resume execution after partial failure
 - post-apply observed-state refresh and verification result emission
 - compensating rollback plans
 - exact execution of a separately reviewed plan

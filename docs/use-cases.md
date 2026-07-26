@@ -1,12 +1,29 @@
 # Engineering Use Cases
 
-This guide starts with the engineering job to be done, then names the commands, generated artifacts, provider differences, and mutation boundary.
+This guide describes the engineering work the tool is intended to solve, the command boundary, and the exact output to expect. Reliability intent stays in the neutral Ruby definition. Telemetry evidence informs that intent, and provider adapters generate backend-specific artifacts from reviewed bindings.
 
-Usage documentation is part of the feature contract. When command scope, provider behavior, generated artifacts, or safety boundaries change, this guide and the README must be updated in the same checkpoint.
+Usage documentation is part of the feature contract. When command scope, provider behavior, generated artifacts, or safety boundaries change, this guide and the README must change in the same checkpoint.
+
+## Intent And Output Check
+
+| Use case | Reliability intent carried forward | Primary output | Mutation boundary |
+| --- | --- | --- | --- |
+| Find candidates | User-visible signal evidence, not an objective decision | Normalized telemetry and ranked proposals | Read-only backend discovery |
+| Build onboarding queue | Accepted/rejected evidence with reviewer notes | Saved handoff packets and reviewable Ruby draft | Handoff packet is updated; no provider mutation |
+| Cross-provider delivery | One reviewed SLO with explicit binding per target | Target-provider manifest linked to source-provider evidence | No metric or query translation is inferred |
+| Generate provider bundle | SLI, objective, response context, dashboard, route, and miss policy | Reviewed provider manifest and manifest-review report | Generation is local and read-only |
+| Package release | Reviewed evidence and target identity | Immutable review and apply-ready bundle JSON | Planning reads state but does not mutate it |
+| Inspect drift | Reviewed desired state compared with observed state | Provider plan with deterministic state fingerprints | Read-only provider or managed-file access |
+| Inventory state | Ownership and adoption evidence | Observed state and findings | Read-only provider or managed-file access |
+| Create operation journal | Exact provider plan identity and operation safety evidence | Immutable initial journal plus status assessment | No operation execution |
+| Apply reviewed state | Reviewed provider artifacts and mutation gates | Provider resources or managed files plus a pre-mutation plan | Explicit `--confirm` |
+| Remove managed state | Reviewed scope and ownership evidence | Planned or confirmed deletes | Explicit `--confirm` |
+| Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
+| Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
 
 ## Output Map
 
-### Shared workflow outputs
+### Shared Workflow Outputs
 
 | Workflow stage | Output |
 | --- | --- |
@@ -15,27 +32,29 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Candidate review | Candidate SLI/SLO proposals with confidence, explanations, caveats, and rejected-signal findings |
 | Onboarding handoff | One saved packet per scope with discovery evidence, candidate reasoning, and explicit accept/reject decisions |
 | Draft generation | Reviewable Ruby DSL definition carrying onboarding provenance; provider bindings still require maintainer review |
-| Provider generation | Reviewed provider manifest plus a provider-level manifest-review report |
+| Provider generation | Provider manifest JSON plus a provider-level manifest-review report |
 | Artifact indexing | Per-scope links across discovery, handoff, reviewed definition, provider manifests, and review reports |
-| Release bundling | Content-addressed `review_ready` JSON containing the reviewed evidence and target artifacts |
-| Bundle planning | New content-addressed `apply_ready` JSON containing provider plans, transition lineage, and provider summaries |
+| Release bundling | Content-addressed `review_ready` JSON containing reviewed evidence and target artifacts |
+| Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
+| Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 
-### Provider generation and state outputs
+### Provider Outputs
 
 | Engineering output | `datadog` | `prometheus_stack` | `sloth` |
 | --- | --- | --- | --- |
-| Telemetry evidence | Active-metric or explicit query evidence normalized from Datadog APIs | Metric-name, series, or explicit PromQL evidence normalized from a Prometheus-compatible API | Same Prometheus-compatible adapter, with evidence labeled for the Sloth provider |
-| Reviewed manifest | SLO intent, burn-rate monitor intent, missing-telemetry monitor intent, dashboard intent, and route context | Recording rules, burn-rate rules, telemetry-gap alerts, burn-rate alerts, Grafana dashboards, Alertmanager routes, and rendered native resources | Sloth `prometheus/v1` SLO specs with event queries, page/ticket alert labels, and annotations |
+| Telemetry evidence | Active-metric or explicit query evidence normalized from Datadog APIs | Metric-name, series, or explicit PromQL evidence normalized from a Prometheus-compatible API | The Prometheus-compatible adapter, with evidence labeled for the Sloth target |
+| Reviewed manifest | SLOs, burn-rate monitors, missing-telemetry monitors, decision dashboards, and route context | SLI/SLO/burn-rate recording rules, telemetry-gap and burn-rate alerts, Grafana dashboards, Alertmanager routes, and rendered native resource content | Sloth `prometheus/v1` SLO specs with event queries, page/ticket alert labels, and response annotations |
 | Saved review report | `manifest-review/datadog.json` | `manifest-review/prometheus_stack.json` | `manifest-review/sloth.json` |
-| Dry-run plan | Versioned desired/observed state plus API payload operations: `create`, `update`, `recreate`, or `noop`; includes managed identity and Datadog risk evidence | Versioned desired/observed state plus managed-file operations: `write` or `noop` for manifest and native resource files | Versioned desired/observed state plus managed-file `write` or `noop` operations and an external `sloth generate` handoff operation |
-| Confirmed output | Datadog SLOs, monitors, telemetry-gap monitors, and dashboards | Reviewed manifest, PrometheusRule YAML, Grafana dashboard ConfigMap YAML, and Alertmanager route-intent YAML | Reviewed manifest and native Sloth YAML input |
-| What remains external | Notification endpoint/credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoint/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
+| Dry-run plan | API-oriented `create`, `update`, `recreate`, or `noop` changes with IDs, ownership identity, and risk | `write` or `noop` changes for `manifest.json` and every native YAML file | `write` or `noop` changes for the manifest and native Sloth input plus a `handoff` change |
+| Operation journal | One entry per Datadog change, preserving resource ID, match identity, and risk | One entry per managed-file change with file-state verification requirements | Managed-file entries plus a non-resumable external-generator handoff entry |
+| Confirmed engine output | Datadog SLO, monitor, telemetry-gap monitor, and dashboard resources | `manifest.json`, PrometheusRule YAML, Grafana dashboard ConfigMap YAML, and Alertmanager route-intent YAML | `manifest.json` and native Sloth YAML input |
+| External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
 
-**Task:** a service has metrics but no reviewed SLO definition. Inventory what exists before writing policy.
+**Task:** inventory available service telemetry before choosing an SLI, objective, or response policy.
 
-For Datadog:
+Datadog:
 
 ```bash
 bin/rules-ctl discover-telemetry \
@@ -44,7 +63,7 @@ bin/rules-ctl discover-telemetry \
   > ./work/checkout-datadog-evidence.json
 ```
 
-For Prometheus Stack:
+Prometheus Stack:
 
 ```bash
 bin/rules-ctl discover-telemetry \
@@ -54,7 +73,7 @@ bin/rules-ctl discover-telemetry \
   > ./work/checkout-prometheus-evidence.json
 ```
 
-For a Sloth delivery target, use the same Prometheus-compatible discovery path:
+Sloth uses the Prometheus-compatible discovery adapter:
 
 ```bash
 bin/rules-ctl discover-telemetry \
@@ -64,24 +83,25 @@ bin/rules-ctl discover-telemetry \
   > ./work/checkout-sloth-evidence.json
 ```
 
-Rank one evidence file:
+Rank one saved evidence file:
 
 ```bash
-bin/rules-ctl candidates ./work/checkout-datadog-evidence.json
+bin/rules-ctl candidates ./work/checkout-datadog-evidence.json \
+  > ./work/checkout-datadog-candidates.json
 ```
 
-**Generated result:**
+**What to expect:**
 
-- normalized signals rather than raw provider responses
-- proposed candidate SLI/SLO identities and calculation basis
-- confidence level, evidence reasons, caveats, and explanation
-- findings for unknown, non-user-visible, incomplete, or unsupported telemetry
+- `discover-telemetry` writes one normalized JSON envelope to stdout; the shell redirection above creates the evidence file.
+- `candidates` writes ranked proposal JSON to stdout with candidate UID, calculation basis, confidence, reasons, caveats, explanation, and rejected-signal findings.
+- Datadog evidence comes from Datadog APIs. Prometheus Stack and Sloth evidence comes from a Prometheus-compatible API and retains the selected provider label.
+- No definition, provider manifest, alert, dashboard, or backend resource is created.
 
-**Safety boundary:** discovery and candidate generation do not create policy or backend resources. Objectives and thresholds remain proposals until reviewed.
+**Intent preserved:** telemetry can support or reject a candidate, but it does not choose the objective, user journey, or operational response.
 
 ## Use Case 2: Build A Portfolio Onboarding Queue
 
-**Task:** inspect many service scopes in one provider and leave a reusable queue for service owners.
+**Task:** inspect many service scopes in one provider and leave a reusable review queue for service owners.
 
 ```bash
 bin/rules-ctl discover-telemetry \
@@ -91,10 +111,11 @@ bin/rules-ctl discover-telemetry \
 
 bin/rules-ctl onboarding-summary \
   --handoff-dir=./work/handoff \
-  ./work/discovery/index.json
+  ./work/discovery/index.json \
+  > ./work/onboarding-summary.json
 ```
 
-Review one scope:
+Review and validate one scope:
 
 ```bash
 bin/rules-ctl review-handoff \
@@ -117,25 +138,24 @@ bin/rules-ctl draft-from-handoff \
   > ./work/drafts/checkout-prod.rb
 ```
 
-**Generated result:**
+**What to expect:**
 
-- per-scope normalized discovery evidence
-- aggregate discovery index with runtime failures preserved
-- readiness ranking: `ready`, `partial`, `insufficient`, or `failed`
-- accepted and rejected candidate decisions with review notes
-- a Ruby DSL draft carrying the original discovery-provider provenance
+- Batch discovery writes one normalized JSON evidence file per scope and `./work/discovery/index.json`; runtime failures are recorded per scope.
+- `onboarding-summary` writes readiness JSON to stdout and creates one rerun-safe handoff packet per scope under `./work/handoff`.
+- `review-handoff` updates that packet in place and prints the updated packet; accepted/rejected decisions, notes, candidate reasoning, and original discovery evidence remain together.
+- `validate-handoff` prints a validation report. `draft-from-handoff` prints Ruby DSL text; the redirection above creates the draft file with provenance comments.
+- Readiness values are `ready`, `partial`, `insufficient`, or `failed`.
 
-**Safety boundary:** generated drafts intentionally contain provider-binding handoff work. A maintainer must verify metric semantics, thresholds, selectors, routes, dashboards, and miss policy before provider generation.
+**Intent preserved:** a maintainer must review metric meaning, success semantics, objective, selectors, provider bindings, routes, dashboards, playbook, and miss policy before provider generation.
 
 ## Use Case 3: Discover With One Provider And Deliver Through Another
 
-**Task:** use evidence from the backend currently deployed, but generate the reviewed SLO for a different destination.
+**Task:** use evidence from the backend currently deployed while generating reviewed reliability resources for a different backend.
 
-Example: discover in Datadog, generate for Prometheus Stack.
+Example: discover in Datadog, then target Prometheus Stack.
 
-1. Discover, rank, and review Datadog evidence as shown above.
-2. Generate the neutral draft from the accepted handoff.
-3. Add a reviewed `prometheus_stack` binding to the accepted metric:
+1. Run Use Cases 1 and 2 with `--provider=datadog`.
+2. Add a reviewed Prometheus binding to the accepted SLI in the generated definition:
 
 ```ruby
 provider_binding 'prometheus_stack' do
@@ -146,7 +166,7 @@ provider_binding 'prometheus_stack' do
 end
 ```
 
-4. Add the required Alertmanager notification route and validate against target telemetry:
+3. Add the reviewed Alertmanager route, validate the definition, and check target telemetry:
 
 ```bash
 bin/rules-ctl validate ./work/drafts/checkout-prod.rb
@@ -158,7 +178,7 @@ bin/rules-ctl reality-check \
   ./work/drafts/checkout-prod.rb
 ```
 
-5. Generate the target bundle:
+4. Generate the target provider manifest:
 
 ```bash
 bin/rules-ctl generate \
@@ -168,72 +188,40 @@ bin/rules-ctl generate \
   ./work/drafts/checkout-prod.rb
 ```
 
-**Generated result:**
+**What to expect:**
 
-- the handoff and definition retain `datadog` as the source of onboarding evidence
-- target generation uses only the explicit reviewed `prometheus_stack` binding
-- the provider manifest contains recording, alert, dashboard, and route artifacts
-- `manifest-review/prometheus_stack.json` links the target manifest back to the reviewed handoff
+- The handoff, draft, generated manifest, and review report retain Datadog as onboarding evidence provenance.
+- Target validation and generation use only the explicit reviewed `prometheus_stack` binding.
+- `./work/generated/checkout-api/prometheus_stack/manifest.json` contains recording rules, alerts, dashboard intent, route intent, and rendered native resource content.
+- `./work/generated/manifest-review/prometheus_stack.json` links the target manifest to the reviewed handoff and fingerprints both inputs.
+- The reverse flow is supported with Prometheus evidence and a reviewed Datadog binding. A definition may also contain explicit bindings for all three providers and generate one manifest per provider.
 
-The reverse is also supported: discover Prometheus telemetry, accept the candidate, add a reviewed Datadog metric/query binding, run a Datadog reality check, and generate Datadog resources.
-
-A single definition may carry all three bindings:
-
-```bash
-bin/rules-ctl generate --provider=datadog --output-dir=./work/generated ./work/checkout-api.rb
-bin/rules-ctl generate --provider=prometheus_stack --output-dir=./work/generated ./work/checkout-api.rb
-bin/rules-ctl generate --provider=sloth --output-dir=./work/generated ./work/checkout-api.rb
-```
-
-**Cross-provider boundary:**
-
-- portable: discovered signal kind, evidence counts, candidate reasoning, accepted SLO identity, objective, calculation basis, miss policy, owner, and review notes
-- target-specific: metric names, query syntax, selectors, aggregation semantics, histogram shape, routes, dashboard paths, and resource payloads
-- never automatic: the engine does not infer that one provider metric/query is semantically equivalent to another
+**Intent preserved:** signal kind, candidate reasoning, accepted SLO identity, objective, calculation basis, miss policy, owner, and review notes are portable. Metric names, query syntax, selectors, aggregation, histogram semantics, routes, and provider payloads are target-specific and never translated automatically.
 
 ## Use Case 4: Generate A Complete Provider Delivery Bundle
 
-**Task:** translate one reviewed service definition into the artifacts required by the selected observability backend.
+**Task:** translate one reviewed service definition into the complete artifact set owned by a selected observability provider.
 
 ```bash
 bin/rules-ctl generate \
-  --provider=datadog \
+  --provider=prometheus_stack \
   --output-dir=./work/generated \
   --handoff-dir=./work/handoff \
   ./work/checkout-api.rb
 ```
 
-Change `--provider` to `prometheus_stack` or `sloth` for another target.
+Change `--provider` to `datadog` or `sloth` for another target.
 
-**Datadog generates:**
+**What to expect:**
 
-- one SLO intent per reviewed SLO
-- burn-rate monitor intent
-- missing-telemetry monitor intent
-- decision dashboard intent
-- route and response context
-- saved reviewed manifest and Datadog manifest-review report
+- All providers print a JSON array of generated manifests to stdout.
+- With `--output-dir`, each service manifest is saved at `./work/generated/<service>/<provider>/manifest.json`, and the provider report is saved at `./work/generated/manifest-review/<provider>.json`.
+- Datadog manifests contain one SLO, burn-rate monitor, missing-telemetry monitor, and decision dashboard intent per reviewed SLO, including owner, playbook, route, and source context.
+- Prometheus Stack manifests contain one base observation recording rule per SLI instance; success-ratio, error-ratio, objective-ratio, error-budget-ratio, and burn-rate recording rules per SLO; telemetry-gap and burn-rate alerts; Grafana dashboards; Alertmanager routes; and rendered PrometheusRule/ConfigMap/route-intent content.
+- Sloth manifests contain `prometheus/v1` SLO specs, error and total event queries, page/ticket alert labels, and owner/dashboard/playbook/miss-policy/route annotations.
+- Generation does not write Prometheus Stack or Sloth native YAML files. Confirmed file-backed apply writes those files from the reviewed manifest.
 
-**Prometheus Stack generates:**
-
-- one base observation recording rule per SLI instance
-- success-ratio, error-ratio, objective-ratio, and error-budget-ratio rules per SLO
-- burn-rate recording rules and alerts
-- missing-telemetry alerts
-- Grafana dashboards
-- Alertmanager route intent
-- rendered PrometheusRule, dashboard ConfigMap, and route-intent resources
-- saved reviewed manifest and Prometheus Stack manifest-review report
-
-**Sloth generates:**
-
-- `prometheus/v1` SLO specifications
-- error and total event queries
-- page and ticket alert labels
-- dashboard, playbook, miss-policy, owner, and route annotations
-- saved reviewed manifest and Sloth manifest-review report
-
-Validate a saved report against the current manifest and handoff:
+Validate the saved report against current inputs:
 
 ```bash
 bin/rules-ctl manifest-review \
@@ -243,11 +231,11 @@ bin/rules-ctl manifest-review \
   --report=./work/generated/manifest-review/prometheus_stack.json
 ```
 
+**Intent preserved:** adapters render backend artifacts from reviewed neutral intent and explicit provider bindings. They do not invent telemetry, objectives, paging policy, ownership, or notification destinations.
+
 ## Use Case 5: Package A Reviewed Multi-Provider Release
 
-**Task:** create one immutable artifact that records what was reviewed for several provider targets.
-
-Build an index containing each generated provider:
+**Task:** create one immutable review artifact for several provider targets, then derive read-only plans against current state.
 
 ```bash
 bin/rules-ctl onboarding-artifact-index \
@@ -259,21 +247,13 @@ bin/rules-ctl onboarding-artifact-index \
   --provider=sloth \
   --output=./work/artifact-index.json \
   ./work/discovery/index.json
-```
 
-Create the review boundary:
-
-```bash
 bin/rules-ctl bundle create \
   --artifact-index=./work/artifact-index.json \
   --reviewer=team/payments-sre \
   --reviewed-at=2026-07-26T09:30:00Z \
   --output=./work/review-ready.json
-```
 
-Plan every target:
-
-```bash
 bin/rules-ctl bundle plan ./work/review-ready.json \
   --target-backend=checkout-api/datadog=environment \
   --target-output=checkout-api/prometheus_stack=./managed \
@@ -281,85 +261,113 @@ bin/rules-ctl bundle plan ./work/review-ready.json \
   --output=./work/apply-ready.json
 ```
 
-**Generated result:**
+**What to expect:**
 
-- new bundle ID; the input bundle is unchanged
-- one generated plan artifact per provider target
-- transition lineage back to the `review_ready` predecessor
-- provider-level target, plan, operation, destructive, and risk counts
-- action, resource-target, and risk-level breakdowns
+- The artifact index is written to the requested file and stdout with per-scope artifact links, next actions, review validity, and freshness findings.
+- `bundle create` writes and prints a content-addressed `review_ready` bundle with reviewer identity, explicit review time, source artifacts, provider targets, and no credentials.
+- `bundle plan` leaves the predecessor unchanged and writes/prints a new `apply_ready` bundle with a new bundle ID and predecessor lineage.
+- Each provider plan is embedded as a `change_plan` artifact in `apply-ready.json`; separate plan files are not written.
+- The bundle summary includes provider-level target, plan, operation, destructive, action, target, and risk counts.
+- Datadog planning reads current managed API state. Prometheus Stack and Sloth planning read their configured managed directories. No mutation occurs.
 
-**Provider reads during planning:**
-
-- Datadog reads current managed backend state using runtime credentials
-- Prometheus Stack reads the configured managed-file directory
-- Sloth reads the configured managed-file directory
-
-No provider mutation occurs.
+**Intent preserved:** the bundle binds reviewed evidence, definition, provider manifests, review decisions, and observed-state plans without storing credentials or weakening provider-specific safety evidence.
 
 ## Use Case 6: Understand Drift Before Applying
 
-**Task:** compare reviewed desired state with current provider state.
-
-Datadog:
+**Task:** compare reviewed provider intent with current backend or managed-file state.
 
 ```bash
 bin/rules-ctl diff \
   --provider=datadog \
-  --manifest=./work/generated/checkout-api/datadog/manifest.json
-```
+  --manifest=./work/generated/checkout-api/datadog/manifest.json \
+  > ./work/datadog-diff.json
 
-Prometheus Stack:
-
-```bash
 bin/rules-ctl diff \
   --provider=prometheus_stack \
   --output-dir=./managed \
-  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json
-```
+  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json \
+  > ./work/prometheus-stack-diff.json
 
-Sloth:
-
-```bash
 bin/rules-ctl diff \
   --provider=sloth \
   --output-dir=./managed \
-  --manifest=./work/generated/checkout-api/sloth/manifest.json
+  --manifest=./work/generated/checkout-api/sloth/manifest.json \
+  > ./work/sloth-diff.json
 ```
 
-**Generated result:**
+**What to expect:**
 
-- Datadog: `create`, `update`, `recreate`, or `noop` operations with changed paths, backend IDs, match identity, and risk where applicable
-- Prometheus Stack: `create`, `update`, or `noop` comparisons for the manifest and each native managed file
-- Sloth: `create`, `update`, or `noop` comparisons for the manifest and native Sloth input
-- all providers: `slo-rules-engine/provider-state/v1` desired-state and observed-state snapshots, deterministic fingerprints, normalized changes, provider findings, and the existing impact summary under `state_contract`
+- Every command prints a JSON array with one plan per manifest; the redirections above create saved diff files.
+- Datadog changes are `create`, `update`, `recreate`, or `noop` and include changed paths, backend IDs, match identity, and risk when applicable.
+- Prometheus Stack changes are `create`, `update`, or `noop` comparisons for `manifest.json` and each PrometheusRule, Grafana ConfigMap, and Alertmanager route-intent file.
+- Sloth changes are `create`, `update`, or `noop` comparisons for `manifest.json` and each native Sloth input file.
+- Every plan includes `slo-rules-engine/provider-state/v1` desired/observed snapshots, deterministic fingerprints, normalized changes, findings, and impact summary under `state_contract`.
 
-`diff` never mutates provider state.
+**Safety boundary:** `diff` reads provider or managed-file state and never mutates it. A difference is evidence for review, not permission to apply.
 
 ## Use Case 7: Inventory Existing Managed State
 
-**Task:** determine what the engine can match, what is missing, and what may be orphaned before adoption.
+**Task:** determine what the engine can match, what is missing, and what may be orphaned before adoption or cleanup.
 
 ```bash
 bin/rules-ctl import \
   --provider=datadog \
-  --manifest=./work/generated/checkout-api/datadog/manifest.json
+  --manifest=./work/generated/checkout-api/datadog/manifest.json \
+  > ./work/datadog-import.json
 ```
 
-For file-backed providers add `--output-dir=./managed`.
+For Prometheus Stack or Sloth, change `--provider`, use that provider's manifest, and add `--output-dir=./managed`.
 
-**Generated result:**
+**What to expect:**
 
-- Datadog: matched backend state, missing expected resources, managed orphan findings, and match-identity confidence
-- Prometheus Stack: current manifest and every expected native file, with missing-file findings
-- Sloth: current manifest and every expected native Sloth input, with missing-input findings
-- all providers: versioned desired-state, observed-state, and normalized finding evidence under `state_contract`
+- The command prints a JSON array of imported-state reports; the redirection above saves the report.
+- Datadog reports matched API state, missing expected resources, managed orphans, and match-identity confidence.
+- Prometheus Stack reports the current managed manifest and every expected native YAML file, including missing-file findings.
+- Sloth reports the current managed manifest and every expected native input, including missing-input findings.
+- Every report includes versioned desired state, observed state, deterministic fingerprints, and normalized findings under `state_contract`.
 
-Import is observational. It does not adopt, update, or delete resources.
+**Safety boundary:** import is observational. It does not claim adoption, change ownership tags, update resources, or delete orphans.
 
-## Use Case 8: Apply Reviewed State
+## Use Case 8: Create An Auditable Operation Journal
 
-**Task:** converge current provider state after the plan and review evidence have been inspected.
+**Task:** persist the identity and safety requirements of one dry-run provider plan before execution behavior is added.
+
+Create a single-manifest plan:
+
+```bash
+bin/rules-ctl apply \
+  --provider=prometheus_stack \
+  --dry-run \
+  --output-dir=./managed \
+  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json \
+  > ./work/prometheus-stack-plan.json
+```
+
+Create and inspect its journal:
+
+```bash
+bin/rules-ctl journal create \
+  ./work/prometheus-stack-plan.json \
+  --output=./work/prometheus-stack-journal.json
+
+bin/rules-ctl journal status \
+  ./work/prometheus-stack-journal.json
+```
+
+**What to expect:**
+
+- `journal create` accepts exactly one valid `dry_run` provider plan, verifies its nested desired-state, observed-state, and plan fingerprints, writes the initial journal atomically, and prints the same JSON.
+- Repeating creation with the same plan and output is idempotent. Different content at the output path is rejected without overwrite.
+- The journal ID is deterministic and tied to provider, service, plan fingerprint, desired-state fingerprint, observed-state fingerprint, and static operation identity.
+- Actionable entries start `pending`; `noop` entries start `skipped`. The schema permits `pending`, `running`, `succeeded`, `failed`, and `skipped` entry states.
+- Datadog entries retain backend resource IDs, match identity, changed paths, desired/observed payloads, and risk. Prometheus Stack entries retain managed-file changes and file-state verification requirements. Sloth adds external-generator handoff verification.
+- `journal status` prints effective state, entry counts, resume eligibility, and findings such as `partial_failure`, `resume_blocked`, or `resume_state_recheck_required`.
+
+**Safety boundary:** this checkpoint creates and assesses journals only. It does not update entry states, execute operations, resume a failed apply, verify post-apply convergence, or guarantee execution of a separately approved exact plan.
+
+## Use Case 9: Apply Reviewed State
+
+**Task:** converge current provider state after reviewing the current manifest and evidence gates.
 
 Datadog:
 
@@ -394,17 +402,18 @@ bin/rules-ctl apply \
   --manifest=./work/generated/checkout-api/sloth/manifest.json
 ```
 
-**Mutation result:**
+**What to expect:**
 
-- Datadog creates or updates API resources; risky weak-ownership updates are blocked
-- Prometheus Stack writes only changed deterministic bundle files
-- Sloth writes only changed manifest and native input files; running Sloth remains external
+- Datadog creates, updates, or recreates SLO, monitor, telemetry-gap monitor, and dashboard API resources. Weak-ownership mutations are blocked.
+- Prometheus Stack writes only changed `manifest.json`, PrometheusRule YAML, Grafana dashboard ConfigMap YAML, and Alertmanager route-intent YAML files below `./managed/<service>/prometheus_stack`.
+- Sloth writes only changed `manifest.json` and native Sloth input YAML below `./managed/<service>/sloth`; it does not run Sloth or apply downstream rules.
+- Stdout is a JSON array of the live-mode plan produced immediately before mutation. It describes planned operations; it is not an operation journal, per-operation outcome record, or post-apply verification result.
 
-Current `apply` replans immediately before mutation. It does not yet promise execution of a separately approved exact plan; that is a later explicit workflow phase.
+**Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. It does not execute a separately approved exact plan, persist outcomes, resume partial failure, or emit `ProviderStateResult`.
 
-## Use Case 9: Remove Managed Orphans
+## Use Case 10: Remove Managed State
 
-**Task:** inspect and explicitly remove provider state that is managed for the service but absent from reviewed desired state.
+**Task:** inspect and explicitly remove provider state managed for the reviewed service scope.
 
 Start with dry-run:
 
@@ -412,20 +421,25 @@ Start with dry-run:
 bin/rules-ctl prune \
   --provider=datadog \
   --dry-run \
-  --manifest=./work/generated/checkout-api/datadog/manifest.json
+  --manifest=./work/generated/checkout-api/datadog/manifest.json \
+  > ./work/datadog-prune-plan.json
 ```
 
-Confirmed prune uses `--confirm` and should include current handoff/report evidence. File-backed providers also require `--output-dir`.
+Confirmed prune uses `--confirm` and current handoff/report evidence. File-backed providers also require `--output-dir`.
 
-**Generated or mutation result:**
+**What to expect:**
 
-- Datadog dry-run identifies managed orphan deletes with ownership confidence and risk; confirmed prune blocks weak service-scope ownership
-- Prometheus Stack dry-run identifies managed bundle files; confirmed prune deletes existing files in that reviewed bundle
-- Sloth dry-run identifies its manifest and input files; confirmed prune deletes those managed files
+- Dry-run prints a JSON plan and does not delete anything.
+- Datadog plans managed orphan deletes with provider resource ID, ownership confidence, and risk; confirmed prune rejects weak service-scope ownership.
+- Prometheus Stack plans/deletes the reviewed manifest and the expected native PrometheusRule, Grafana, and route-intent files.
+- Sloth plans/deletes the reviewed manifest and native Sloth input files.
+- Confirmed stdout remains a plan, not verified post-delete state.
 
-## Use Case 10: Verify Telemetry Before Production Adoption
+**Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. There is no rollback or post-delete verification contract yet.
 
-**Task:** prove that the selected provider binding resolves to usable evidence.
+## Use Case 11: Verify Telemetry Before Production Adoption
+
+**Task:** prove that each reviewed provider binding resolves to usable current evidence.
 
 Datadog:
 
@@ -446,42 +460,45 @@ bin/rules-ctl reality-check \
   ./work/checkout-api.rb
 ```
 
-**Generated result:**
+**What to expect:**
 
-- provider and service identity
-- validity rollup
-- per-SLI reports
-- findings for missing metrics, absent series, incomplete histogram evidence, or incompatible binding semantics
+- The command prints JSON with provider identity, overall validity, per-service/per-SLI reports, and findings.
+- Findings identify missing metrics, absent series, incomplete histogram evidence, incompatible binding semantics, or provider lookup failures.
+- Datadog uses Datadog lookup semantics. Prometheus Stack and Sloth use Prometheus-compatible lookup semantics for their explicit bindings.
+- A non-valid result exits nonzero and leaves definitions and provider state unchanged.
 
-The command reports evidence gaps. It does not modify definitions or backend state.
+**Intent preserved:** the check tests whether reviewed intent is measurable. It reports gaps rather than changing the binding, objective, calculation basis, or SLO policy.
 
-## Use Case 11: Generate Contextual Alert Routes
+## Use Case 12: Generate Contextual Alert Routes
 
-**Task:** hand provider alert context to a delivery system without giving the rules engine delivery credentials.
+**Task:** hand alert context to a delivery system without giving the rules engine delivery credentials.
 
 ```bash
 bin/rules-ctl generate-routes \
   --integration=notification_router \
-  ./work/checkout-api.rb
+  ./work/checkout-api.rb \
+  > ./work/notification-routes.json
 ```
 
-**Generated result:**
+**What to expect:**
 
-- Datadog route entries for Datadog-sourced notification routes
-- Alertmanager route entries for Prometheus Stack and Sloth routes
-- route availability-check intent
+- The command prints a JSON array of integration manifests; the redirection above saves it.
+- Datadog notification routes become Datadog route entries.
+- Prometheus Stack and Sloth notification routes become Alertmanager route entries.
+- Route availability-check intent is included. Endpoint URLs, tokens, receiver credentials, and message delivery outcomes are not.
 
-The notification router owns Teams, Slack, Telegram, webhook, console, or other channel configuration. The rules engine generates route intent and keys only.
+**Intent preserved:** generated routes carry service, owner, severity, response, dashboard, and playbook context. The notification router remains responsible for Teams, Slack, Telegram, webhook, console, or other channel configuration and delivery.
 
 ## Maintenance Rule
 
 Update or rewrite usage when any of these changes:
 
-- a command is added, removed, renamed, or gains a new safety gate
+- a command is added, removed, renamed, or gains a safety gate
 - a provider starts or stops generating an artifact
 - a provider automation mode or state action changes
 - a workflow begins contacting a backend or mutating state
 - bundle lifecycle, identity, runtime configuration, or output changes
+- operation-journal schema, execution, resume, or verification behavior changes
 - cross-provider evidence portability or binding requirements change
 
-Do not append isolated command examples to an outdated catalog. Keep the guide organized around the engineering task and state the generated result for every supported provider.
+Keep this guide organized around engineering tasks. Every use case must state concrete stdout, written-file, provider-read, provider-write, and refusal behavior that applies.

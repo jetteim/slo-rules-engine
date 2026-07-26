@@ -14,6 +14,7 @@ Use the toolkit to:
 - generate SLO evaluation, alerting, dashboard, and routing artifacts
 - package review evidence and provider plans into a content-addressed release bundle
 - compare reviewed desired state with existing backend or managed-file state
+- persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
 - run telemetry reality checks before treating an SLO as operationally ready
 
@@ -28,6 +29,12 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 | `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | `manifest.json` and native Sloth YAML input; the engine does not run Sloth or mutate Prometheus |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
+
+All provider dry-run plans can be converted into
+`slo-rules-engine/provider-operation-journal/v1` JSON. Datadog journals
+preserve resource IDs, ownership identity, and risk; Prometheus Stack journals
+preserve managed-file verification requirements; Sloth journals also identify
+the external-generator handoff as requiring manual verification.
 
 ## Usage By Use Case
 
@@ -105,6 +112,31 @@ bin/rules-ctl bundle plan ./work/review-ready.json \
 
 The planned bundle contains generated dry-run plans and provider-level total, actionable, destructive, and risk summaries. Planning does not change the predecessor bundle or provider state.
 
+### Persist an operation journal
+
+Create one journal from a saved single-manifest dry-run plan:
+
+```bash
+bin/rules-ctl apply \
+  --provider=prometheus_stack \
+  --dry-run \
+  --output-dir=./managed \
+  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json \
+  > ./work/prometheus-stack-plan.json
+
+bin/rules-ctl journal create \
+  ./work/prometheus-stack-plan.json \
+  --output=./work/prometheus-stack-journal.json
+
+bin/rules-ctl journal status ./work/prometheus-stack-journal.json
+```
+
+The initial journal is deterministic, verifies the saved state and plan
+fingerprints, records every operation as `pending` or `skipped`, and states
+whether an uncertain failure could be retried after a state refresh. Journal
+creation and status assessment are read-only; execution, entry-state updates,
+resume, and post-apply verification are not wired yet.
+
 ### Inspect or reconcile provider state
 
 Use a reviewed provider manifest for all state work:
@@ -167,6 +199,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - Cross-provider evidence reuse never implies automatic metric or query translation.
 - Provider generation is deterministic and read-only.
 - Bundle planning is read-only and rejects stale or invalid predecessors.
+- Journal creation accepts exactly one verified dry-run provider plan and never executes it.
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
 - Confirmed apply and prune require reviewed manifest input.
 - Datadog reconciliation requires managed ownership evidence for risky updates or deletes.

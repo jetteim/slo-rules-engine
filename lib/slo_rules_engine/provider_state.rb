@@ -56,7 +56,10 @@ module SloRulesEngine
 
       def fetch(container, key)
         return container[key] if container.is_a?(Hash) && container.key?(key)
-        return container[key.to_s] if container.is_a?(Hash) && container.key?(key.to_s)
+        return nil unless container.is_a?(Hash)
+
+        alternate_key = key.is_a?(String) ? key.to_sym : key.to_s
+        return container[alternate_key] if container.key?(alternate_key)
 
         nil
       end
@@ -310,6 +313,11 @@ module SloRulesEngine
         Value.require_one_of!('mode', mode, MODES)
         Value.require_instances!('changes', changes, Change)
         Value.require_instances!('findings', findings, Finding)
+        findings.each_with_index do |finding, index|
+          next if finding.provider == provider.to_s
+
+          raise ContractError.new("findings[#{index}].provider", 'must match plan provider')
+        end
 
         @provider = provider.to_s.freeze
         @service = service.to_s.freeze

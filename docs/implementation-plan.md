@@ -149,7 +149,9 @@ This is the running plan for the long refactor.
 - [x] Define versioned provider-neutral desired-state, observed-state, change, plan/import, result, and finding contracts.
 - [x] Preserve Datadog and Prometheus Stack provider payload, identity, finding, and risk evidence through the shared planning/import contracts.
 - [x] Include Sloth native external-generator input state and missing-input findings in the shared import contract.
-- [ ] Add operation journaling, partial-failure reporting, and resumable execution.
+- [x] Define a durable operation-journal schema with deterministic plan and operation identity.
+- [x] Persist initial journals from verified single-manifest dry-run plans and assess partial-failure/resume eligibility.
+- [ ] Wire live execution outcomes into operation journals and add safe resumable execution.
 - [ ] Add provider-specific post-apply verification evidence and managed resource identifiers.
 - [ ] Define compensating rollback plans for reversible mutations and explicit findings for irreversible operations.
 
