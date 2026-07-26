@@ -16,8 +16,8 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Inspect drift | Reviewed desired state compared with observed state | Provider plan with deterministic state fingerprints | Read-only provider or managed-file access |
 | Inventory state | Ownership and adoption evidence | Observed state and findings | Read-only provider or managed-file access |
 | Create operation journal | Exact provider plan identity and operation safety evidence | Immutable initial journal plus status assessment | Standalone journal creation does not execute |
-| Apply reviewed state | Reviewed provider artifacts and mutation gates | Datadog pre-mutation plan, or file-backed journal plus operation result | Explicit `--confirm`; file-backed mutation also requires `--journal-dir` |
-| Remove managed state | Reviewed scope and ownership evidence | Planned deletes, or file-backed journal plus confirmed delete result | Explicit `--confirm`; file-backed mutation also requires `--journal-dir` |
+| Apply reviewed state | Reviewed provider artifacts and mutation gates | Durable journal plus provider result and post-operation verification | Explicit `--confirm` and `--journal-dir` |
+| Remove managed state | Reviewed scope and ownership evidence | Durable journal plus confirmed delete result and absence verification | Explicit `--confirm` and `--journal-dir` |
 | Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
 | Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
 
@@ -37,7 +37,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Release bundling | Content-addressed `review_ready` JSON containing reviewed evidence and target artifacts |
 | Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
-| File-backed execution | Durable live journal transitions plus a `ProviderStateResult` with per-file expected/actual state fingerprints; Sloth downstream generation remains explicitly `pending` |
+| Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
 
 ### Provider Outputs
 
@@ -47,8 +47,8 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Reviewed manifest | SLOs, burn-rate monitors, missing-telemetry monitors, decision dashboards, and route context | SLI/SLO/burn-rate recording rules, telemetry-gap and burn-rate alerts, Grafana dashboards, Alertmanager routes, and rendered native resource content | Sloth `prometheus/v1` SLO specs with event queries, page/ticket alert labels, and response annotations |
 | Saved review report | `manifest-review/datadog.json` | `manifest-review/prometheus_stack.json` | `manifest-review/sloth.json` |
 | Dry-run plan | API-oriented `create`, `update`, `recreate`, or `noop` changes with IDs, ownership identity, and risk | `write` or `noop` changes for `manifest.json` and every native YAML file | `write` or `noop` changes for the manifest and native Sloth input plus a `handoff` change |
-| Operation journal | Standalone dry-run journals preserve resource ID, match identity, and risk; live Datadog execution is not journal-backed yet | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
-| Confirmed engine output | Datadog resources plus the immediate live plan | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
+| Operation journal | Confirmed apply/prune persists request method/path, returned resource ID, response fingerprint, sanitized failures, and terminal backend verification | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
+| Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
@@ -363,9 +363,9 @@ bin/rules-ctl journal status \
 - Actionable entries start `pending`; `noop` entries start `skipped`. The schema permits `pending`, `running`, `succeeded`, `failed`, and `skipped` entry states.
 - Datadog entries retain backend resource IDs, match identity, changed paths, desired/observed payloads, and risk. Prometheus Stack entries retain managed-file changes and file-state verification requirements. Sloth adds external-generator handoff verification.
 - `journal status` prints effective state, entry counts, resume eligibility, and findings such as `partial_failure`, `resume_blocked`, or `resume_state_recheck_required`.
-- Confirmed Prometheus Stack and Sloth apply/prune create a separate live-mode journal automatically through `--journal-dir`; operators do not manually transition that journal.
+- Confirmed apply/prune for every provider creates a separate live-mode journal automatically through `--journal-dir`; operators do not manually transition that journal.
 
-**Safety boundary:** standalone `journal create` and `journal status` never execute operations. File-backed live commands update and verify their own journal while executing, but there is no manual transition command, automatic resume, downstream Sloth verification, or separately approved exact-plan guarantee.
+**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing, but there is no manual transition command, automatic resume, downstream Sloth verification, or separately approved exact-plan guarantee.
 
 ## Use Case 9: Apply Reviewed State
 
@@ -377,6 +377,7 @@ Datadog:
 bin/rules-ctl apply \
   --provider=datadog \
   --confirm \
+  --journal-dir=./work/journals \
   --manifest=./work/generated/checkout-api/datadog/manifest.json \
   --handoff-dir=./work/handoff \
   --review-report=./work/generated/manifest-review/datadog.json
@@ -408,20 +409,22 @@ bin/rules-ctl apply \
 
 **What to expect:**
 
-- Datadog creates, updates, or recreates SLO, monitor, telemetry-gap monitor, and dashboard API resources. Weak-ownership mutations are blocked.
+- Datadog creates, updates, or recreates SLO, monitor, telemetry-gap monitor, and dashboard API resources. Weak-ownership mutations are blocked before a journal is created.
 - Prometheus Stack writes only changed `manifest.json`, PrometheusRule YAML, Grafana dashboard ConfigMap YAML, and Alertmanager route-intent YAML files below `./managed/<service>/prometheus_stack`.
 - Sloth writes only changed `manifest.json` and native Sloth input YAML below `./managed/<service>/sloth`; it does not run Sloth or apply downstream rules.
-- Datadog stdout remains the immediate live-mode plan and does not yet contain a live operation journal or `ProviderStateResult`.
-- Prometheus Stack and Sloth stdout include the immediate live-mode plan plus `execution.operation_journal` and `execution.result`.
-- Each file-backed journal is saved at `./work/journals/<service>/<provider>/<journal-id>.json`. Successful attempts record the managed path as `provider_resource_id`; failed attempts record a public-safe error class, code, and message.
-- File-backed execution stops after the first failed operation, marks untouched actionable operations `skipped`, emits `failed` or `partial`, and exits nonzero.
+- Every provider prints the immediate live-mode plan plus `execution.operation_journal` and `execution.result`.
+- Each journal is saved at `./work/journals/<service>/<provider>/<journal-id>.json`.
+- Successful Datadog attempts record the returned or existing `provider_resource_id`, request method/path, response fingerprint, and response top-level keys. Raw responses and raw backend error messages are not persisted.
+- After Datadog mutation, the engine rereads backend state once and compares canonical payload plus provider resource identity. Missing resources, identity mismatch, payload drift, delete survival, or refresh failure produce stable verification findings and a nonzero result.
+- Successful file-backed attempts record the managed path as `provider_resource_id`; failed attempts record a public-safe error class, code, and message.
+- Confirmed execution stops after the first failed operation, marks untouched actionable operations `skipped`, emits `failed` or `partial`, and exits nonzero.
 - After execution, every attempted engine-owned file is parsed again and compared with the live plan. Journal verification evidence contains a timestamp, expected presence/content fingerprint, actual presence/content fingerprint, and stable finding codes for missing, unreadable, unexpectedly present, or mismatched files.
 - Prometheus Stack reports verification `succeeded` only when every attempted managed file matches. A mismatch adds `post_apply_verification_failed`, makes the provider result `failed` when execution otherwise succeeded, and exits nonzero.
-- An all-`noop` apply reports verification `not_required` because the live plan already read matching files immediately before execution.
+- An all-`noop` apply reports verification `not_required` because the live plan already observed matching provider or file state immediately before execution.
 - Sloth records its external-generator `handoff` as `skipped` with reason `external_handoff_required` after writing engine-owned files.
 - Sloth reports `engine_owned_status: succeeded` after its manifest and native inputs verify, while overall and external verification remain `pending` until the operator runs Sloth and verifies downstream Prometheus state.
 
-**Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. Verification covers only engine-owned managed files, not Kubernetes application, Grafana loading, Alertmanager receiver delivery, Sloth execution, automatic resume, or execution of a separately approved exact plan.
+**Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. Datadog verification covers the supported managed API payload and identity contract, while file verification covers engine-owned paths. It does not prove notification delivery, Kubernetes application, Grafana loading, Alertmanager receiver delivery, Sloth execution, automatic resume, or execution of a separately approved exact plan.
 
 ## Use Case 10: Remove Managed State
 
@@ -437,7 +440,18 @@ bin/rules-ctl prune \
   > ./work/datadog-prune-plan.json
 ```
 
-Confirmed Datadog prune uses `--confirm` and current handoff/report evidence. Confirmed Prometheus Stack or Sloth prune also requires both `--output-dir` and `--journal-dir`:
+Confirmed Datadog prune uses `--confirm`, `--journal-dir`, and current handoff/report evidence:
+
+```bash
+bin/rules-ctl prune \
+  --provider=datadog \
+  --confirm \
+  --journal-dir=./work/journals \
+  --manifest=./work/generated/checkout-api/datadog/manifest.json \
+  --review-report=./work/generated/manifest-review/datadog.json
+```
+
+Confirmed Prometheus Stack or Sloth prune also requires `--output-dir`:
 
 ```bash
 bin/rules-ctl prune \
@@ -455,12 +469,13 @@ bin/rules-ctl prune \
 - Datadog plans managed orphan deletes with provider resource ID, ownership confidence, and risk; confirmed prune rejects weak service-scope ownership.
 - Prometheus Stack plans/deletes the reviewed manifest and the expected native PrometheusRule, Grafana, and route-intent files.
 - Sloth plans/deletes the reviewed manifest and native Sloth input files.
-- Datadog confirmed stdout remains a plan, not verified post-delete state.
+- Datadog confirmed stdout includes the live plan, durable journal reference, per-delete API request evidence, deleted provider IDs, and a `ProviderStateResult`.
+- Datadog rereads the managed service scope once after deletion and verifies each recorded ID is absent. A surviving resource produces `backend_resource_present_after_delete`.
 - Prometheus Stack and Sloth confirmed stdout include the live plan, durable journal reference, per-delete attempts, managed path identifiers, and `ProviderStateResult`.
-- A file deletion failure stops later deletes, persists `failed` or `partial`, and exits nonzero.
+- A deletion failure stops later deletes, persists `failed` or `partial`, and exits nonzero.
 - Every attempted delete is rechecked for absence. Remaining files record `managed_file_present_after_delete`, fail verification, and keep the command nonzero.
 
-**Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. Verification proves engine-owned path absence only; journaling does not provide rollback, automatic resume, or downstream-system cleanup.
+**Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. Verification proves Datadog managed-ID absence or engine-owned path absence only; journaling does not provide rollback, automatic resume, or downstream-system cleanup.
 
 ## Use Case 11: Verify Telemetry Before Production Adoption
 

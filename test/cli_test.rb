@@ -401,6 +401,7 @@ class CLITest < Minitest::Test
         'apply',
         '--provider=datadog',
         '--confirm',
+        "--journal-dir=#{File.dirname(file.path)}",
         "--manifest=#{file.path}"
       )
 
@@ -449,6 +450,7 @@ class CLITest < Minitest::Test
           'apply',
           '--provider=datadog',
           '--confirm',
+          "--journal-dir=#{File.join(handoff_dir, 'journals')}",
           "--manifest=#{file.path}",
           "--handoff-dir=#{handoff_dir}"
         )
@@ -499,6 +501,7 @@ class CLITest < Minitest::Test
           'apply',
           '--provider=datadog',
           '--confirm',
+          "--journal-dir=#{File.join(handoff_dir, 'journals')}",
           "--manifest=#{file.path}",
           "--handoff-dir=#{handoff_dir}"
         )

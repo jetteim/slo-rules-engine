@@ -85,6 +85,14 @@ Explicit features:
 - **Apply planning:** dry-run apply emits planned create, update, write, or handoff operations.
 - **Explicit live mutation:** live backend changes require a separate command, confirmation, and credentials when the provider needs them.
 - **Datadog live API support:** Datadog can apply SLOs, monitors, telemetry-gap monitors, and dashboards through API calls.
+- **Datadog durable execution:** confirmed Datadog apply/prune requires
+  `--journal-dir`, persists atomic attempts and returned backend identifiers,
+  stops after the first failure, and emits a linked `ProviderStateResult`.
+- **Datadog post-mutation verification:** after confirmed mutation, Datadog
+  state is refreshed once and each attempted resource is checked for canonical
+  payload and provider identity convergence or confirmed delete absence.
+  Request evidence contains only method/path, response fingerprints, and
+  top-level response keys; API failures are sanitized before persistence.
 - **Payload provenance:** Datadog apply operations preserve the source artifact path through managed `source_ref` tags and use that identity during import, diff, apply, and prune.
 - **Managed tag contract:** Datadog apply-ready payloads require managed identity tags such as `managed_by`, `service`, and `source_ref`, while reconciliation ignores unmanaged backend tags so provider-owned semantics drive drift detection.
 - **Provider field contract:** Datadog apply-ready payloads validate SLO timeframe/threshold consistency, burn-rate query and threshold consistency, and telemetry-gap no-data monitor semantics before live mutation.

@@ -96,12 +96,13 @@ Existing `ApplyPlan#to_h` and `ImportedState#to_h` fields remain available. The 
 - findings
 - verification evidence
 
-Confirmed Prometheus Stack and Sloth apply/prune now emit this value under
-`execution.result`. Their operation results carry managed paths as provider
-resource identifiers. The plan's observed-state fingerprint still identifies
-the pre-execution snapshot. Post-operation verification separately records
-expected and actual managed-file state fingerprints, timestamps, per-resource
-status, and findings. Live Datadog apply/prune does not emit this result yet.
+Confirmed apply/prune for every current provider emits this value under
+`execution.result`. Datadog operation results carry returned or existing
+backend IDs; Prometheus Stack and Sloth carry managed paths as provider resource
+identifiers. The plan's observed-state fingerprint still identifies the
+pre-execution snapshot. Post-operation verification separately records
+expected and actual provider/file state fingerprints, timestamps, per-resource
+status, and findings.
 
 ### Operation Journal
 
@@ -152,8 +153,8 @@ fingerprint before writing the initial journal atomically. Recreating the same
 journal at the same path is idempotent. Existing different content is never
 overwritten.
 
-Confirmed file-backed apply/prune uses `JournalStore` and requires
-`--journal-dir`. The store:
+Confirmed apply/prune uses `JournalStore` and requires `--journal-dir`. The
+store:
 
 - creates one live-mode journal before the first mutation
 - serializes transitions with an exclusive journal lock
@@ -164,10 +165,25 @@ Confirmed file-backed apply/prune uses `JournalStore` and requires
 - refuses to replace an existing journal with execution evidence; an identical
   all-`skipped` noop journal is reused safely
 
-Execution stops after the first failed file operation. Later actionable entries
+Execution stops after the first failed operation. Later actionable entries
 become `skipped` with `prior_operation_failed`; the result becomes `failed` or
-`partial` and the CLI exits nonzero. Successful write/delete attempts record
-the managed path, byte/delete evidence, and completion timestamp.
+`partial` and the CLI exits nonzero.
+
+Datadog successful attempts record the request method/path, returned or
+existing backend identifier, response fingerprint, response top-level keys,
+and completion timestamp. Raw API responses and backend error messages are not
+persisted. After attempts finish, the engine refreshes backend state once:
+
+- apply compares canonical desired and actual payload plus provider identity
+- prune compares each recorded provider ID with the refreshed managed scope and
+  requires absence
+- stable findings distinguish missing resources, identity mismatch, payload
+  drift, surviving deletes, and refresh failure
+- a verification failure adds `post_apply_verification_failed` and makes an
+  otherwise successful result and CLI exit fail
+
+Successful file write/delete attempts record the managed path, byte/delete
+evidence, and completion timestamp.
 
 After operation attempts finish, every attempted engine-owned file is refreshed
 from disk:
@@ -257,7 +273,7 @@ skipped handoff rather than claiming downstream execution.
 - Provider and service identity must match across plan/import envelopes and snapshots.
 - Provider-specific payloads, resource IDs, identity confidence, and risk remain intact.
 - Credentials and credential-like keys are forbidden in journals.
-- Existing review and ownership gates remain in force; confirmed file-backed
+- Existing review and ownership gates remain in force; every confirmed
   apply/prune additionally requires `--journal-dir`.
 - Release-bundle plans now package the state contract inside each generated change-plan artifact.
 - Journal creation accepts exactly one `dry_run` plan and revalidates all
@@ -267,13 +283,13 @@ skipped handoff rather than claiming downstream execution.
 - Journal commands do not contact providers or managed-file targets.
 - Journal entry transitions and attempt evidence do not change journal
   identity.
-- File-backed verification covers only engine-owned managed paths and never
-  claims Kubernetes, Grafana, Alertmanager receiver, Sloth, or downstream
-  Prometheus convergence.
+- Datadog verification covers supported managed payload/identity semantics and
+  delete absence. File-backed verification covers only engine-owned managed
+  paths. Neither claims notification delivery, Kubernetes, Grafana,
+  Alertmanager receiver, Sloth, or downstream Prometheus convergence.
 
 ## Not Yet Implemented
 
-- live Datadog execution journals and results
 - actual resume execution after partial failure
 - downstream Sloth generation and Prometheus-state verification
 - compensating rollback plans

@@ -26,7 +26,7 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, '| Operation journal |'
   end
 
-  def test_usage_covers_durable_file_execution_results
+  def test_usage_covers_durable_provider_execution_results
     document = File.read(USE_CASES_PATH)
     readme = File.read(README_PATH)
 
@@ -38,6 +38,9 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'expected presence/content fingerprint'
     assert_includes document, 'engine_owned_status: succeeded'
     assert_includes readme, 'expected and actual state'
+    assert_includes document, 'backend_resource_present_after_delete'
+    assert_includes document, 'Raw responses and raw backend error messages are not persisted'
+    assert_includes readme, 'canonical payload or confirmed delete absence'
   end
 
   private

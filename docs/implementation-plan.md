@@ -158,12 +158,12 @@ This is the running plan for the long refactor.
 
 ## Phase 11: Production-Grade Datadog Reconciliation
 
-- [ ] Route confirmed Datadog apply/prune outcomes through durable operation journals and `ProviderStateResult`.
+- [x] Route confirmed Datadog apply/prune outcomes through durable operation journals and `ProviderStateResult`.
 - [ ] Validate remaining Datadog SLO, monitor, and dashboard resource semantics using safe real-backend evidence.
 - [ ] Complete provider-schema payload translation for supported create and update operations.
 - [ ] Complete import and adoption behavior for managed resources with explicit identity confidence.
 - [ ] Reconcile update, recreate, and prune behavior against current backend state without accepting weak ownership evidence.
-- [ ] Capture resulting backend identifiers and provider verification evidence after every confirmed mutation.
+- [x] Capture resulting backend identifiers and provider verification evidence after every confirmed mutation.
 - [ ] Add public-safe contract fixtures for every verified Datadog request and response shape.
 
 ## Phase 12: Apply-Exact-Plan Workflow
@@ -184,3 +184,18 @@ This is the running plan for the long refactor.
 - [ ] Distinguish healthy, at-risk, exhausted, missing-telemetry, and unverifiable states with machine-readable findings.
 - [ ] Link status output to reviewed SLO identity, owner, dashboard, playbook, and current provider resource identifiers.
 - [ ] Persist optional status reports with source timestamps and freshness metadata for later bundle review.
+
+## Project Backlog: Atomic Coherence-Preserving Simplification
+
+- [ ] Execute one repository-wide review, refactor, simplification, and cleanup
+  checkpoint as a single revertible delivery unit, without adding product
+  features or weakening any requirement, intent, provider contract, output,
+  safety gate, public-safe boundary, or supported use case. Completion requires
+  a before/after traceability map from requirements and engineering use cases to
+  executable tests; characterization coverage for every changed boundary;
+  removal or consolidation of demonstrated duplication and accidental
+  complexity; compatibility of documented CLI, schemas, provider artifacts,
+  findings, and refusal behavior; updated architecture and usage documentation;
+  recorded before/after structural evidence; and the full verification suite.
+  The checkpoint is atomic: it is complete only when all preservation and
+  verification gates pass, and the entire branch/PR can be reverted as one unit.

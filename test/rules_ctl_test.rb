@@ -60,7 +60,12 @@ class RulesCtlTest < Minitest::Test
       stdout, _stderr = capture_io do
         exit_error = assert_raises(SystemExit) do
           stub_singleton(SloRulesEngine::Appliers::Datadog, :new, fake_applier) do
-            RulesCtl.apply(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
+            RulesCtl.apply([
+              '--provider=datadog',
+              '--confirm',
+              "--journal-dir=#{File.dirname(file.path)}",
+              "--manifest=#{file.path}"
+            ])
           end
         end
         assert_equal 1, exit_error.status
@@ -102,7 +107,12 @@ class RulesCtlTest < Minitest::Test
       stdout, _stderr = capture_io do
         exit_error = assert_raises(SystemExit) do
           stub_singleton(SloRulesEngine::Appliers::Datadog, :new, fake_applier) do
-            RulesCtl.apply(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
+            RulesCtl.apply([
+              '--provider=datadog',
+              '--confirm',
+              "--journal-dir=#{File.dirname(file.path)}",
+              "--manifest=#{file.path}"
+            ])
           end
         end
         assert_equal 1, exit_error.status
@@ -144,7 +154,12 @@ class RulesCtlTest < Minitest::Test
       stdout, _stderr = capture_io do
         exit_error = assert_raises(SystemExit) do
           stub_singleton(SloRulesEngine::Appliers::Datadog, :new, fake_applier) do
-            RulesCtl.prune(['--provider=datadog', '--confirm', "--manifest=#{file.path}"])
+            RulesCtl.prune([
+              '--provider=datadog',
+              '--confirm',
+              "--journal-dir=#{File.dirname(file.path)}",
+              "--manifest=#{file.path}"
+            ])
           end
         end
         assert_equal 1, exit_error.status

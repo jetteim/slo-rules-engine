@@ -165,7 +165,7 @@ module RulesCtl
       opts.on('--dry-run', 'Plan apply without mutating backend state') { dry_run = true }
       opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
       opts.on('--output-dir=DIR', 'Output directory for file-backed provider apply') { |value| output_dir = value }
-      opts.on('--journal-dir=DIR', 'Durable operation journal directory for confirmed file-backed apply') { |value| journal_dir = value }
+      opts.on('--journal-dir=DIR', 'Durable operation journal directory for confirmed apply') { |value| journal_dir = value }
       opts.on('--manifest=FILE', 'Reviewed manifest JSON file to apply instead of regenerating from definitions') { |value| manifest_path = value }
       opts.on('--handoff-dir=DIR', 'Require current onboarding handoff evidence before live apply') { |value| handoff_dir = value }
       opts.on('--review-report=FILE', 'Require saved manifest review report freshness before live apply') { |value| review_report_path = value }
@@ -180,11 +180,21 @@ module RulesCtl
     validate_apply_review_evidence!(manifests, provider: provider, provider_key: provider_key, mode: mode) if mode == 'live'
     validate_live_manifest_review!(manifests, provider: provider, provider_key: provider_key, mode: mode, handoff_dir: handoff_dir, action: 'apply', review_report_path: review_report_path) if mode == 'live' && (!handoff_dir.to_s.empty? || !review_report_path.to_s.empty?)
     if provider.key == 'datadog'
-      applier = SloRulesEngine::Appliers::Datadog.new
-      plans = manifests.map do |manifest|
-        mode == 'live' ? applier.apply(manifest) : applier.plan(manifest)
+      if mode == 'live' && journal_dir.to_s.empty?
+        abort_usage('live Datadog apply requires --journal-dir')
+      end
+
+      applier = SloRulesEngine::Appliers::Datadog.new(
+        journal_dir: mode == 'live' ? journal_dir : nil
+      )
+      plans = []
+      manifests.each do |manifest|
+        plan = mode == 'live' ? applier.apply(manifest) : applier.plan(manifest)
+        plans << plan
+        break if failed_execution?(plan)
       end
       puts JSON.pretty_generate(plans.map(&:to_h))
+      exit 1 if plans.any? { |plan| failed_execution?(plan) }
       return
     end
 
@@ -387,7 +397,7 @@ module RulesCtl
       opts.on('--dry-run', 'Plan prune without mutating backend state') { dry_run = true }
       opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
       opts.on('--output-dir=DIR', 'Output directory for file-backed provider prune') { |value| output_dir = value }
-      opts.on('--journal-dir=DIR', 'Durable operation journal directory for confirmed file-backed prune') { |value| journal_dir = value }
+      opts.on('--journal-dir=DIR', 'Durable operation journal directory for confirmed prune') { |value| journal_dir = value }
       opts.on('--manifest=FILE', 'Reviewed manifest JSON file to prune instead of regenerating from definitions') { |value| manifest_path = value }
       opts.on('--handoff-dir=DIR', 'Require current onboarding handoff evidence before live prune') { |value| handoff_dir = value }
       opts.on('--review-report=FILE', 'Require saved manifest review report freshness before live prune') { |value| review_report_path = value }
@@ -401,11 +411,21 @@ module RulesCtl
     manifests = resolve_state_manifests(argv, provider, manifest_path)
     validate_live_manifest_review!(manifests, provider: provider, provider_key: provider_key, mode: mode, handoff_dir: handoff_dir, action: 'prune', review_report_path: review_report_path) if mode == 'live' && (!handoff_dir.to_s.empty? || !review_report_path.to_s.empty?)
     if provider.key == 'datadog'
-      applier = SloRulesEngine::Appliers::Datadog.new
-      plans = manifests.map do |manifest|
-        applier.prune(manifest, mode: mode)
+      if mode == 'live' && journal_dir.to_s.empty?
+        abort_usage('live Datadog prune requires --journal-dir')
+      end
+
+      applier = SloRulesEngine::Appliers::Datadog.new(
+        journal_dir: mode == 'live' ? journal_dir : nil
+      )
+      plans = []
+      manifests.each do |manifest|
+        plan = applier.prune(manifest, mode: mode)
+        plans << plan
+        break if failed_execution?(plan)
       end
       puts JSON.pretty_generate(plans.map(&:to_h))
+      exit 1 if plans.any? { |plan| failed_execution?(plan) }
       return
     end
 

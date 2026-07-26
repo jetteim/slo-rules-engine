@@ -24,7 +24,7 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 
 | Provider | Generation output | Dry-run planning output | Confirmed state output |
 | --- | --- | --- | --- |
-| `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources plus the immediate live plan; live execution journaling is not wired yet |
+| `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources, durable operation journal, and a `ProviderStateResult` with backend identity and canonical payload/absence verification |
 | `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and a `ProviderStateResult` with post-write/delete convergence evidence |
 | `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned manifest/input files, durable journal/result, and a skipped external handoff that remains pending and operator-owned |
 
@@ -136,8 +136,8 @@ fingerprints, records every operation as `pending` or `skipped`, and states
 whether an uncertain failure could be retried after a state refresh. Standalone
 journal creation and status assessment are read-only.
 
-Confirmed Prometheus Stack and Sloth mutations require a durable journal
-directory and record live file-operation outcomes automatically:
+Every confirmed provider mutation requires a durable journal directory and
+records live operation outcomes automatically:
 
 ```bash
 bin/rules-ctl apply \
@@ -150,12 +150,15 @@ bin/rules-ctl apply \
 
 The command writes one journal under
 `./work/journals/<service>/<provider>/`, transitions each operation atomically,
-re-reads each attempted engine-owned file, records expected and actual state
-fingerprints, and includes a linked `ProviderStateResult` in stdout. It stops
-on the first operation failure and exits nonzero for partial execution or
-verification drift. No-op files retain their immediately pre-execution
-convergence evidence. Sloth's downstream generator remains pending. Automatic
-resume and exact-plan execution are not implemented.
+and includes a linked `ProviderStateResult` in stdout. Datadog journals record
+returned resource IDs, request method/path, response fingerprints, and
+public-safe failures, then reread backend state and compare provider identity
+and canonical payload or confirmed delete absence. Prometheus Stack and Sloth
+reread each attempted engine-owned file and record expected and actual state
+fingerprints. Execution stops on the first operation failure and exits nonzero
+for partial execution or verification drift. No-op resources retain their
+immediately pre-execution convergence evidence. Sloth's downstream generator
+remains pending. Automatic resume and exact-plan execution are not implemented.
 
 ### Inspect or reconcile provider state
 
@@ -184,8 +187,8 @@ bin/rules-ctl apply \
 
 `diff`, `import`, and dry-run planning are observational. Confirmed `apply` and
 `prune` are the mutation boundaries and require reviewed manifests; current
-handoff and report evidence can be required as additional gates. Confirmed
-file-backed mutation also requires `--journal-dir`.
+handoff and report evidence can be required as additional gates. Every
+confirmed provider mutation also requires `--journal-dir`.
 
 ### Check whether the SLO is supported by real telemetry
 
@@ -226,10 +229,10 @@ The initial delivery integration is `notification_router`, which generates conte
 - Journal creation accepts exactly one verified dry-run provider plan and never executes it.
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
 - Confirmed apply and prune require reviewed manifest input.
-- Confirmed Prometheus Stack and Sloth mutations require durable journal
-  persistence, stop after the first failed file operation, and verify the
-  resulting engine-owned file state.
-- Datadog reconciliation requires managed ownership evidence for risky updates or deletes.
+- Confirmed mutations require durable journal persistence, stop after the first
+  failed operation, and verify resulting provider or managed-file state.
+- Datadog reconciliation requires managed ownership evidence for risky updates
+  or deletes and never persists raw API responses or backend error messages.
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 
 ## Documentation

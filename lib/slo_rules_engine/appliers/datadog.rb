@@ -9,7 +9,10 @@ module SloRulesEngine
         client: SloRulesEngine::Datadog::Client.new,
         risk_policy: SloRulesEngine::Datadog::RiskPolicy.new,
         payload_translator: SloRulesEngine::Datadog::PayloadTranslator.new,
-        state_planner: nil
+        state_planner: nil,
+        journal_dir: nil,
+        clock: -> { Time.now.utc },
+        verifier: nil
       )
         @client = client
         @risk_policy = risk_policy
@@ -18,6 +21,21 @@ module SloRulesEngine
           risk_policy: @risk_policy,
           payload_translator: @payload_translator
         )
+        journal_store = if journal_dir
+                          ProviderState::JournalStore.new(root_dir: journal_dir, clock: clock)
+                        end
+        @executor = if journal_store
+                      ProviderState::JournaledExecutor.new(
+                        journal_store: journal_store,
+                        clock: clock,
+                        verifier: verifier || SloRulesEngine::Datadog::StateVerifier.new(
+                          client: @client,
+                          state_planner: @state_planner,
+                          payload_translator: @payload_translator
+                        ),
+                        error_evidence: method(:operation_error_evidence)
+                      )
+                    end
       end
 
       def plan(manifest, mode: 'dry_run')
@@ -63,19 +81,21 @@ module SloRulesEngine
         managed_state = @client.managed_state(service: manifest.fetch(:service))
         operations = @state_planner.prune_operations(manifest, managed_state)
 
-        apply_plan(
+        plan = apply_plan(
           manifest,
           mode: mode,
           operations: operations,
           observed: managed_state,
           observed_source: 'managed_backend_scope'
-        ).tap do |plan|
-          next unless mode == 'live'
+        )
+        return plan unless mode == 'live'
 
-          preflight_live_ownership!(plan.operations)
-          plan.operations.each do |operation|
-            prune_operation(operation)
-          end
+        preflight_live_ownership!(plan.operations)
+        return plan.tap { plan.operations.each { |operation| prune_operation(operation) } } unless @executor
+
+        @executor.execute(plan) do |operation|
+          response = prune_operation(operation)
+          mutation_outcome(operation, response, provider_resource_id: operation.backend_id, prune: true)
         end
       end
 
@@ -83,23 +103,31 @@ module SloRulesEngine
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         @client.validate_credentials!
 
-        plan(manifest, mode: 'live').tap do |apply_plan|
-          preflight_live_ownership!(apply_plan.operations)
-          resolved_slo_ids = apply_plan.operations.each_with_object({}) do |operation, resolved|
-            next unless operation.target == 'datadog.slo' && operation.backend_id
+        apply_plan = plan(manifest, mode: 'live')
+        preflight_live_ownership!(apply_plan.operations)
+        resolved_slo_ids = apply_plan.operations.each_with_object({}) do |operation, resolved|
+          next unless operation.target == 'datadog.slo' && operation.backend_id
 
-            resolved[operation.name] = operation.backend_id.to_s
+          resolved[operation.name] = operation.backend_id.to_s
+        end
+        execute = lambda do |operation|
+          response = apply_operation(operation, resolved_slo_ids)
+          generated_id = resulting_resource_id(operation, response)
+          if operation.target == 'datadog.slo'
+            resolved_slo_ids[operation.name] = generated_id if generated_id
           end
+          mutation_outcome(operation, response, provider_resource_id: generated_id)
+        end
+        unless @executor
           apply_plan.operations.each do |operation|
             next if operation.action == 'noop'
 
-            response = apply_operation(operation, resolved_slo_ids)
-            next unless operation.target == 'datadog.slo'
-
-            generated_id = operation.backend_id || datadog_id_from_response(response)
-            resolved_slo_ids[operation.name] = generated_id if generated_id
+            execute.call(operation)
           end
+          return apply_plan
         end
+
+        @executor.execute(apply_plan, &execute)
       end
 
       private
@@ -258,6 +286,74 @@ module SloRulesEngine
              end
 
         id || fetch_value(response, :id)
+      end
+
+      def resulting_resource_id(operation, response)
+        if %w[create create_and_wait recreate recreate_and_wait].include?(operation.action)
+          return datadog_id_from_response(response) || operation.backend_id
+        end
+
+        operation.backend_id || datadog_id_from_response(response)
+      end
+
+      def mutation_outcome(operation, response, provider_resource_id:, prune: false)
+        response_keys = response.is_a?(Hash) ? response.keys.map(&:to_s).sort : []
+        ProviderState::Value.compact(
+          provider_resource_id: provider_resource_id,
+          requests: mutation_requests(operation, prune: prune),
+          response: {
+            fingerprint: ProviderState::Fingerprint.content(response),
+            top_level_keys: response_keys
+          }
+        )
+      end
+
+      def mutation_requests(operation, prune:)
+        return [prune_request(operation)] if prune
+
+        case operation.action
+        when 'recreate', 'recreate_and_wait'
+          delete = request_target(
+            ApplyOperation.new(
+              action: 'delete',
+              target: operation.target,
+              backend_id: operation.backend_id
+            )
+          )
+          create = request_target(
+            ApplyOperation.new(action: 'create', target: operation.target)
+          )
+          [request_description(delete), request_description(create)]
+        else
+          [request_description(request_target(operation))]
+        end
+      end
+
+      def prune_request(operation)
+        method, path = request_target(operation)
+        path = "#{path}?force=true" if operation.target == 'datadog.slo'
+        request_description([method, path])
+      end
+
+      def request_description(request)
+        { method: request.fetch(0), path: request.fetch(1) }
+      end
+
+      def operation_error_evidence(error, _operation)
+        if error.is_a?(SloRulesEngine::Datadog::ApiError)
+          return ProviderState::Value.compact(
+            code: 'datadog_api_request_failed',
+            class: error.class.name,
+            message: 'Datadog API request failed',
+            http_status: error.response&.code
+          )
+        end
+
+        {
+          code: 'datadog_operation_failed',
+          class: error.class.name,
+          message: 'Datadog operation failed'
+        }
       end
 
       def fetch_value(hash, key, default = nil)

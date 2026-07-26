@@ -412,12 +412,14 @@ module SloRulesEngine
       def initialize(
         journal_store: nil,
         clock: -> { Time.now.utc },
-        verifier: ManagedFileVerifier.new
+        verifier: ManagedFileVerifier.new,
+        error_evidence: nil
       )
         @journal_store = journal_store
         @clock = clock
         @transitioner = JournalTransitioner.new
         @verifier = verifier
+        @error_evidence = error_evidence || method(:file_error_evidence)
       end
 
       def execute(apply_plan)
@@ -471,19 +473,13 @@ module SloRulesEngine
               journal_path,
               entry_id: entry_id,
               to: 'failed',
-              evidence: {
-                error: {
-                  code: 'file_operation_failed',
-                  class: error.class.name,
-                  message: error.message
-                }
-              }
+              evidence: { error: @error_evidence.call(error, operation) }
             )
             failed = true
           end
         end
 
-        journal = verify_engine_owned_entries(journal, journal_path)
+        journal = verify_entries(plan, journal, journal_path)
         result = ResultBuilder.new.build(plan: plan, journal: journal)
         apply_plan.execution = {
           operation_journal: Value.compact(
@@ -499,13 +495,21 @@ module SloRulesEngine
 
       private
 
-      def verify_engine_owned_entries(journal, path)
-        Value.fetch(journal, :entries).each do |entry|
+      def verify_entries(plan, journal, path)
+        entries = Value.fetch(journal, :entries).select do |entry|
           verification = Value.fetch(entry, :verification)
-          next unless Value.fetch(verification, :required)
-          next if Value.fetch(entry, :target) == 'external_generator'
+          next false unless Value.fetch(verification, :required)
+          next false if Value.fetch(entry, :target) == 'external_generator'
 
-          evidence = @verifier.verify(entry, checked_at: timestamp)
+          !@verifier.respond_to?(:verifiable?) || @verifier.verifiable?(entry)
+        end
+        return journal if entries.empty?
+
+        context = if @verifier.respond_to?(:prepare)
+                    @verifier.prepare(plan: plan, journal: journal)
+                  end
+        entries.each do |entry|
+          evidence = verify_entry(entry, context)
           journal = record_verification(
             journal,
             path,
@@ -514,6 +518,24 @@ module SloRulesEngine
           )
         end
         journal
+      end
+
+      def verify_entry(entry, context)
+        parameters = @verifier.method(:verify).parameters
+        accepts_context = parameters.any? do |type, name|
+          type == :keyrest || (name == :context && %i[key keyreq].include?(type))
+        end
+        return @verifier.verify(entry, checked_at: timestamp, context: context) if accepts_context
+
+        @verifier.verify(entry, checked_at: timestamp)
+      end
+
+      def file_error_evidence(error, _operation)
+        {
+          code: 'file_operation_failed',
+          class: error.class.name,
+          message: error.message
+        }
       end
 
       def record_verification(journal, path, entry_id:, evidence:)

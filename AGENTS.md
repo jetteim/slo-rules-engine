@@ -27,8 +27,11 @@ evidence, stops after the first file failure, and emits a linked
 `ProviderStateResult`. Managed paths are recorded as resource identifiers.
 Every attempted engine-owned file is refreshed after execution with
 expected/actual state fingerprints and stable findings. Sloth keeps downstream
-generation explicitly pending. Live Datadog execution is not journal-backed
-yet, and exact-plan/resume behavior is still a later phase.
+generation explicitly pending. Confirmed Datadog apply/prune now uses the same
+durable journal/result boundary, records sanitized request outcomes and returned
+backend identifiers, and refreshes backend state to verify canonical payload
+and identity convergence or delete absence. Exact-plan/resume behavior is still
+a later phase.
 
 ## Non-Negotiable Working Rules
 
@@ -186,10 +189,31 @@ Implemented by the latest feature slices:
   already observed convergence immediately before execution
 - Sloth reports verified engine-owned manifest/input state separately from its
   still-pending downstream generator and Prometheus state
+- Confirmed Datadog apply/prune requires durable journal storage before
+  mutation and persists atomic attempt transitions
+- Successful Datadog attempts record request method/path, returned or existing
+  provider resource IDs, response fingerprints, and response top-level keys
+  without persisting raw API responses
+- Datadog API failures are reduced to public-safe error evidence before journal
+  persistence, and later operations are skipped after the first failure
+- Datadog apply refreshes backend state once after mutation and verifies
+  canonical payload plus provider identity for each attempted resource
+- Datadog prune refreshes the managed service scope once and verifies each
+  recorded resource ID is absent
+- Missing, identity-mismatched, payload-drifted, surviving-delete, and
+  refresh-failed resources emit stable verification finding codes and fail the
+  linked `ProviderStateResult`
+- Confirmed Datadog CLI apply/prune now requires `--journal-dir` after review
+  evidence passes and before credentials or provider mutation
+- The project backlog includes one atomic, revertible repository-wide
+  simplification checkpoint gated by requirements/use-case traceability and full
+  behavioral verification
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: post-operation Prometheus Stack and Sloth managed-file
+- latest checkpoint: journal-backed Datadog execution outcomes and
+  post-mutation backend convergence evidence
+- previous checkpoint: post-operation Prometheus Stack and Sloth managed-file
   convergence evidence
 - previous checkpoint: journal-backed Prometheus Stack and Sloth execution
   outcomes with partial-failure capture
@@ -248,42 +272,43 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Record live Datadog operation outcomes and returned backend identifiers in durable journals
-2. Refresh Datadog state after mutation and emit provider verification evidence without weakening ownership gates
-3. Validate remaining Datadog resource semantics against safe real-backend evidence
-4. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
-5. Expose live SLO and error-budget status without weakening provider-neutral intent
+1. Validate remaining Datadog resource semantics against safe real-backend evidence
+2. Complete provider-schema create/update fixtures and managed-resource adoption evidence
+3. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
+4. Expose live SLO and error-budget status without weakening provider-neutral intent
 
 Secondary gaps:
 
 1. Broader state-management parity for future providers after Datadog and Prometheus Stack prove the shared contract
 2. Additional CLI command extraction only when the bundle or state features expose a clean ownership boundary
 3. Additional provider breadth only after the accepted feature sequence above
+4. Execute the atomic coherence-preserving simplification checkpoint after the
+   feature sequence reaches a stable behavioral boundary
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- begin production-grade Datadog reconciliation by routing confirmed apply and
-  prune outcomes through the durable journal/result contract
-- preserve current ownership, source-ref, payload validation, and risk gates
-  before every mutation
-- capture returned backend identifiers and public-safe request outcomes per
-  operation, then reread managed backend state and compare it with the live plan
-- characterize all behavior first with the existing fake Datadog client; use a
-  real backend only when safe credentials and explicit evidence are available
+- validate the remaining supported Datadog create/update/readback semantics
+  against safe, explicit backend evidence and convert only confirmed shapes into
+  public-safe request/response contract fixtures
+- preserve current ownership, source-ref, payload validation, review, risk,
+  journal, sanitization, and post-mutation verification gates
+- keep unverified provider fields out of the supported contract rather than
+  generalizing from fake-client behavior
 - keep automatic resume, exact-plan execution, `bundle apply`, and live SLO
   status outside this slice
 
 Rationale:
 
 - the provider-neutral plan, journal, attempt, result, and verification
-  contracts are now proven by deterministic file-backed execution
-- Datadog already has the strongest live mutation, ownership, payload, risk,
-  retry, and state-reading baseline, so it is the next provider to adopt those
-  contracts
-- backend identifiers and post-mutation state evidence are required before
-  Datadog execution can truthfully claim production-grade reconciliation
+  contracts are now exercised by both deterministic files and the Datadog live
+  API adapter
+- fake-client evidence proves orchestration, failure, sanitization, and
+  convergence behavior but cannot prove the remaining external API field
+  contract
+- safe backend evidence is required before the remaining Datadog Phase 11
+  compatibility items can be marked complete
 - exact-plan execution remains a separate Phase 12 guarantee and must not be
   implied by immediate live replanning or operation journals
 

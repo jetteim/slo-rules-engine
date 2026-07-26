@@ -93,6 +93,7 @@ class TelemetryFirstWalkthroughTest < Minitest::Test
         'apply',
         '--provider=datadog',
         '--confirm',
+        "--journal-dir=#{File.join(dir, 'journals')}",
         "--manifest=#{manifest_path}",
         "--handoff-dir=#{handoff_dir}",
         "--review-report=#{report_path}",
