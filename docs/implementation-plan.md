@@ -95,6 +95,7 @@ This is the running plan for the long refactor.
 - [x] Surface saved manifest-review report validity and blocking findings in onboarding artifact indexes.
 - [x] Surface saved manifest-review report freshness and stale-report refresh guidance in onboarding artifact indexes.
 - [x] Validate provider-level saved manifest-review report freshness against all saved provider manifests in multi-scope artifact indexes.
+- [x] Make provider-level manifest-review validation and refresh commands reproducible across all current provider manifests.
 - [x] Add a representative saved-artifact fixture and smoke-test the telemetry-first walkthrough through reviewed provider gates.
 
 ## Phase 6: Contract Hardening

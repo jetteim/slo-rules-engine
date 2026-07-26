@@ -14,7 +14,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index with next-action, saved-report-validity, and provider-level saved-report-freshness guidance, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, Datadog request transport, and onboarding/catalog/telemetry/report CLI command families. Further housekeeping is paused unless a future change exposes a clean seam without reducing readability.
+Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index with next-action, saved-report-validity, and provider-level saved-report validation and refresh guidance across all current manifests, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, Datadog request transport, and onboarding/catalog/telemetry/report CLI command families. Further housekeeping is paused unless a future change exposes a clean seam without reducing readability.
 
 ## Non-Negotiable Working Rules
 
@@ -92,6 +92,7 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 - Onboarding artifact indexes now surface saved manifest-review report validity, finding codes, and blocking next actions when reports exist but are not apply-ready
 - Onboarding artifact indexes now validate saved manifest-review report freshness against current provider manifest and handoff artifacts, surface stale report finding codes, and point reviewers at the refresh command
 - Onboarding artifact index freshness checks now compare provider-level saved manifest-review reports against all saved manifests for that provider, avoiding false stale reports in multi-scope handoff bundles
+- `manifest-review` now accepts repeatable `--manifest` inputs, and artifact-index validation and refresh commands include every current manifest for the provider so multi-scope provider reports can be reproduced faithfully
 - `docs/telemetry-first-walkthrough.md` and `test/telemetry_first_walkthrough_test.rb` now cover the saved-artifact flow through reviewed provider gates without live backend credentials
 - `docs/housekeeping/test-suite-compaction-review.md` maps test-suite dependency shape and recommends compaction steps without changing test behavior
 - `docs/housekeeping/abstraction-layer-review.md` maps abstraction layer pressure points and recommends extraction order without changing production code
@@ -110,7 +111,8 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: onboarding artifact index provider-level saved report freshness for multi-scope bundles
+- latest checkpoint: reproducible provider-level manifest-review validation and refresh commands for multi-scope bundles
+- previous checkpoint: onboarding artifact index provider-level saved report freshness for multi-scope bundles
 - previous checkpoint: onboarding artifact index saved report freshness/staleness guidance
 - previous checkpoint: onboarding artifact index saved report validity and blocking next-action guidance
 - previous checkpoint: onboarding artifact index next-action guidance for incomplete saved handoff bundles
@@ -196,6 +198,7 @@ Rationale:
 - artifact indexes now expose whether saved manifest-review reports are valid or still blocking provider handoff
 - artifact indexes now inline saved manifest-review freshness/staleness status and stale finding codes from current saved artifacts without rerunning telemetry discovery or contacting backends
 - artifact indexes now validate provider-level saved manifest-review report freshness against the full provider manifest set in multi-scope generated bundles
+- provider-level saved report validation and refresh commands now pass every current provider manifest through repeatable `--manifest` inputs, so following artifact-index guidance reproduces the same freshness scope
 - the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
 - housekeeping reviews now identify concrete compaction and layering follow-ups
 - Sloth external-generator handoff now writes native provider input files instead of relying on the engine manifest as generator input
@@ -219,9 +222,19 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `4c7d76e fix: check provider report freshness across manifests`
+- latest pushed checkpoint: `2e2a8ae fix: refresh provider reports across manifests`
 - expected startup state: `git status --short --branch` should show clean `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
+
+Verification evidence:
+
+- target: local `main` worktree at `2e2a8ae`
+- command: `./scripts/verify.sh`
+- timestamp: `2026-07-26T08:50:49Z`
+- output path: agent terminal transcript; no separate repository artifact persisted
+- result: exit 0, `verification ok`, 276 tests, 1,373 assertions, 0 failures, 0 errors
+- metric/log/trace names: none; this slice used saved public-safe artifacts and made no backend calls
+- rollback path: `git revert 2e2a8ae`
 
 When the user types `proceed` in a fresh session:
 
