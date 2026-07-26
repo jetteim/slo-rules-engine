@@ -212,6 +212,26 @@ Rationale:
 - the remaining CLI state/generate/review commands are coupled through shared provider-manifest and review helpers, so extracting them now would reduce clarity more than it improves structure
 - Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
 
+## Next Session Handoff
+
+Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
+
+Current safe boundary:
+
+- branch: `main`
+- latest pushed checkpoint: `4c7d76e fix: check provider report freshness across manifests`
+- expected startup state: `git status --short --branch` should show clean `main...origin/main`
+- last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
+
+When the user types `proceed` in a fresh session:
+
+1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
+2. Confirm the worktree is clean with `git status --short --branch`.
+3. Do not resume housekeeping by default.
+4. Look only for a concrete telemetry-first saved-artifact reviewer gap that can be proven from saved discovery, handoff, manifest, and manifest-review files without backend calls.
+5. If a concrete gap is found, use TDD: add a failing test first, implement the smallest behavior, run the verification commands below, update this handoff, commit, and push.
+6. If no concrete saved-artifact reviewer gap is evident, stop and report that the repo is at a safe boundary rather than inventing provider-state or housekeeping work.
+
 ## Verification Commands
 
 Use these before claiming a checkpoint:
@@ -242,5 +262,5 @@ If a new session needs to resume quickly:
 4. Read the latest 5-10 commits on `main`
 5. Inspect `lib/slo_rules_engine/onboarding/summary_builder.rb`
 6. Inspect `lib/slo_rules_engine/onboarding/artifact_index_builder.rb`, `lib/slo_rules_engine/manifest_review_queue.rb`, and `test/onboarding_artifact_index_test.rb`
-7. If the user says `proceed`, first check `git status --short --branch`; if clean, continue the recommended saved-artifact freshness/status slice above using TDD
+7. If the user says `proceed`, follow the `Next Session Handoff` above; only continue if a concrete saved-artifact reviewer gap is evident from local artifacts and tests
 8. Do not resume housekeeping by default; only do it if a concrete command-family or backend-evidence change exposes a clean seam
