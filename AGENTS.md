@@ -319,36 +319,43 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `395263a feat: verify file-backed
-  convergence`
+- latest verified feature checkpoint: `49d27c2 feat: journal datadog
+  reconciliation`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree containing managed-file convergence evidence
+- target: `49d27c2` on local and remote `main`
 - command: `./scripts/verify.sh`
-- timestamp: `2026-07-26T12:29:37Z`
+- recorded timestamp: `2026-07-26T21:01:50Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 353 tests, 2,070 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 368 tests, 2,225 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- blast radius: confirmed Prometheus Stack and Sloth apply/prune refreshes
-  attempted managed paths, persists verification evidence, and exits nonzero on
-  convergence failure; Datadog behavior is unchanged
-- rollback path: revert the managed-file verification checkpoint; managed files
-  remain reconcilable from their last reviewed manifests
+- blast radius: confirmed Datadog apply/prune now requires `--journal-dir`,
+  persists sanitized operation outcomes and backend identifiers, refreshes
+  provider state after mutation, and exits nonzero on execution or convergence
+  failure; dry-run, diff, import, review gates, ownership gates, and file-backed
+  execution retain their prior behavior
+- rollback path: revert `49d27c2`; existing Datadog resources remain
+  reconcilable from reviewed manifests, but live journal/result evidence and the
+  Datadog CLI journal gate are removed
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Begin Datadog journal/result parity using fake-client characterization before
-   changing live mutation behavior.
-5. Preserve current ownership, payload, review, and risk gates while recording
-   backend identifiers and post-mutation state evidence.
-6. Do not add automatic resume, exact-plan execution, `bundle apply`, or live
+4. Continue Phase 11 only with safe explicit Datadog backend evidence for a
+   remaining create/update/readback contract gap.
+5. Convert confirmed backend shapes into public-safe fixtures without storing
+   credentials, raw private payloads, or backend error bodies.
+6. Preserve current ownership, payload, review, risk, journal, sanitization, and
+   post-mutation verification gates.
+7. If safe backend evidence is unavailable, stop at the verified boundary
+   rather than inventing provider semantics.
+8. Do not add automatic resume, exact-plan execution, `bundle apply`, or live
    SLO/error-budget status in the same slice.
 
 ## Verification Commands
@@ -392,7 +399,8 @@ If a new session needs to resume quickly:
 4. Read the latest 5-10 commits on `main`
 5. Inspect `lib/slo_rules_engine/provider_state/operation_journal.rb`,
    `lib/slo_rules_engine/provider_state/journal_execution.rb`, and their tests
-6. Inspect `lib/slo_rules_engine/apply.rb`, both provider appliers, and
+6. Inspect `lib/slo_rules_engine/datadog/state_verifier.rb`,
+   `lib/slo_rules_engine/apply.rb`, both provider appliers, and
    `docs/provider-state-contract.md`
-7. If the user says `proceed`, follow the Phase 10 handoff above
+7. If the user says `proceed`, follow the Phase 11 handoff above
 8. Keep Phase 11 Datadog reconciliation, Phase 12 exact-plan execution, and Phase 13 live status in the accepted order
