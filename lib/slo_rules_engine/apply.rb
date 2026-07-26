@@ -32,13 +32,23 @@ module SloRulesEngine
     end
   end
 
-  ApplyPlan = Struct.new(:provider, :mode, :operations, keyword_init: true) do
+  ApplyPlan = Struct.new(
+    :provider,
+    :service,
+    :mode,
+    :operations,
+    :desired_state,
+    :observed_state,
+    :findings,
+    keyword_init: true
+  ) do
     DESTRUCTIVE_ACTIONS = %w[delete recreate recreate_and_wait].freeze
     RISK_ORDER = %w[low medium high].freeze
 
     def initialize(**kwargs)
       super
       self.operations ||= []
+      self.findings ||= []
     end
 
     def empty?
@@ -46,13 +56,17 @@ module SloRulesEngine
     end
 
     def to_h
-      {
+      payload = {
         provider: provider,
+        service: service,
         mode: mode,
         empty: empty?,
         summary: summary,
         operations: operations.map(&:to_h)
-      }
+      }.compact
+      contract = state_contract
+      payload[:state_contract] = contract.to_h if contract
+      payload
     end
 
     def summary
@@ -70,6 +84,21 @@ module SloRulesEngine
     end
 
     private
+
+    def state_contract
+      return nil unless desired_state && observed_state
+
+      ProviderState::Plan.new(
+        provider: provider,
+        service: service,
+        mode: mode,
+        desired_state: desired_state,
+        observed_state: observed_state,
+        changes: operations.map { |operation| ProviderState::Change.from_apply_operation(operation) },
+        findings: findings.map { |finding| ProviderState::Finding.from_hash(finding, provider: provider) },
+        summary: summary
+      )
+    end
 
     def counts_by
       operations.each_with_object(Hash.new(0)) do |operation, counts|
@@ -92,7 +121,17 @@ module SloRulesEngine
     end
   end
 
-  ImportedState = Struct.new(:provider, :service, :mode, :source, :state, :findings, keyword_init: true) do
+  ImportedState = Struct.new(
+    :provider,
+    :service,
+    :mode,
+    :source,
+    :state,
+    :findings,
+    :desired_state,
+    :observed_state,
+    keyword_init: true
+  ) do
     def initialize(**kwargs)
       super
       self.mode ||= 'import_existing'
@@ -100,7 +139,7 @@ module SloRulesEngine
     end
 
     def to_h
-      {
+      payload = {
         provider: provider,
         service: service,
         mode: mode,
@@ -108,6 +147,23 @@ module SloRulesEngine
         state: state,
         findings: findings
       }
+      contract = state_contract
+      payload[:state_contract] = contract.to_h if contract
+      payload
+    end
+
+    private
+
+    def state_contract
+      return nil unless desired_state && observed_state
+
+      ProviderState::Import.new(
+        provider: provider,
+        service: service,
+        desired_state: desired_state,
+        observed_state: observed_state,
+        findings: findings.map { |finding| ProviderState::Finding.from_hash(finding, provider: provider) }
+      )
     end
   end
 

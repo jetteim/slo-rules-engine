@@ -23,9 +23,9 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 
 | Provider | Generation output | Dry-run planning output | Confirmed state output |
 | --- | --- | --- | --- |
-| `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog SLO, monitor, and dashboard resources through the live API |
-| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | `write` or `noop` operations for the manifest and every native bundle file | `manifest.json`, Prometheus Operator `PrometheusRule` YAML, Grafana dashboard `ConfigMap` YAML, and Alertmanager route-intent YAML |
-| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | `write` or `noop` operations for the manifest and native Sloth input, plus an external-generator handoff | `manifest.json` and native Sloth YAML input; the engine does not run Sloth or mutate Prometheus |
+| `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog SLO, monitor, and dashboard resources through the live API |
+| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | `manifest.json`, Prometheus Operator `PrometheusRule` YAML, Grafana dashboard `ConfigMap` YAML, and Alertmanager route-intent YAML |
+| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | `manifest.json` and native Sloth YAML input; the engine does not run Sloth or mutate Prometheus |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
 
@@ -178,6 +178,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Telemetry-First Walkthrough](docs/telemetry-first-walkthrough.md)
 - [Prometheus Stack Walkthrough](docs/prometheus-stack-walkthrough.md)
 - [Release Bundle Contract](docs/release-bundle-contract.md)
+- [Provider State Contract](docs/provider-state-contract.md)
 - [Provider Contract](docs/provider-contract.md)
 - [Provider Contribution Guide](docs/provider-contribution-guide.md)
 - [Implementation Plan](docs/implementation-plan.md)

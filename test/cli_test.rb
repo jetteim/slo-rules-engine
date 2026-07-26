@@ -920,7 +920,7 @@ class CLITest < Minitest::Test
     assert_equal 'missing_credentials', payload.fetch('error').fetch('code')
   end
 
-  def test_import_manifest_bundle_reads_existing_manifest_file
+  def test_import_sloth_reads_existing_manifest_and_native_input
     generate_stdout, generate_stderr, generate_status = Open3.capture3(
       'ruby',
       "#{ROOT}/bin/rules-ctl",
@@ -933,8 +933,11 @@ class CLITest < Minitest::Test
 
     Dir.mktmpdir do |dir|
       manifest_path = File.join(dir, 'checkout-api', 'sloth', 'manifest.json')
+      spec_path = File.join(dir, 'checkout-api', 'sloth', 'generated', 'sloth.yaml')
       FileUtils.mkdir_p(File.dirname(manifest_path))
+      FileUtils.mkdir_p(File.dirname(spec_path))
       File.write(manifest_path, JSON.pretty_generate(manifest))
+      File.write(spec_path, YAML.dump(manifest.fetch('artifacts').fetch('sloth_specs').fetch(0)))
 
       stdout, stderr, status = Open3.capture3(
         'ruby',
@@ -949,9 +952,14 @@ class CLITest < Minitest::Test
       payload = JSON.parse(stdout).fetch(0)
       assert_equal 'sloth', payload.fetch('provider')
       assert_equal 'import_existing', payload.fetch('mode')
-      assert_equal 'manifest_file', payload.fetch('source')
-      assert_equal 'checkout-api', payload.fetch('state').fetch('service')
+      assert_equal 'external_generator_files', payload.fetch('source')
+      assert_equal 'checkout-api', payload.fetch('state').fetch('manifest').fetch('service')
+      assert_equal spec_path,
+                   payload.fetch('state').fetch('external_generator_inputs').fetch(0).fetch('path')
+      assert_equal 'prometheus/v1',
+                   payload.fetch('state').fetch('external_generator_inputs').fetch(0).fetch('spec').fetch('version')
       assert_equal [], payload.fetch('findings')
+      assert_equal 'ProviderStateImport', payload.fetch('state_contract').fetch('kind')
     end
   end
 

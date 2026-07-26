@@ -73,6 +73,8 @@ Provider generation is read-only. Backend state changes belong to explicit apply
 Explicit features:
 
 - **State pipeline contract:** model backend management as sources, transforms, sinks, and findings.
+- **Versioned provider-state values:** plan and import outputs expose immutable desired-state and observed-state snapshots, provider-neutral changes and findings, stable fingerprints, and a result boundary under `slo-rules-engine/provider-state/v1`.
+- **Provider evidence preservation:** shared state values retain Datadog API payloads, backend IDs, match identity, and risk; Prometheus Stack managed resources and paths; and Sloth native input and handoff evidence.
 - **Automation modes:** providers declare `live_api`, `manifest_bundle`, or `external_generator`.
 - **Reviewed manifest input:** apply workflows accept a reviewed provider manifest directly instead of forcing regeneration in the same command.
 - **Reviewed manifest diff:** diff workflows compare desired reviewed manifests to observed provider state and emit `create`, `update`, or `noop` operations with changed paths.
@@ -93,6 +95,7 @@ Explicit features:
 - **Selector-aware Datadog dashboard evidence:** generated Datadog dashboard timeseries queries merge reviewed selector scope into provider query expressions so dashboard evidence stays aligned with the reviewed SLI instance rather than drifting to backend-binding-only scope.
 - **Dashboard payload contract:** generated Datadog dashboards validate the expected template variables (`service`, `sli`, `sli_instance`, `slo`) and the generated note/timeseries widget structure before live mutation.
 - **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but manage deterministic files and handoff plans rather than mutating live backends. Sloth apply writes both the reviewed engine manifest and native Sloth `prometheus/v1` generator input files.
+- **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 
 ## Sloth Provider Generation

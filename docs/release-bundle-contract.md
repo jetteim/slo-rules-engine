@@ -80,7 +80,7 @@ Accepted and rejected candidate IDs plus review notes are copied from the review
 - persisted findings and effective lifecycle
 - explicit runtime configuration for every packaged target
 
-The command creates a new `apply_ready` bundle with a new content-addressed ID, a transition reference to its predecessor, one generated dry-run plan per target, and provider-level operation and risk summaries. It never edits the predecessor bundle.
+The command creates a new `apply_ready` bundle with a new content-addressed ID, a transition reference to its predecessor, one generated dry-run plan per target, and provider-level operation and risk summaries. Each generated plan includes the versioned `slo-rules-engine/provider-state/v1` desired-state, observed-state, change, finding, and plan fingerprints. It never edits the predecessor bundle.
 
 File-backed providers require a per-target managed output directory. Planning reads that directory to distinguish `write` from `noop` but does not create, update, or delete files. Live API providers require the explicit `environment` backend mode; credentials stay in the environment and never enter the bundle. Their planning path may read current backend state but does not invoke provider mutations.
 

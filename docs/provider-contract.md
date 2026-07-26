@@ -55,6 +55,8 @@ Provider state management follows a pipeline contract:
 
 Provider generation is a transform and must stay deterministic. Provider apply is a sink and must be isolated behind dry-run, confirmation, and provider-specific state-action support. Generated manifests and reviewed manifest inputs must validate against provider schema before diff, apply, import, or prune.
 
+Plan and import output also carries the versioned [Provider State Contract](provider-state-contract.md). The shared contract standardizes desired state, observed state, changes, findings, and fingerprints while preserving provider-owned payloads, identifiers, ownership evidence, and risk.
+
 ## Telemetry Evidence Contract
 
 Providers may support explicit metric lookup, service-scoped discovery, or both.
@@ -111,6 +113,7 @@ Expected state behavior:
 - credential validation through environment or explicit runtime configuration
 - retry handling for rate limiting and transient server errors, including Datadog `X-RateLimit-Reset` and `X-RateLimit-Period` headers
 - source-artifact provenance through managed `source_ref` tags used during import, diff, apply, and prune
+- versioned provider-state plan/import evidence with reviewed desired-state and current backend-state fingerprints
 - managed identity tags required on apply-ready payloads: `managed_by:slo-rules-engine`, `service:*`, and `source_ref:*`
 - monitor payloads also require `route_key:*` tags for alert-routing context
 - SLO payloads require `30d` timeframe consistency between `timeframe`, `thresholds[0].timeframe`, and `target_threshold`
@@ -152,6 +155,7 @@ Expected state behavior:
 - confirmed file apply validates and writes the complete deterministic bundle into an output directory
 - diff compares every managed file, import reports missing native files, and prune covers the complete bundle
 - the Alertmanager route-intent file records notification-router matcher and webhook-path requirements without claiming receiver endpoint or credential ownership
+- versioned provider-state plan/import evidence covering the manifest and every native bundle file
 - direct backend mutation only through a future dedicated adapter
 
 Recording-rule behavior:
@@ -189,6 +193,8 @@ Expected state behavior:
 - dry-run plans include the reviewed engine manifest, native Sloth spec input files, and the external-generator handoff command
 - confirmed file apply writes the engine manifest plus deterministic Sloth `prometheus/v1` YAML input files under the provider output directory
 - diff and prune account for both the engine manifest and generated Sloth input files
+- import reads the engine manifest and every expected native Sloth input and reports missing external-generator inputs
+- versioned provider-state plan/import evidence preserves native input state and external handoff intent
 - external-generator handoff commands point at the native Sloth spec files while retaining the reviewed engine manifest as provenance
 - no live backend mutation or Sloth CLI execution happens inside the engine
 

@@ -22,18 +22,20 @@ module SloRulesEngine
 
       def plan(manifest, mode: 'dry_run')
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        state = @client.existing_state(desired: @state_planner.desired_state(manifest))
+        desired = @state_planner.desired_state(manifest)
+        state = @client.existing_state(desired: desired)
         operations = @state_planner.plan_operations(manifest, state: state)
 
-        ApplyPlan.new(provider: 'datadog', mode: mode, operations: operations)
+        apply_plan(manifest, mode: mode, operations: operations, observed: state)
       end
 
       def diff(manifest)
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        state = @client.existing_state(desired: @state_planner.desired_state(manifest))
+        desired = @state_planner.desired_state(manifest)
+        state = @client.existing_state(desired: desired)
         operations = @state_planner.diff_operations(manifest, state: state)
 
-        ApplyPlan.new(provider: 'datadog', mode: 'diff', operations: operations)
+        apply_plan(manifest, mode: 'diff', operations: operations, observed: state)
       end
 
       def import(manifest)
@@ -49,7 +51,9 @@ module SloRulesEngine
           state: state,
           findings: @state_planner.missing_backend_resource_findings(manifest, state) +
             @state_planner.orphan_backend_resource_findings(manifest, managed_state) +
-            @state_planner.weak_identity_match_findings(state)
+            @state_planner.weak_identity_match_findings(state),
+          desired_state: desired_snapshot(manifest),
+          observed_state: observed_snapshot(manifest, state, source: 'backend_api')
         )
       end
 
@@ -59,7 +63,13 @@ module SloRulesEngine
         managed_state = @client.managed_state(service: manifest.fetch(:service))
         operations = @state_planner.prune_operations(manifest, managed_state)
 
-        ApplyPlan.new(provider: 'datadog', mode: mode, operations: operations).tap do |plan|
+        apply_plan(
+          manifest,
+          mode: mode,
+          operations: operations,
+          observed: managed_state,
+          observed_source: 'managed_backend_scope'
+        ).tap do |plan|
           next unless mode == 'live'
 
           preflight_live_ownership!(plan.operations)
@@ -93,6 +103,36 @@ module SloRulesEngine
       end
 
       private
+
+      def apply_plan(manifest, mode:, operations:, observed:, observed_source: 'backend_api', findings: [])
+        ApplyPlan.new(
+          provider: 'datadog',
+          service: manifest.fetch(:service),
+          mode: mode,
+          operations: operations,
+          findings: findings,
+          desired_state: desired_snapshot(manifest),
+          observed_state: observed_snapshot(manifest, observed, source: observed_source)
+        )
+      end
+
+      def desired_snapshot(manifest)
+        ProviderState::DesiredState.new(
+          provider: 'datadog',
+          service: manifest.fetch(:service),
+          source: 'provider_manifest',
+          resources: manifest
+        )
+      end
+
+      def observed_snapshot(manifest, state, source:)
+        ProviderState::ObservedState.new(
+          provider: 'datadog',
+          service: manifest.fetch(:service),
+          source: source,
+          resources: state
+        )
+      end
 
       def request_target(operation)
         spec = ARTIFACTS.find { |candidate| candidate.fetch(:target) == operation.target }

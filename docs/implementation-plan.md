@@ -146,11 +146,12 @@ This is the running plan for the long refactor.
 
 ## Phase 10: Provider-Neutral State-Manager Hardening
 
-- [ ] Define provider-neutral desired-state, observed-state, change, result, and finding contracts.
+- [x] Define versioned provider-neutral desired-state, observed-state, change, plan/import, result, and finding contracts.
+- [x] Preserve Datadog and Prometheus Stack provider payload, identity, finding, and risk evidence through the shared planning/import contracts.
+- [x] Include Sloth native external-generator input state and missing-input findings in the shared import contract.
 - [ ] Add operation journaling, partial-failure reporting, and resumable execution.
 - [ ] Add provider-specific post-apply verification evidence and managed resource identifiers.
 - [ ] Define compensating rollback plans for reversible mutations and explicit findings for irreversible operations.
-- [ ] Prove the shared state contracts across Datadog and Prometheus Stack without weakening provider-specific safety policy.
 
 ## Phase 11: Production-Grade Datadog Reconciliation
 

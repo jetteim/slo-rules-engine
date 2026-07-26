@@ -121,6 +121,8 @@ class ReleaseBundleTest < Minitest::Test
       assert_equal 'generated', plan.fetch(:source).fetch(:type)
       assert_equal predecessor.fetch(:bundle_id), plan.fetch(:source).fetch(:predecessor_bundle_id)
       assert_equal Array.new(4, 'write'), plan.fetch(:content).fetch('operations').map { |operation| operation.fetch('action') }
+      assert_equal 'ProviderStatePlan', plan.fetch(:content).fetch('state_contract').fetch('kind')
+      assert_equal 'checkout-api', plan.fetch(:content).fetch('state_contract').fetch('service')
 
       summary = planned.fetch(:summary)
       assert_equal 4, summary.fetch(:total_operations)

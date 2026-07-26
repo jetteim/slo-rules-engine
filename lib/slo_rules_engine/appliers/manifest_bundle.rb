@@ -18,11 +18,7 @@ module SloRulesEngine
         operations.concat(external_generator_input_operations(manifest, plan_action: true))
         operations << handoff_operation(manifest) if manifest.fetch(:provider) == 'sloth'
 
-        ApplyPlan.new(
-          provider: manifest.fetch(:provider),
-          mode: mode,
-          operations: operations
-        )
+        apply_plan(manifest, mode: mode, operations: operations)
       end
 
       def apply(manifest)
@@ -47,14 +43,15 @@ module SloRulesEngine
 
       def diff(manifest)
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        ApplyPlan.new(
-          provider: manifest.fetch(:provider),
+        operations = [
+          managed_manifest_operation(manifest, plan_action: false),
+          *managed_bundle_resource_operations(manifest, plan_action: false),
+          *external_generator_input_operations(manifest, plan_action: false)
+        ]
+        apply_plan(
+          manifest,
           mode: 'diff',
-          operations: [
-            managed_manifest_operation(manifest, plan_action: false),
-            *managed_bundle_resource_operations(manifest, plan_action: false),
-            *external_generator_input_operations(manifest, plan_action: false)
-          ]
+          operations: operations
         )
       end
 
@@ -63,7 +60,35 @@ module SloRulesEngine
         path = manifest_path(manifest)
         actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
         findings = actual.nil? ? [missing_manifest_finding(path)] : []
-        return imported_manifest_state(manifest, actual, findings) unless manifest.fetch(:provider) == 'prometheus_stack'
+        if manifest.fetch(:provider) == 'sloth'
+          inputs = sloth_specs(manifest).each_index.map do |index|
+            input_path = sloth_spec_path(manifest, index)
+            spec = read_yaml(input_path)
+            findings << missing_external_generator_input_finding(input_path, index) if spec.nil?
+            {
+              source: "artifacts.sloth_specs[#{index}]",
+              path: input_path,
+              spec: spec
+            }
+          end
+          return imported_state(
+            manifest,
+            source: 'external_generator_files',
+            state: {
+              manifest: actual,
+              external_generator_inputs: inputs
+            },
+            findings: findings
+          )
+        end
+        unless manifest.fetch(:provider) == 'prometheus_stack'
+          return imported_state(
+            manifest,
+            source: 'manifest_file',
+            state: actual,
+            findings: findings
+          )
+        end
 
         bundle_files = managed_bundle_resource_entries(manifest).map do |entry|
           resource = read_yaml(entry.fetch(:path))
@@ -78,9 +103,8 @@ module SloRulesEngine
           }
         end
 
-        ImportedState.new(
-          provider: manifest.fetch(:provider),
-          service: manifest.fetch(:service),
+        imported_state(
+          manifest,
           source: 'manifest_bundle',
           state: {
             manifest: actual,
@@ -94,11 +118,7 @@ module SloRulesEngine
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         operations = prune_operations(manifest)
 
-        ApplyPlan.new(
-          provider: manifest.fetch(:provider),
-          mode: mode,
-          operations: operations
-        ).tap do |plan|
+        apply_plan(manifest, mode: mode, operations: operations).tap do |plan|
           next unless mode == 'live'
 
           plan.operations.each do |operation|
@@ -110,6 +130,67 @@ module SloRulesEngine
       end
 
       private
+
+      def apply_plan(manifest, mode:, operations:, findings: [])
+        ApplyPlan.new(
+          provider: manifest.fetch(:provider),
+          service: manifest.fetch(:service),
+          mode: mode,
+          operations: operations,
+          findings: findings,
+          desired_state: ProviderState::DesiredState.new(
+            provider: manifest.fetch(:provider),
+            service: manifest.fetch(:service),
+            source: 'provider_manifest',
+            resources: manifest
+          ),
+          observed_state: ProviderState::ObservedState.new(
+            provider: manifest.fetch(:provider),
+            service: manifest.fetch(:service),
+            source: 'manifest_bundle',
+            resources: observed_resources(operations)
+          )
+        )
+      end
+
+      def observed_resources(operations)
+        {
+          entries: operations.filter_map do |operation|
+            next if operation.target == 'external_generator'
+
+            {
+              target: operation.target,
+              name: operation.name,
+              source: operation.source,
+              path: operation.payload&.fetch(:path, nil),
+              present: !operation.actual.nil? || operation.action == 'delete',
+              resource: operation.actual
+            }.compact
+          end
+        }
+      end
+
+      def imported_state(manifest, source:, state:, findings:)
+        ImportedState.new(
+          provider: manifest.fetch(:provider),
+          service: manifest.fetch(:service),
+          source: source,
+          state: state,
+          findings: findings,
+          desired_state: ProviderState::DesiredState.new(
+            provider: manifest.fetch(:provider),
+            service: manifest.fetch(:service),
+            source: 'provider_manifest',
+            resources: manifest
+          ),
+          observed_state: ProviderState::ObservedState.new(
+            provider: manifest.fetch(:provider),
+            service: manifest.fetch(:service),
+            source: source,
+            resources: state
+          )
+        )
+      end
 
       def managed_manifest_operation(manifest, plan_action:)
         path = manifest_path(manifest)
@@ -317,16 +398,6 @@ module SloRulesEngine
         YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
       end
 
-      def imported_manifest_state(manifest, actual, findings)
-        ImportedState.new(
-          provider: manifest.fetch(:provider),
-          service: manifest.fetch(:service),
-          source: 'manifest_file',
-          state: actual,
-          findings: findings
-        )
-      end
-
       def manifest_review_command(manifest)
         "rules-ctl manifest-review --provider=#{manifest.fetch(:provider)} --manifest=#{manifest_path(manifest)} --report=#{manifest_review_report_path(manifest)}"
       end
@@ -350,6 +421,16 @@ module SloRulesEngine
           source: entry.fetch(:source),
           path: entry.fetch(:path),
           message: "managed bundle file does not exist at #{entry.fetch(:path)}"
+        }
+      end
+
+      def missing_external_generator_input_finding(path, index)
+        {
+          code: 'missing_external_generator_input',
+          target: 'external_generator_input',
+          source: "artifacts.sloth_specs[#{index}]",
+          path: path,
+          message: "managed external-generator input does not exist at #{path}"
         }
       end
     end

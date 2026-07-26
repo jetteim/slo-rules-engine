@@ -27,7 +27,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Telemetry evidence | Active-metric or explicit query evidence normalized from Datadog APIs | Metric-name, series, or explicit PromQL evidence normalized from a Prometheus-compatible API | Same Prometheus-compatible adapter, with evidence labeled for the Sloth provider |
 | Reviewed manifest | SLO intent, burn-rate monitor intent, missing-telemetry monitor intent, dashboard intent, and route context | Recording rules, burn-rate rules, telemetry-gap alerts, burn-rate alerts, Grafana dashboards, Alertmanager routes, and rendered native resources | Sloth `prometheus/v1` SLO specs with event queries, page/ticket alert labels, and annotations |
 | Saved review report | `manifest-review/datadog.json` | `manifest-review/prometheus_stack.json` | `manifest-review/sloth.json` |
-| Dry-run plan | API payload operations: `create`, `update`, `recreate`, or `noop`; includes managed identity and Datadog risk evidence | Managed-file operations: `write` or `noop` for manifest and native resource files | Managed-file `write` or `noop` operations plus an external `sloth generate` handoff operation |
+| Dry-run plan | Versioned desired/observed state plus API payload operations: `create`, `update`, `recreate`, or `noop`; includes managed identity and Datadog risk evidence | Versioned desired/observed state plus managed-file operations: `write` or `noop` for manifest and native resource files | Versioned desired/observed state plus managed-file `write` or `noop` operations and an external `sloth generate` handoff operation |
 | Confirmed output | Datadog SLOs, monitors, telemetry-gap monitors, and dashboards | Reviewed manifest, PrometheusRule YAML, Grafana dashboard ConfigMap YAML, and Alertmanager route-intent YAML | Reviewed manifest and native Sloth YAML input |
 | What remains external | Notification endpoint/credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoint/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
@@ -332,6 +332,7 @@ bin/rules-ctl diff \
 - Datadog: `create`, `update`, `recreate`, or `noop` operations with changed paths, backend IDs, match identity, and risk where applicable
 - Prometheus Stack: `create`, `update`, or `noop` comparisons for the manifest and each native managed file
 - Sloth: `create`, `update`, or `noop` comparisons for the manifest and native Sloth input
+- all providers: `slo-rules-engine/provider-state/v1` desired-state and observed-state snapshots, deterministic fingerprints, normalized changes, provider findings, and the existing impact summary under `state_contract`
 
 `diff` never mutates provider state.
 
@@ -351,7 +352,8 @@ For file-backed providers add `--output-dir=./managed`.
 
 - Datadog: matched backend state, missing expected resources, managed orphan findings, and match-identity confidence
 - Prometheus Stack: current manifest and every expected native file, with missing-file findings
-- Sloth: current manifest and native Sloth input state
+- Sloth: current manifest and every expected native Sloth input, with missing-input findings
+- all providers: versioned desired-state, observed-state, and normalized finding evidence under `state_contract`
 
 Import is observational. It does not adopt, update, or delete resources.
 

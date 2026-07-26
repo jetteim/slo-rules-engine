@@ -13,6 +13,15 @@ class DatadogApplyTest < Minitest::Test
     assert_equal %w[create_and_wait create create create], plan.operations.map(&:action)
     assert_equal ['datadog.slo', 'datadog.monitor', 'datadog.monitor', 'datadog.dashboard'], plan.operations.map(&:target)
     assert_equal ['artifacts.slos[0]', 'artifacts.monitors[0]', 'artifacts.telemetry_gap_monitors[0]', 'artifacts.dashboards[0]'], plan.operations.map(&:source)
+    state_contract = plan.to_h.fetch(:state_contract)
+    assert_equal 'ProviderStatePlan', state_contract.fetch(:kind)
+    assert_equal 'checkout-api', state_contract.fetch(:service)
+    assert_equal 'provider_manifest', state_contract.dig(:desired_state, :source)
+    assert_equal 'backend_api', state_contract.dig(:observed_state, :source)
+    assert_equal %w[create_and_wait create create create],
+                 state_contract.fetch(:changes).map { |change| change.fetch(:action) }
+    assert_equal plan.operations.fetch(0).payload,
+                 state_contract.fetch(:changes).fetch(0).fetch(:desired)
   end
 
 
@@ -151,6 +160,12 @@ class DatadogApplyTest < Minitest::Test
       { name: @manifest.fetch(:artifacts).fetch(:telemetry_gap_monitors).fetch(0).fetch(:name), source: 'artifacts.telemetry_gap_monitors[0]' }
     ],
                  client.existing_state_requests.fetch(0).fetch(:monitors)
+    state_contract = imported.to_h.fetch(:state_contract)
+    assert_equal 'ProviderStateImport', state_contract.fetch(:kind)
+    assert_equal 'provider_manifest', state_contract.dig(:desired_state, :source)
+    assert_equal 'backend_api', state_contract.dig(:observed_state, :source)
+    assert_equal 'slo-123',
+                 state_contract.dig(:observed_state, :resources, :slos, slo_name, :id)
   end
 
 

@@ -71,6 +71,14 @@ class ApplyTest < Minitest::Test
     assert_equal 'write', plan.operations.fetch(0).action
     assert_equal 'manifest_file', plan.operations.fetch(0).target
     assert_equal '/tmp/generated/checkout-api/prometheus_stack/manifest.json', plan.operations.fetch(0).payload.fetch(:path)
+    state_contract = plan.to_h.fetch(:state_contract)
+    assert_equal 'ProviderStatePlan', state_contract.fetch(:kind)
+    assert_equal 'checkout-api', state_contract.fetch(:service)
+    assert_equal 'provider_manifest', state_contract.dig(:desired_state, :source)
+    assert_equal 'manifest_bundle', state_contract.dig(:observed_state, :source)
+    assert_equal 'ProviderStateChange', state_contract.fetch(:changes).fetch(0).fetch(:kind)
+    assert_equal plan.operations.fetch(0).payload,
+                 state_contract.fetch(:changes).fetch(0).fetch(:desired)
   end
 
   def test_manifest_bundle_diff_reports_update_when_existing_manifest_differs
@@ -238,6 +246,11 @@ class ApplyTest < Minitest::Test
       assert_nil route_state.fetch(:resource)
       assert_equal ['missing_managed_bundle_file'], imported.findings.map { |finding| finding.fetch(:code) }
       assert_equal route_path, imported.findings.fetch(0).fetch(:path)
+      state_contract = imported.to_h.fetch(:state_contract)
+      assert_equal 'ProviderStateImport', state_contract.fetch(:kind)
+      assert_equal 'provider_manifest', state_contract.dig(:desired_state, :source)
+      assert_equal 'manifest_bundle', state_contract.dig(:observed_state, :source)
+      assert_equal 'ProviderStateFinding', state_contract.fetch(:findings).fetch(0).fetch(:kind)
     end
   end
 
@@ -317,6 +330,29 @@ class ApplyTest < Minitest::Test
       assert_equal 'prometheus/v1', spec.fetch('version')
       assert_equal 'checkout-api', spec.fetch('service')
       assert_equal 'checkout-slo', spec.fetch('slos').fetch(0).fetch('name')
+    end
+  end
+
+  def test_sloth_import_reads_native_input_and_reports_when_it_is_missing
+    manifest = valid_sloth_manifest
+
+    Dir.mktmpdir do |dir|
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      applier.apply(manifest)
+      spec_path = File.join(dir, 'checkout-api', 'sloth', 'generated', 'sloth.yaml')
+      File.delete(spec_path)
+
+      imported = applier.import(manifest)
+
+      assert_equal 'external_generator_files', imported.source
+      assert_equal 'checkout-api', imported.state.fetch(:manifest).fetch(:service)
+      assert_equal 1, imported.state.fetch(:external_generator_inputs).length
+      input = imported.state.fetch(:external_generator_inputs).fetch(0)
+      assert_equal spec_path, input.fetch(:path)
+      assert_nil input.fetch(:spec)
+      assert_equal ['missing_external_generator_input'], imported.findings.map { |finding| finding.fetch(:code) }
+      assert_equal 'external_generator_files',
+                   imported.to_h.dig(:state_contract, :observed_state, :source)
     end
   end
 

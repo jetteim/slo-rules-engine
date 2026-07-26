@@ -126,10 +126,15 @@ Implemented by the latest feature slices:
 - Live API bundle planning requires an explicit environment-backed runtime selection and keeps credentials outside the bundle
 - Planning writes a new content-addressed `apply_ready` bundle with immutable predecessor lineage and generated plan-artifact lineage
 - Bundle summaries now publish per-provider total, actionable, destructive, risky, action, resource-target, and risk-level counts
+- Provider plans and imports now expose immutable `slo-rules-engine/provider-state/v1` desired-state, observed-state, change, finding, plan/import, and result value contracts
+- Datadog shared state evidence preserves API payloads, backend IDs, match identity, and provider risk without weakening ownership gates
+- Prometheus Stack shared state evidence preserves managed paths and native resource content
+- Sloth import now reads native external-generator inputs and reports missing input files through the shared finding contract
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: immutable bundle-native provider planning and provider-level impact/risk summaries
+- latest checkpoint: provider-neutral state value contracts across Datadog, Prometheus Stack, and Sloth
+- previous checkpoint: immutable bundle-native provider planning and provider-level impact/risk summaries
 - previous checkpoint: fail-closed `bundle create` and source-aware `bundle status`
 - previous checkpoint: versioned content-addressed release-bundle contract
 - previous checkpoint: public-safe reviewed Prometheus Stack bundle walkthrough
@@ -181,8 +186,8 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Define and prove provider-neutral desired-state, observed-state, change, result, and finding contracts
-2. Add execution journaling, partial-failure reporting, and provider verification evidence on those contracts
+1. Add execution journaling, partial-failure reporting, and resumable execution on the provider-state contracts
+2. Add provider-specific post-apply verification evidence and managed resource identifiers
 3. Validate remaining Datadog resource semantics against safe real-backend evidence after shared state contracts are stronger
 4. Persist and execute an exact reviewed plan with stale-state rejection
 5. Expose live SLO and error-budget status without weakening provider-neutral intent
@@ -197,19 +202,19 @@ Secondary gaps:
 
 Next recommended slice:
 
-- start Phase 10 by defining provider-neutral desired-state, observed-state, change, result, and finding value contracts
-- adapt existing Datadog and Prometheus Stack planning evidence to those contracts without changing provider mutation behavior
-- preserve provider-owned payloads, ownership policy, and risk metadata rather than flattening them into generic policy
-- use public-safe fixtures to prove both providers can cross the shared boundary
-- do not add `bundle apply`, operation journaling, or exact-plan execution in the same foundational slice
+- continue Phase 10 with a durable operation-journal schema tied to provider, service, desired-state fingerprint, observed-state fingerprint, and plan identity
+- record per-operation pending, running, succeeded, failed, and skipped states without changing current apply execution yet
+- define partial-failure and resume eligibility findings, including explicit non-resumable operations
+- preserve provider-specific resource IDs, ownership evidence, risk, and verification requirements in journal entries
+- prove deterministic journal creation for Datadog and Prometheus Stack plans before wiring live execution
 
 Rationale:
 
-- bundle planning now proves the reviewed bundle-to-provider planning boundary without mutation
-- the planned bundle preserves provider operations and risk evidence but the shared state vocabulary is still implicit in `ApplyPlan`, imported state, and provider-specific hashes
-- formal value contracts are required before journaling, resumability, verification results, or bundle apply can be implemented coherently
-- Datadog and Prometheus Stack already provide sufficiently different state mechanisms to expose weak abstractions early
-- exact-plan execution remains a separate Phase 12 guarantee and must not be implied by the first state-contract slice
+- provider state now has immutable desired, observed, change, finding, plan/import, and result values with deterministic fingerprints
+- current plans and imports retain both their compatibility fields and the shared versioned contract
+- the result contract intentionally does not pretend current apply captures operation-level outcomes or post-apply verification
+- a journal schema is the next prerequisite for truthful partial-failure and resume behavior
+- exact-plan execution remains a separate Phase 12 guarantee and must not be implied by journal creation alone
 
 ## Next Session Handoff
 
@@ -238,9 +243,9 @@ When the user types `proceed` in a fresh session:
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Start Phase 10 with provider-neutral state value contracts and adapters over current plan/import evidence.
-5. Use TDD to prove Datadog and Prometheus Stack retain provider-specific payload, identity, finding, and risk evidence through the shared contracts.
-6. Do not change live mutation behavior or add `bundle apply` in the foundational contract slice.
+4. Continue Phase 10 with deterministic operation-journal creation from shared provider-state plans.
+5. Use TDD for journal identity, operation states, partial-failure findings, resumability classification, and Datadog/Prometheus evidence preservation.
+6. Do not wire journal execution into live mutation or add `bundle apply` until the journal contract is proven.
 
 ## Verification Commands
 
