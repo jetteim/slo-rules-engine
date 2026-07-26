@@ -59,7 +59,7 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 - deterministic bundle identity and artifact fingerprints
 - fail-closed bundle creation for stale, incomplete, or credential-bearing inputs
 - source-aware bundle status without backend calls
-- provider-level plan and risk summaries before bundle apply behavior
+- immutable bundle-native plan generation with provider-level change and risk summaries
 
 ## What We Are Not Optimizing For
 
@@ -69,9 +69,9 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. add bundle-native plan generation and provider-level change/risk summaries
-2. keep bundle apply deferred until its interaction with provider-neutral state contracts is explicit
-3. harden provider-neutral state management after the first-class bundle planning boundary is proven
+1. define provider-neutral desired-state, observed-state, change, result, and finding contracts
+2. prove those contracts across Datadog and Prometheus Stack without changing mutation behavior
+3. keep bundle apply deferred until the shared execution boundary and exact-plan guarantees are explicit
 4. proceed to production-grade Datadog reconciliation, exact-plan execution, and live status in the accepted order
 5. keep housekeeping paused unless feature work exposes a clean, behavior-tested boundary
 

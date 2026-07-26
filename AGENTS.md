@@ -14,9 +14,9 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 4. Apply-exact-plan workflow
 5. Live SLO and error-budget status
 
-The first release-bundle checkpoint is at a safe commit/push boundary. New slices should follow the accepted sequence above and should not resume housekeeping or opportunistic provider work.
+The release-bundle planning boundary is implemented. New slices should follow the accepted sequence above and should not resume housekeeping or opportunistic provider work.
 
-Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages discovery evidence, reviewed handoffs and definitions, provider manifests, fresh manifest-review reports, and optional dry-run plans into a content-addressed JSON document. It records explicit reviewer attestation, lifecycle state, provider targets, artifact fingerprints, and change impact totals without credentials. `bundle create` is fail-closed for incomplete, stale, invalid, or credential-bearing input, and `bundle status` detects schema errors, embedded tampering, identity mismatch, missing sources, and source drift without backend calls.
+Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages discovery evidence, reviewed handoffs and definitions, provider manifests, fresh manifest-review reports, and dry-run plans into a content-addressed JSON document. It records explicit reviewer attestation, lifecycle state, provider targets, artifact fingerprints, transition lineage, and provider-level change and risk summaries without credentials. `bundle create` is fail-closed for incomplete, stale, invalid, or credential-bearing input. `bundle plan` rechecks predecessor freshness, requires explicit runtime configuration for every target, leaves the predecessor immutable, performs no provider mutation, and writes a new content-addressed `apply_ready` bundle. `bundle status` detects schema errors, embedded tampering, identity mismatch, missing sources, and source drift.
 
 ## Non-Negotiable Working Rules
 
@@ -25,6 +25,7 @@ Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages dis
 - Commit and push often.
 - Add verification evidence before claiming a checkpoint is complete.
 - Update this file when a checkpoint materially changes current priorities, recent checkpoints, or the next recommended slice.
+- Keep `README.md` and `docs/use-cases.md` current whenever command scope, provider output, workflow behavior, or safety boundaries change; rewrite usage around engineering tasks instead of appending to a stale command catalog.
 
 ## Current State Summary
 
@@ -120,10 +121,16 @@ Implemented by the latest feature slices:
 - Datadog backend state discovery now lives in `SloRulesEngine::Datadog::StateReader`, leaving the client focused on credentials, HTTP retry/transport, deletes, and create-and-wait mutations
 - Migration and model report CLI commands now live in `lib/slo_rules_engine/cli/report_commands.rb`
 - Datadog request transport and retry behavior now lives in `SloRulesEngine::Datadog::RequestTransport`, leaving the client focused on credentials, state-reader delegation, deletes, and create-and-wait mutations
+- `bundle plan` generates one dry-run provider plan per packaged target after rechecking predecessor schema, identity, artifact fingerprints, and file-source freshness
+- File-backed bundle planning requires an explicit target output directory and reads managed state without writing files
+- Live API bundle planning requires an explicit environment-backed runtime selection and keeps credentials outside the bundle
+- Planning writes a new content-addressed `apply_ready` bundle with immutable predecessor lineage and generated plan-artifact lineage
+- Bundle summaries now publish per-provider total, actionable, destructive, risky, action, resource-target, and risk-level counts
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: fail-closed `bundle create` and source-aware `bundle status`
+- latest checkpoint: immutable bundle-native provider planning and provider-level impact/risk summaries
+- previous checkpoint: fail-closed `bundle create` and source-aware `bundle status`
 - previous checkpoint: versioned content-addressed release-bundle contract
 - previous checkpoint: public-safe reviewed Prometheus Stack bundle walkthrough
 - previous checkpoint: managed PrometheusRule, Grafana dashboard, and Alertmanager route-intent file lifecycle
@@ -174,8 +181,8 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Generate bundle-native provider plans and publish provider-level change and risk summaries
-2. Harden provider-neutral state contracts only after the bundle boundary is explicit
+1. Define and prove provider-neutral desired-state, observed-state, change, result, and finding contracts
+2. Add execution journaling, partial-failure reporting, and provider verification evidence on those contracts
 3. Validate remaining Datadog resource semantics against safe real-backend evidence after shared state contracts are stronger
 4. Persist and execute an exact reviewed plan with stale-state rejection
 5. Expose live SLO and error-budget status without weakening provider-neutral intent
@@ -190,18 +197,19 @@ Secondary gaps:
 
 Next recommended slice:
 
-- add `bundle plan` for packaged manifests, with explicit per-target runtime configuration and no provider mutation
-- aggregate per-provider total, actionable, destructive, and risk counts into the planned bundle
-- preserve source and bundle fingerprint checks before planning, write a new content-addressed `apply_ready` bundle, and leave the input bundle immutable
-- do not add `bundle apply` in the same slice; first resolve its boundary with the provider-neutral state-manager phase
+- start Phase 10 by defining provider-neutral desired-state, observed-state, change, result, and finding value contracts
+- adapt existing Datadog and Prometheus Stack planning evidence to those contracts without changing provider mutation behavior
+- preserve provider-owned payloads, ownership policy, and risk metadata rather than flattening them into generic policy
+- use public-safe fixtures to prove both providers can cross the shared boundary
+- do not add `bundle apply`, operation journaling, or exact-plan execution in the same foundational slice
 
 Rationale:
 
-- reviewed saved artifacts now have one versioned, content-addressed release boundary
-- create/status already reject stale predecessors, content tampering, identity mismatch, and credential-like structured keys
-- existing provider plans already expose shared impact and risk summaries that can be aggregated without inventing new policy
-- planning can remain read-only while proving the bundle-to-provider state boundary
-- bundle apply should not silently imply exact-plan execution before Phase 12 implements that guarantee
+- bundle planning now proves the reviewed bundle-to-provider planning boundary without mutation
+- the planned bundle preserves provider operations and risk evidence but the shared state vocabulary is still implicit in `ApplyPlan`, imported state, and provider-specific hashes
+- formal value contracts are required before journaling, resumability, verification results, or bundle apply can be implemented coherently
+- Datadog and Prometheus Stack already provide sufficiently different state mechanisms to expose weak abstractions early
+- exact-plan execution remains a separate Phase 12 guarantee and must not be implied by the first state-contract slice
 
 ## Next Session Handoff
 
@@ -230,9 +238,9 @@ When the user types `proceed` in a fresh session:
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Continue Phase 9 with read-only `bundle plan` over packaged provider manifests.
-5. Use TDD for per-target runtime configuration, immutable input bundles, provider-level impact/risk summaries, source freshness rechecks, and new `apply_ready` bundle identity.
-6. Do not add `bundle apply` until the boundary with Phase 10 provider-neutral state-manager hardening is explicit.
+4. Start Phase 10 with provider-neutral state value contracts and adapters over current plan/import evidence.
+5. Use TDD to prove Datadog and Prometheus Stack retain provider-specific payload, identity, finding, and risk evidence through the shared contracts.
+6. Do not change live mutation behavior or add `bundle apply` in the foundational contract slice.
 
 ## Verification Commands
 
@@ -268,5 +276,5 @@ If a new session needs to resume quickly:
 4. Read the latest 5-10 commits on `main`
 5. Inspect `lib/slo_rules_engine/release_bundle`, `lib/slo_rules_engine/cli/bundle_commands.rb`, and their tests
 6. Inspect `lib/slo_rules_engine/apply.rb`, both provider appliers, and `docs/release-bundle-contract.md`
-7. If the user says `proceed`, follow the Phase 9 handoff above
-8. Do not start provider-neutral state-manager hardening until the first-class bundle boundary is tested and pushed
+7. If the user says `proceed`, follow the Phase 10 handoff above
+8. Keep Phase 11 Datadog reconciliation, Phase 12 exact-plan execution, and Phase 13 live status in the accepted order

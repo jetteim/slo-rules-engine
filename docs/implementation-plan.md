@@ -138,9 +138,11 @@ This is the running plan for the long refactor.
 - [x] Package discovery evidence, handoff decisions, reviewed definitions, provider manifests, review reports, and change plans into one bundle.
 - [x] Record reviewer identity, review timestamp, decisions, notes, fingerprints, and provider targets without embedding credentials.
 - [x] Add fail-closed `bundle create` and source-aware `bundle status` commands.
-- [ ] Add `bundle plan`, `bundle apply`, and `bundle verify` commands.
-- [ ] Make bundle transitions deterministic and reject stale or incomplete predecessor artifacts.
-- [ ] Support multi-scope and multi-provider bundles with provider-level change and risk summaries.
+- [x] Add read-only `bundle plan` with explicit runtime configuration for every packaged provider target.
+- [x] Make the `review_ready` to `apply_ready` transition deterministic and reject stale, invalid, incomplete, or already-planned predecessors.
+- [x] Support multi-scope and multi-provider bundles with provider-level change and risk summaries.
+- [ ] Add `bundle apply` only after Phase 10 defines shared execution and result contracts and Phase 12 defines exact-plan guarantees.
+- [ ] Add `bundle verify` after provider-specific verification evidence has a shared Phase 10 contract.
 
 ## Phase 10: Provider-Neutral State-Manager Hardening
 

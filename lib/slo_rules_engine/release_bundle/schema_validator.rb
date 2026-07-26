@@ -74,10 +74,17 @@ module SloRulesEngine
         result.error('lifecycle', "must be one of #{LIFECYCLE_STATES.inspect}") unless LIFECYCLE_STATES.include?(lifecycle)
 
         validate_review(result, fetch_value(bundle, :review))
+        validate_transition(result, fetch_value(bundle, :transition)) if fetch_value(bundle, :transition)
         artifacts = validate_array(result, 'artifacts', fetch_value(bundle, :artifacts))
         targets = validate_array(result, 'targets', fetch_value(bundle, :targets))
         validate_artifacts(result, artifacts)
-        validate_targets(result, targets, artifacts, require_references: lifecycle != 'incomplete')
+        validate_targets(
+          result,
+          targets,
+          artifacts,
+          require_references: lifecycle != 'incomplete',
+          require_plans: %w[apply_ready applied verified].include?(lifecycle)
+        )
         validate_array(result, 'findings', fetch_value(bundle, :findings))
         validate_hash(result, 'summary', fetch_value(bundle, :summary))
 
@@ -85,6 +92,23 @@ module SloRulesEngine
           result.error(path, 'credential-like keys are forbidden in release bundles')
         end
         result
+      end
+
+      def validate_transition(result, transition)
+        validate_hash(result, 'transition', transition)
+        return unless transition.is_a?(Hash)
+
+        validate_exact(result, 'transition.action', fetch_value(transition, :action), 'plan')
+        predecessor_id = fetch_value(transition, :predecessor_bundle_id)
+        unless predecessor_id.to_s.match?(/\Aslo-bundle-[0-9a-f]{64}\z/)
+          result.error('transition.predecessor_bundle_id', 'must be a content-addressed slo-bundle identifier')
+        end
+        validate_exact(
+          result,
+          'transition.predecessor_lifecycle',
+          fetch_value(transition, :predecessor_lifecycle),
+          'review_ready'
+        )
       end
 
       def validate!(bundle)
@@ -141,11 +165,27 @@ module SloRulesEngine
           result.error("#{path}.content", 'is required') if fetch_value(artifact, :content).nil?
           source = fetch_value(artifact, :source)
           validate_hash(result, "#{path}.source", source)
-          validate_presence(result, "#{path}.source.path", fetch_value(source, :path)) if source.is_a?(Hash)
+          validate_artifact_source(result, "#{path}.source", source) if source.is_a?(Hash)
         end
       end
 
-      def validate_targets(result, targets, artifacts, require_references:)
+      def validate_artifact_source(result, path, source)
+        type = fetch_value(source, :type) || 'file'
+        case type
+        when 'file'
+          validate_presence(result, "#{path}.path", fetch_value(source, :path))
+        when 'generated'
+          predecessor_id = fetch_value(source, :predecessor_bundle_id)
+          unless predecessor_id.to_s.match?(/\Aslo-bundle-[0-9a-f]{64}\z/)
+            result.error("#{path}.predecessor_bundle_id", 'must be a content-addressed slo-bundle identifier')
+          end
+          validate_presence(result, "#{path}.target_uid", fetch_value(source, :target_uid))
+        else
+          result.error("#{path}.type", 'must be file or generated')
+        end
+      end
+
+      def validate_targets(result, targets, artifacts, require_references:, require_plans:)
         result.error('targets', 'must contain at least one provider target') if targets.empty?
         artifact_uids = artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         seen = {}
@@ -158,20 +198,52 @@ module SloRulesEngine
           validate_presence(result, "#{path}.service", fetch_value(target, :service))
           validate_presence(result, "#{path}.provider", fetch_value(target, :provider))
           validate_presence(result, "#{path}.automation_mode", fetch_value(target, :automation_mode))
-          %i[manifest_artifact_uid review_report_artifact_uid].each do |reference|
+          provider = fetch_value(target, :provider)
+          {
+            manifest_artifact_uid: 'provider_manifest',
+            review_report_artifact_uid: 'manifest_review_report'
+          }.each do |reference, expected_kind|
             reference_uid = fetch_value(target, reference)
-            if require_references || reference_uid
-              validate_artifact_reference(result, "#{path}.#{reference}", reference_uid, artifact_uids)
-            end
+            next unless require_references || reference_uid
+
+            validate_artifact_reference(
+              result,
+              "#{path}.#{reference}",
+              reference_uid,
+              artifact_uids,
+              expected_kind: expected_kind,
+              expected_provider: provider
+            )
           end
           plan_uid = fetch_value(target, :change_plan_artifact_uid)
-          validate_artifact_reference(result, "#{path}.change_plan_artifact_uid", plan_uid, artifact_uids) if plan_uid
+          if require_plans || plan_uid
+            validate_artifact_reference(
+              result,
+              "#{path}.change_plan_artifact_uid",
+              plan_uid,
+              artifact_uids,
+              expected_kind: 'change_plan',
+              expected_provider: provider
+            )
+          end
         end
       end
 
-      def validate_artifact_reference(result, path, uid, artifacts)
+      def validate_artifact_reference(result, path, uid, artifacts, expected_kind:, expected_provider:)
         validate_presence(result, path, uid)
-        result.error(path, 'must reference a packaged artifact') unless uid.to_s.empty? || artifacts.key?(uid)
+        return if uid.to_s.empty?
+
+        artifact = artifacts[uid]
+        unless artifact
+          result.error(path, 'must reference a packaged artifact')
+          return
+        end
+        unless fetch_value(artifact, :kind) == expected_kind
+          result.error(path, "must reference a #{expected_kind} artifact")
+        end
+        unless fetch_value(artifact, :provider) == expected_provider
+          result.error(path, 'must reference an artifact for the target provider')
+        end
       end
 
       def validate_array(result, path, value)

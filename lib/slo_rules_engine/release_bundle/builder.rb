@@ -253,6 +253,7 @@ module SloRulesEngine
           content_type: content_type,
           fingerprint: fingerprint,
           source: {
+            type: 'file',
             path: File.expand_path(path)
           },
           content: content
@@ -289,20 +290,12 @@ module SloRulesEngine
       end
 
       def summary(scopes, targets, artifacts)
-        plan_artifacts = artifacts.select { |artifact| artifact[:kind] == 'change_plan' }
-        {
-          scope_count: scopes.length,
-          provider_target_count: targets.length,
-          artifact_count: artifacts.length,
-          change_plan_count: plan_artifacts.length,
-          actionable_operations: plan_artifacts.sum do |artifact|
-            fetch_value(fetch_value(artifact[:content], :summary), :actionable_operations).to_i
-          end,
-          destructive_operations: plan_artifacts.sum do |artifact|
-            fetch_value(fetch_value(artifact[:content], :summary), :destructive_operations).to_i
-          end,
-          finding_count: @findings.length
-        }
+        SummaryBuilder.new.build(
+          review: { scopes: scopes.map { |scope| scope.fetch(:review) } },
+          targets: targets,
+          artifacts: artifacts,
+          findings: @findings
+        )
       end
 
       def add_finding(code, path, message)

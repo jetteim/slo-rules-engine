@@ -78,6 +78,8 @@ module SloRulesEngine
       def source_findings(artifacts)
         artifacts.each_with_index.filter_map do |artifact, index|
           source = fetch_value(artifact, :source)
+          next if fetch_value(source, :type) == 'generated'
+
           path = fetch_value(source, :path)
           unless File.exist?(path.to_s)
             next {

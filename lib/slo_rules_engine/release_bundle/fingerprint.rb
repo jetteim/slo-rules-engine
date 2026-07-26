@@ -31,13 +31,16 @@ module SloRulesEngine
                         else
                           fetch_value(artifact, :fingerprint)
                         end
-          {
+          identity = {
             uid: fetch_value(artifact, :uid),
             kind: fetch_value(artifact, :kind),
             scope: fetch_value(artifact, :scope),
             provider: fetch_value(artifact, :provider),
             fingerprint: fingerprint
           }.compact
+          source = fetch_value(artifact, :source)
+          identity[:source] = source if fetch_value(source, :type) == 'generated'
+          identity
         end.sort_by { |artifact| artifact.fetch(:uid).to_s }
 
         identity = {
@@ -48,6 +51,8 @@ module SloRulesEngine
           end,
           artifacts: artifacts
         }
+        transition = fetch_value(bundle, :transition)
+        identity[:transition] = transition if transition
         "slo-bundle-#{content(identity)}"
       end
 

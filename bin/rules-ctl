@@ -651,6 +651,7 @@ module RulesCtl
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
         bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
+        bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
         bin/rules-ctl bundle status <bundle.json>
         bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
         bin/rules-ctl providers list
