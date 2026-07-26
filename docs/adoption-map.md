@@ -6,7 +6,7 @@ The engine should help teams start from telemetry they already have, produce rev
 
 ## Primary Outcome
 
-Turn measured service telemetry into a review-ready onboarding queue, reviewed SLO definitions, and managed provider artifacts.
+Turn measured service telemetry into a review-ready onboarding queue, reviewed SLO definitions, a content-addressed release bundle, and managed provider artifacts.
 
 ## Adoption Flows
 
@@ -48,6 +48,19 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 - stricter provider payload reconciliation
 - explicit destructive-change signaling before mutation
 
+### 4. Reviewed Saved Artifacts To Release Boundary
+
+**Trigger:** discovery, handoff, reviewed definitions, provider manifests, review reports, and optional change plans exist as separate files.
+
+**Outcome:** one versioned, content-addressed release bundle records review attestation, packaged evidence, provider targets, lifecycle state, and source freshness.
+
+**Needed capability increments:**
+
+- deterministic bundle identity and artifact fingerprints
+- fail-closed bundle creation for stale, incomplete, or credential-bearing inputs
+- source-aware bundle status without backend calls
+- provider-level plan and risk summaries before bundle apply behavior
+
 ## What We Are Not Optimizing For
 
 - copying internal service definitions into this repository
@@ -56,11 +69,11 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. pause further housekeeping unless a future behavior change exposes a clean seam without reducing readability
-2. revisit provider-state hardening only when new backend evidence exposes a concrete safety gap
-3. continue provider breadth only when another provider has a concrete reviewed handoff gap
-4. continue additional CLI command extraction only when another command family changes
-5. revisit test-suite compaction after the current collaborator and command-module count settles
+1. add bundle-native plan generation and provider-level change/risk summaries
+2. keep bundle apply deferred until its interaction with provider-neutral state contracts is explicit
+3. harden provider-neutral state management after the first-class bundle planning boundary is proven
+4. proceed to production-grade Datadog reconciliation, exact-plan execution, and live status in the accepted order
+5. keep housekeeping paused unless feature work exposes a clean, behavior-tested boundary
 
 ## Housekeeping Backlog
 

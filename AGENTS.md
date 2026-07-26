@@ -14,9 +14,9 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 4. Apply-exact-plan workflow
 5. Live SLO and error-budget status
 
-The Prometheus Stack completion checkpoint is at a safe commit/push boundary. New slices should follow the accepted sequence above and should not resume housekeeping or opportunistic provider work.
+The first release-bundle checkpoint is at a safe commit/push boundary. New slices should follow the accepted sequence above and should not resume housekeeping or opportunistic provider work.
 
-Current Prometheus Stack status: the provider emits one base observation recording rule per SLI instance, derived success/error/objective/error-budget recording rules and burn-rate rules per SLO, a native Prometheus Operator `PrometheusRule`, a Grafana sidecar dashboard `ConfigMap`, and an explicit Alertmanager route-intent document. Schema validation and `plan`, `apply`, `diff`, `import`, and `prune` cover the complete local bundle. The public-safe walkthrough proves reviewed generation, fresh-report validation, dry-run, apply, zero drift, import, drift repair, and prune without backend calls.
+Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages discovery evidence, reviewed handoffs and definitions, provider manifests, fresh manifest-review reports, and optional dry-run plans into a content-addressed JSON document. It records explicit reviewer attestation, lifecycle state, provider targets, artifact fingerprints, and change impact totals without credentials. `bundle create` is fail-closed for incomplete, stale, invalid, or credential-bearing input, and `bundle status` detects schema errors, embedded tampering, identity mismatch, missing sources, and source drift without backend calls.
 
 ## Non-Negotiable Working Rules
 
@@ -123,7 +123,9 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: public-safe reviewed Prometheus Stack bundle walkthrough
+- latest checkpoint: fail-closed `bundle create` and source-aware `bundle status`
+- previous checkpoint: versioned content-addressed release-bundle contract
+- previous checkpoint: public-safe reviewed Prometheus Stack bundle walkthrough
 - previous checkpoint: managed PrometheusRule, Grafana dashboard, and Alertmanager route-intent file lifecycle
 - previous checkpoint: complete Prometheus SLI and SLO recording-rule coverage
 - previous checkpoint: reproducible provider-level manifest-review validation and refresh commands for multi-scope bundles
@@ -172,7 +174,7 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Package the existing saved onboarding and provider artifacts into one versioned first-class bundle with deterministic identity and lifecycle state
+1. Generate bundle-native provider plans and publish provider-level change and risk summaries
 2. Harden provider-neutral state contracts only after the bundle boundary is explicit
 3. Validate remaining Datadog resource semantics against safe real-backend evidence after shared state contracts are stronger
 4. Persist and execute an exact reviewed plan with stale-state rejection
@@ -188,17 +190,18 @@ Secondary gaps:
 
 Next recommended slice:
 
-- define a versioned first-class bundle schema with stable bundle identity, lifecycle state, artifact inventory, and fingerprints
-- add the smallest `bundle create` and `bundle status` path over existing saved discovery, handoff, reviewed definition, provider manifest, manifest-review report, and change-plan artifacts
-- keep the first slice local and deterministic; do not add bundle apply or backend mutation until create/status contracts and stale-artifact findings are proven
+- add `bundle plan` for packaged manifests, with explicit per-target runtime configuration and no provider mutation
+- aggregate per-provider total, actionable, destructive, and risk counts into the planned bundle
+- preserve source and bundle fingerprint checks before planning, write a new content-addressed `apply_ready` bundle, and leave the input bundle immutable
+- do not add `bundle apply` in the same slice; first resolve its boundary with the provider-neutral state-manager phase
 
 Rationale:
 
-- all first-class bundle inputs already exist as saved, fingerprintable artifacts
-- the current artifact index is a useful read model but is not a versioned lifecycle or release boundary
-- making bundle identity and state explicit first avoids leaking CLI file conventions into provider-neutral state-manager contracts
-- Prometheus Stack now proves complete deterministic file-backed reconciliation while Datadog proves live-provider reconciliation
-- exact-plan execution and live status should consume stable bundle and state contracts rather than define them implicitly
+- reviewed saved artifacts now have one versioned, content-addressed release boundary
+- create/status already reject stale predecessors, content tampering, identity mismatch, and credential-like structured keys
+- existing provider plans already expose shared impact and risk summaries that can be aggregated without inventing new policy
+- planning can remain read-only while proving the bundle-to-provider state boundary
+- bundle apply should not silently imply exact-plan execution before Phase 12 implements that guarantee
 
 ## Next Session Handoff
 
@@ -207,30 +210,29 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `01f5f23 docs: add prometheus stack bundle walkthrough`
+- latest verified feature checkpoint: `a769eea feat: add release bundle create and status`
 - expected startup state: `git status --short --branch` should show clean `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree at `01f5f23`
+- target: local `main` worktree at `a769eea`
 - command: `./scripts/verify.sh`
-- timestamp: `2026-07-26T09:24:47Z`
+- timestamp: `2026-07-26T10:26:20Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 293 tests, 1,540 assertions, 0 failures, 0 errors
-- metric names: `sli:checkout_api:http_requests:public_api:observations`, SLO success/error/objective/error-budget ratios, and 1h/6h burn-rate records
-- log/trace names: none; this slice made no backend calls
-- blast radius: deterministic files below `<output-dir>/checkout-api/prometheus_stack` plus provider manifest/schema code
-- rollback path: revert `01f5f23`, `d438f07`, and `1b5e1d1`; restore managed files by applying the last reviewed manifest
+- result: exit 0, `verification ok`, 304 tests, 1,633 assertions, 0 failures, 0 errors
+- metric/log/trace names: none; this slice made no backend calls
+- blast radius: explicitly requested release-bundle JSON output plus local source-file reads
+- rollback path: revert `a769eea` and `cbf271c`; no provider or managed-file rollback is required
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Start Phase 9 with a versioned first-class bundle schema and deterministic bundle identity over existing saved artifacts.
-5. Use TDD to add the smallest `bundle create` and `bundle status` behavior with explicit incomplete/stale findings and no backend calls.
-6. Run the verification commands below, update this handoff, commit, and push before adding bundle plan/apply behavior.
+4. Continue Phase 9 with read-only `bundle plan` over packaged provider manifests.
+5. Use TDD for per-target runtime configuration, immutable input bundles, provider-level impact/risk summaries, source freshness rechecks, and new `apply_ready` bundle identity.
+6. Do not add `bundle apply` until the boundary with Phase 10 provider-neutral state-manager hardening is explicit.
 
 ## Verification Commands
 
@@ -239,6 +241,8 @@ Use these before claiming a checkpoint:
 ```bash
 ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
+ruby -Ilib test/release_bundle_test.rb
+ruby -Ilib test/release_bundle_cli_test.rb
 ruby -Ilib test/onboarding_summary_test.rb
 ruby -Ilib test/onboarding_handoff_test.rb
 ruby -Ilib test/onboarding_artifact_index_test.rb
@@ -262,7 +266,7 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/onboarding/artifact_index_builder.rb`, `lib/slo_rules_engine/manifest_review_queue.rb`, and their tests
-6. Inspect `lib/slo_rules_engine/apply.rb`, `lib/slo_rules_engine/appliers/manifest_bundle.rb`, and `docs/prometheus-stack-walkthrough.md`
+5. Inspect `lib/slo_rules_engine/release_bundle`, `lib/slo_rules_engine/cli/bundle_commands.rb`, and their tests
+6. Inspect `lib/slo_rules_engine/apply.rb`, both provider appliers, and `docs/release-bundle-contract.md`
 7. If the user says `proceed`, follow the Phase 9 handoff above
 8. Do not start provider-neutral state-manager hardening until the first-class bundle boundary is tested and pushed
