@@ -37,7 +37,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Release bundling | Content-addressed `review_ready` JSON containing reviewed evidence and target artifacts |
 | Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
-| File-backed execution | Durable live journal transitions plus a `ProviderStateResult` whose verification remains explicitly `pending` |
+| File-backed execution | Durable live journal transitions plus a `ProviderStateResult` with per-file expected/actual state fingerprints; Sloth downstream generation remains explicitly `pending` |
 
 ### Provider Outputs
 
@@ -47,8 +47,8 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Reviewed manifest | SLOs, burn-rate monitors, missing-telemetry monitors, decision dashboards, and route context | SLI/SLO/burn-rate recording rules, telemetry-gap and burn-rate alerts, Grafana dashboards, Alertmanager routes, and rendered native resource content | Sloth `prometheus/v1` SLO specs with event queries, page/ticket alert labels, and response annotations |
 | Saved review report | `manifest-review/datadog.json` | `manifest-review/prometheus_stack.json` | `manifest-review/sloth.json` |
 | Dry-run plan | API-oriented `create`, `update`, `recreate`, or `noop` changes with IDs, ownership identity, and risk | `write` or `noop` changes for `manifest.json` and every native YAML file | `write` or `noop` changes for the manifest and native Sloth input plus a `handoff` change |
-| Operation journal | Standalone dry-run journals preserve resource ID, match identity, and risk; live Datadog execution is not journal-backed yet | Confirmed apply/prune persists `pending` to `running` to terminal transitions with managed paths and attempts | Confirmed apply/prune persists managed-file outcomes and records external-generator handoff as intentionally skipped |
-| Confirmed engine output | Datadog resources plus the immediate live plan | Managed files, durable journal, and `ProviderStateResult` | Managed manifest/input files, durable journal, `ProviderStateResult`, and external handoff evidence |
+| Operation journal | Standalone dry-run journals preserve resource ID, match identity, and risk; live Datadog execution is not journal-backed yet | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
+| Confirmed engine output | Datadog resources plus the immediate live plan | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
@@ -365,7 +365,7 @@ bin/rules-ctl journal status \
 - `journal status` prints effective state, entry counts, resume eligibility, and findings such as `partial_failure`, `resume_blocked`, or `resume_state_recheck_required`.
 - Confirmed Prometheus Stack and Sloth apply/prune create a separate live-mode journal automatically through `--journal-dir`; operators do not manually transition that journal.
 
-**Safety boundary:** standalone `journal create` and `journal status` never execute operations. File-backed live commands update their own journal while executing, but there is no manual transition command, automatic resume, post-apply convergence check, or separately approved exact-plan guarantee.
+**Safety boundary:** standalone `journal create` and `journal status` never execute operations. File-backed live commands update and verify their own journal while executing, but there is no manual transition command, automatic resume, downstream Sloth verification, or separately approved exact-plan guarantee.
 
 ## Use Case 9: Apply Reviewed State
 
@@ -415,9 +415,13 @@ bin/rules-ctl apply \
 - Prometheus Stack and Sloth stdout include the immediate live-mode plan plus `execution.operation_journal` and `execution.result`.
 - Each file-backed journal is saved at `./work/journals/<service>/<provider>/<journal-id>.json`. Successful attempts record the managed path as `provider_resource_id`; failed attempts record a public-safe error class, code, and message.
 - File-backed execution stops after the first failed operation, marks untouched actionable operations `skipped`, emits `failed` or `partial`, and exits nonzero.
+- After execution, every attempted engine-owned file is parsed again and compared with the live plan. Journal verification evidence contains a timestamp, expected presence/content fingerprint, actual presence/content fingerprint, and stable finding codes for missing, unreadable, unexpectedly present, or mismatched files.
+- Prometheus Stack reports verification `succeeded` only when every attempted managed file matches. A mismatch adds `post_apply_verification_failed`, makes the provider result `failed` when execution otherwise succeeded, and exits nonzero.
+- An all-`noop` apply reports verification `not_required` because the live plan already read matching files immediately before execution.
 - Sloth records its external-generator `handoff` as `skipped` with reason `external_handoff_required` after writing engine-owned files.
+- Sloth reports `engine_owned_status: succeeded` after its manifest and native inputs verify, while overall and external verification remain `pending` until the operator runs Sloth and verifies downstream Prometheus state.
 
-**Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. File-backed `ProviderStateResult.verification` is explicitly `pending`; the command does not refresh post-apply observed state, automatically resume partial failure, or execute a separately approved exact plan.
+**Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. Verification covers only engine-owned managed files, not Kubernetes application, Grafana loading, Alertmanager receiver delivery, Sloth execution, automatic resume, or execution of a separately approved exact plan.
 
 ## Use Case 10: Remove Managed State
 
@@ -453,9 +457,10 @@ bin/rules-ctl prune \
 - Sloth plans/deletes the reviewed manifest and native Sloth input files.
 - Datadog confirmed stdout remains a plan, not verified post-delete state.
 - Prometheus Stack and Sloth confirmed stdout include the live plan, durable journal reference, per-delete attempts, managed path identifiers, and `ProviderStateResult`.
-- A file deletion failure stops later deletes, persists `failed` or `partial`, and exits nonzero. Post-delete verification remains `pending`.
+- A file deletion failure stops later deletes, persists `failed` or `partial`, and exits nonzero.
+- Every attempted delete is rechecked for absence. Remaining files record `managed_file_present_after_delete`, fail verification, and keep the command nonzero.
 
-**Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. Journaling records what happened but does not provide rollback, automatic resume, or post-delete convergence verification.
+**Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. Verification proves engine-owned path absence only; journaling does not provide rollback, automatic resume, or downstream-system cleanup.
 
 ## Use Case 11: Verify Telemetry Before Production Adoption
 

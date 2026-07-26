@@ -152,14 +152,13 @@ This is the running plan for the long refactor.
 - [x] Define a durable operation-journal schema with deterministic plan and operation identity.
 - [x] Persist initial journals from verified single-manifest dry-run plans and assess partial-failure/resume eligibility.
 - [x] Record atomic Prometheus Stack and Sloth apply/prune transitions, attempts, failures, skips, and managed path identifiers.
-- [x] Emit file-backed `ProviderStateResult` values linked to live plan and journal identity with verification explicitly pending.
-- [ ] Wire live Datadog execution outcomes into operation journals.
-- [ ] Add provider-specific post-apply observed-state refresh and completed verification evidence.
-- [ ] Add safe resumable execution after explicit state recheck.
-- [ ] Define compensating rollback plans for reversible mutations and explicit findings for irreversible operations.
+- [x] Emit file-backed `ProviderStateResult` values linked to live plan and journal identity.
+- [x] Refresh engine-owned files after apply/prune and persist expected/actual state fingerprints, timestamps, and stable verification findings.
+- [x] Distinguish verified Sloth engine-owned inputs from pending downstream generator and Prometheus state.
 
 ## Phase 11: Production-Grade Datadog Reconciliation
 
+- [ ] Route confirmed Datadog apply/prune outcomes through durable operation journals and `ProviderStateResult`.
 - [ ] Validate remaining Datadog SLO, monitor, and dashboard resource semantics using safe real-backend evidence.
 - [ ] Complete provider-schema payload translation for supported create and update operations.
 - [ ] Complete import and adoption behavior for managed resources with explicit identity confidence.

@@ -98,9 +98,10 @@ Existing `ApplyPlan#to_h` and `ImportedState#to_h` fields remain available. The 
 
 Confirmed Prometheus Stack and Sloth apply/prune now emit this value under
 `execution.result`. Their operation results carry managed paths as provider
-resource identifiers. The observed-state fingerprint still identifies the
-pre-execution snapshot, so `verification.status` remains explicitly `pending`.
-Live Datadog apply/prune does not emit this result yet.
+resource identifiers. The plan's observed-state fingerprint still identifies
+the pre-execution snapshot. Post-operation verification separately records
+expected and actual managed-file state fingerprints, timestamps, per-resource
+status, and findings. Live Datadog apply/prune does not emit this result yet.
 
 ### Operation Journal
 
@@ -168,8 +169,25 @@ become `skipped` with `prior_operation_failed`; the result becomes `failed` or
 `partial` and the CLI exits nonzero. Successful write/delete attempts record
 the managed path, byte/delete evidence, and completion timestamp.
 
+After operation attempts finish, every attempted engine-owned file is refreshed
+from disk:
+
+- writes compare canonical parsed JSON/YAML content with the live plan
+- deletes compare expected and actual absence
+- terminal evidence records a check timestamp, path, expected state
+  fingerprint, actual state fingerprint, and stable findings
+- verification failures add `post_apply_verification_failed`; a fully executed
+  plan with drift produces a failed result and nonzero CLI exit
+- operation failures still retain `failed` or `partial` execution status while
+  verification identifies every attempted resource that did not converge
+- `noop` entries remain `not_required` because the live plan already observed
+  matching state immediately before execution
+
 Sloth's external-generator handoff is not executed. Its entry becomes
 `skipped` with `external_handoff_required` after engine-owned files are written.
+The manifest and native inputs can reach `engine_owned_status: succeeded`, but
+overall and external verification stay `pending` until downstream generation
+and Prometheus state are verified outside the engine.
 
 ## Provider Evidence
 
@@ -210,7 +228,8 @@ Confirmed apply and prune:
 - managed JSON/YAML paths recorded as successful resource identifiers
 - per-operation write/delete attempts and failure evidence
 - `ProviderStateResult` linked to the immediate live plan
-- post-operation observed-state refresh still pending
+- terminal expected/actual presence and canonical content fingerprints for
+  every attempted managed path
 
 ### Sloth
 
@@ -248,13 +267,15 @@ skipped handoff rather than claiming downstream execution.
 - Journal commands do not contact providers or managed-file targets.
 - Journal entry transitions and attempt evidence do not change journal
   identity.
-- File-backed `ProviderStateResult` never claims post-apply verification.
+- File-backed verification covers only engine-owned managed paths and never
+  claims Kubernetes, Grafana, Alertmanager receiver, Sloth, or downstream
+  Prometheus convergence.
 
 ## Not Yet Implemented
 
 - live Datadog execution journals and results
 - actual resume execution after partial failure
-- post-apply observed-state refresh and completed verification evidence
+- downstream Sloth generation and Prometheus-state verification
 - compensating rollback plans
 - exact execution of a separately reviewed plan
 - concurrent-apply protection

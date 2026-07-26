@@ -25,8 +25,8 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 | Provider | Generation output | Dry-run planning output | Confirmed state output |
 | --- | --- | --- | --- |
 | `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources plus the immediate live plan; live execution journaling is not wired yet |
-| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and `ProviderStateResult` with pending verification |
-| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Managed manifest/input files, durable journal/result, and a skipped external handoff that remains operator-owned |
+| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and a `ProviderStateResult` with post-write/delete convergence evidence |
+| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned manifest/input files, durable journal/result, and a skipped external handoff that remains pending and operator-owned |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
 
@@ -150,9 +150,12 @@ bin/rules-ctl apply \
 
 The command writes one journal under
 `./work/journals/<service>/<provider>/`, transitions each operation atomically,
-and includes a linked `ProviderStateResult` in stdout. It stops on the first
-failure and exits nonzero with persisted partial-failure evidence. Automatic
-resume and post-apply verification are not implemented.
+re-reads each attempted engine-owned file, records expected and actual state
+fingerprints, and includes a linked `ProviderStateResult` in stdout. It stops
+on the first operation failure and exits nonzero for partial execution or
+verification drift. No-op files retain their immediately pre-execution
+convergence evidence. Sloth's downstream generator remains pending. Automatic
+resume and exact-plan execution are not implemented.
 
 ### Inspect or reconcile provider state
 
@@ -224,7 +227,8 @@ The initial delivery integration is `notification_router`, which generates conte
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
 - Confirmed apply and prune require reviewed manifest input.
 - Confirmed Prometheus Stack and Sloth mutations require durable journal
-  persistence and stop after the first failed file operation.
+  persistence, stop after the first failed file operation, and verify the
+  resulting engine-owned file state.
 - Datadog reconciliation requires managed ownership evidence for risky updates or deletes.
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 

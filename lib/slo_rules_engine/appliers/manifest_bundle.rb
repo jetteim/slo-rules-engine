@@ -7,14 +7,20 @@ require 'yaml'
 module SloRulesEngine
   module Appliers
     class ManifestBundle
-      def initialize(output_dir:, journal_dir: nil, clock: -> { Time.now.utc })
+      def initialize(
+        output_dir:,
+        journal_dir: nil,
+        clock: -> { Time.now.utc },
+        verifier: ProviderState::ManagedFileVerifier.new
+      )
         @output_dir = output_dir
         journal_store = if journal_dir
                           ProviderState::JournalStore.new(root_dir: journal_dir, clock: clock)
                         end
         @executor = ProviderState::JournaledExecutor.new(
           journal_store: journal_store,
-          clock: clock
+          clock: clock,
+          verifier: verifier
         )
       end
 

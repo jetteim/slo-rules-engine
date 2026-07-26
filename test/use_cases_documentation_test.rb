@@ -35,6 +35,9 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'partial_failure'
     assert_includes readme, '--journal-dir=./work/journals'
     assert_includes readme, 'ProviderStateResult'
+    assert_includes document, 'expected presence/content fingerprint'
+    assert_includes document, 'engine_owned_status: succeeded'
+    assert_includes readme, 'expected and actual state'
   end
 
   private

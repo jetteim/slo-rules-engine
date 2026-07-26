@@ -139,8 +139,18 @@ module SloRulesEngine
           end,
           verification_required_entries: entries.count do |entry|
             Value.fetch(Value.fetch(entry, :verification), :required)
-          end
+          end,
+          verification_pending_entries: verification_count('pending'),
+          verification_succeeded_entries: verification_count('succeeded'),
+          verification_failed_entries: verification_count('failed'),
+          verification_not_required_entries: verification_count('not_required')
         }
+      end
+
+      def verification_count(status)
+        entries.count do |entry|
+          Value.fetch(Value.fetch(entry, :verification), :status) == status
+        end
       end
     end
 
@@ -292,9 +302,20 @@ module SloRulesEngine
         rollup = rollup(entries)
         failed = entries.select { |entry| Value.fetch(entry, :status) == 'failed' }
         blocked = failed.reject { |entry| Value.fetch(Value.fetch(entry, :resume), :eligible) }
+        failed_verifications = entries.select do |entry|
+          Value.fetch(Value.fetch(entry, :verification), :status) == 'failed'
+        end
         effective_status = rollup.fetch(:status)
         findings = Array(Value.fetch(journal, :findings)).map { |finding| Value.copy(finding) }
-        findings.concat(runtime_findings(Value.fetch(journal, :provider), effective_status, failed, blocked))
+        findings.concat(
+          runtime_findings(
+            Value.fetch(journal, :provider),
+            effective_status,
+            failed,
+            blocked,
+            failed_verifications
+          )
+        )
 
         {
           valid: true,
@@ -336,6 +357,13 @@ module SloRulesEngine
       def rollup(entries)
         counts = OperationJournal::ENTRY_STATUSES.to_h { |entry_status| [entry_status, 0] }
         entries.each { |entry| counts[Value.fetch(entry, :status)] += 1 }
+        verification_counts = OperationJournal::VERIFICATION_STATUSES.to_h do |verification_status|
+          [verification_status, 0]
+        end
+        entries.each do |entry|
+          verification = Value.fetch(entry, :verification)
+          verification_counts[Value.fetch(verification, :status)] += 1
+        end
         {
           status: effective_status(counts),
           summary: {
@@ -344,7 +372,11 @@ module SloRulesEngine
             running_entries: counts.fetch('running'),
             succeeded_entries: counts.fetch('succeeded'),
             failed_entries: counts.fetch('failed'),
-            skipped_entries: counts.fetch('skipped')
+            skipped_entries: counts.fetch('skipped'),
+            verification_pending_entries: verification_counts.fetch('pending'),
+            verification_succeeded_entries: verification_counts.fetch('succeeded'),
+            verification_failed_entries: verification_counts.fetch('failed'),
+            verification_not_required_entries: verification_counts.fetch('not_required')
           }
         }
       end
@@ -404,6 +436,8 @@ module SloRulesEngine
         expected_rollup = rollup(entries)
         require_equal!('status', Value.fetch(journal, :status), expected_rollup.fetch(:status))
         expected_rollup.fetch(:summary).each do |key, expected|
+          next if key.to_s.start_with?('verification_') && Value.fetch(summary, key).nil?
+
           require_equal!("summary.#{key}", Value.fetch(summary, key), expected)
         end
 
@@ -470,6 +504,12 @@ module SloRulesEngine
         raise ContractError.new(path, 'must be an ISO 8601 timestamp')
       end
 
+      def validate_fingerprint!(path, value)
+        return if value.to_s.match?(/\A[0-9a-f]{64}\z/)
+
+        raise ContractError.new(path, 'must be a SHA-256 fingerprint')
+      end
+
       def validate_plan_reference!(plan)
         raise ContractError.new('plan', 'must be a hash') unless plan.is_a?(Hash)
 
@@ -515,6 +555,42 @@ module SloRulesEngine
         )
         requirements = Value.fetch(verification, :requirements)
         raise ContractError.new("#{path}.requirements", 'must be an array') unless requirements.is_a?(Array)
+        status = Value.fetch(verification, :status)
+        required = Value.fetch(verification, :required)
+        if !required && status != 'not_required'
+          raise ContractError.new("#{path}.status", 'must be not_required when verification is not required')
+        end
+        if required && status == 'not_required'
+          raise ContractError.new("#{path}.status", 'cannot be not_required when verification is required')
+        end
+        return if status == 'pending' || status == 'not_required'
+
+        validate_timestamp!("#{path}.checked_at", Value.fetch(verification, :checked_at))
+        required("#{path}.path", verification, :path)
+        expected = validate_verification_state!(verification, :expected, path)
+        actual = validate_verification_state!(verification, :actual, path)
+        findings = Value.fetch(verification, :findings)
+        raise ContractError.new("#{path}.findings", 'must be an array') unless findings.is_a?(Array)
+        if status == 'succeeded' && expected.fetch(:fingerprint) != actual.fetch(:fingerprint)
+          raise ContractError.new("#{path}.status", 'cannot succeed when state fingerprints differ')
+        end
+        if status == 'failed' && expected.fetch(:fingerprint) == actual.fetch(:fingerprint)
+          raise ContractError.new("#{path}.status", 'cannot fail when state fingerprints match')
+        end
+        if status == 'failed' && findings.empty?
+          raise ContractError.new("#{path}.findings", 'must describe a failed verification')
+        end
+      end
+
+      def validate_verification_state!(verification, key, path)
+        state = Value.fetch(verification, key)
+        state_path = "#{path}.#{key}"
+        raise ContractError.new(state_path, 'must be a hash') unless state.is_a?(Hash)
+        unless [true, false].include?(Value.fetch(state, :present))
+          raise ContractError.new("#{state_path}.present", 'must be true or false')
+        end
+        validate_fingerprint!("#{state_path}.fingerprint", Value.fetch(state, :fingerprint))
+        state
       end
 
       def effective_status(counts)
@@ -528,7 +604,7 @@ module SloRulesEngine
         'succeeded'
       end
 
-      def runtime_findings(provider, status, failed, blocked)
+      def runtime_findings(provider, status, failed, blocked, failed_verifications)
         findings = []
         if status == 'partial'
           findings << Finding.new(
@@ -554,6 +630,26 @@ module SloRulesEngine
             severity: 'warning',
             message: 'failed operations may be retried only after provider state is refreshed',
             evidence: { failed_entries: failed.map { |entry| Value.fetch(entry, :entry_id) } }
+          ).to_h
+        end
+        failed_verifications.each do |entry|
+          verification = Value.fetch(entry, :verification)
+          findings << Finding.new(
+            provider: provider,
+            code: 'post_apply_verification_failed',
+            severity: 'error',
+            message: 'managed resource does not match the expected post-apply state',
+            target: Value.fetch(entry, :target),
+            source: Value.fetch(entry, :source),
+            evidence: {
+              entry_id: Value.fetch(entry, :entry_id),
+              path: Value.fetch(verification, :path),
+              expected_fingerprint: Value.fetch(Value.fetch(verification, :expected), :fingerprint),
+              actual_fingerprint: Value.fetch(Value.fetch(verification, :actual), :fingerprint),
+              finding_codes: Array(Value.fetch(verification, :findings)).map do |finding|
+                Value.fetch(finding, :code)
+              end
+            }
           ).to_h
         end
         findings

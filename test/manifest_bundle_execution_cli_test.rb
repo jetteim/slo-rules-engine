@@ -47,13 +47,18 @@ class ManifestBundleExecutionCliTest < Minitest::Test
       payload = JSON.parse(stdout).fetch(0)
       assert_equal 'succeeded', payload.dig('execution', 'result', 'status')
       assert_equal 'ProviderStateResult', payload.dig('execution', 'result', 'kind')
+      assert_equal 'succeeded', payload.dig('execution', 'result', 'verification', 'status')
+      assert_equal 4,
+                   payload.dig('execution', 'result', 'verification', 'summary', 'succeeded_resources')
       journal_path = payload.dig('execution', 'operation_journal', 'path')
       assert journal_path.start_with?(journal_dir)
       assert File.exist?(journal_path)
       assert_equal 'succeeded', JSON.parse(File.read(journal_path)).fetch('status')
       status_stdout, status_stderr, journal_status = command('journal', 'status', journal_path)
       assert journal_status.success?, status_stderr
-      assert_equal 'succeeded', JSON.parse(status_stdout).fetch('status')
+      journal_payload = JSON.parse(status_stdout)
+      assert_equal 'succeeded', journal_payload.fetch('status')
+      assert_equal 4, journal_payload.dig('summary', 'verification_succeeded_entries')
     end
   end
 
@@ -82,6 +87,9 @@ class ManifestBundleExecutionCliTest < Minitest::Test
                    payload.dig('execution', 'result', 'operation_results').map { |result| result.fetch('status') }
       assert_includes payload.dig('execution', 'result', 'findings').map { |finding| finding.fetch('code') },
                       'partial_failure'
+      assert_equal 'failed', payload.dig('execution', 'result', 'verification', 'status')
+      assert_includes payload.dig('execution', 'result', 'findings').map { |finding| finding.fetch('code') },
+                      'post_apply_verification_failed'
     end
   end
 

@@ -89,9 +89,9 @@ The generated files are:
 
 Stdout also contains `execution.operation_journal.path` and a
 `ProviderStateResult`. The journal records four successful write attempts and
-the result records each managed path as `provider_resource_id`.
-`verification.status` remains `pending` until post-apply state refresh is
-implemented.
+the result records each managed path as `provider_resource_id`. The engine then
+parses all four files again and records expected and actual state fingerprints;
+`verification.status` is `succeeded` only when every attempted file matches.
 
 ## Verify And Reconcile
 
@@ -114,7 +114,9 @@ A clean `diff` reports four `noop` operations. A complete `import` reports an em
 When a managed YAML file drifts, `diff` identifies its exact changed paths.
 Re-running the confirmed apply with `--journal-dir="$journal_dir"` rewrites only
 the drifted file; unchanged files remain `noop`. A write failure persists
-`failed` or `partial`, skips later writes, and exits nonzero.
+`failed` or `partial`, skips later writes, verifies the attempted paths, and
+exits nonzero. A write that returns successfully but produces mismatched content
+adds `post_apply_verification_failed` and also exits nonzero.
 
 ## Prune
 
@@ -137,8 +139,8 @@ bin/rules-ctl prune \
 ```
 
 Confirmed prune records one delete attempt per managed path in a separate
-operation journal. There is no automatic rollback, resume, or post-delete
-verification.
+operation journal and verifies that every attempted path is absent. There is no
+automatic rollback or resume.
 
 The automated verification for this flow is:
 

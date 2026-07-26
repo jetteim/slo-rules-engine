@@ -98,8 +98,10 @@ Explicit features:
   use the same apply command but manage deterministic files and handoff plans
   rather than mutating live backends. Confirmed mutation requires
   `--journal-dir`, persists operation attempts, and emits a
-  `ProviderStateResult`. Sloth apply writes both the reviewed engine manifest
-  and native Sloth `prometheus/v1` generator input files.
+  `ProviderStateResult` with post-operation expected/actual file-state
+  fingerprints. Sloth apply verifies both the reviewed engine manifest and
+  native Sloth `prometheus/v1` generator input files while leaving downstream
+  generation explicitly pending.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 
@@ -111,9 +113,9 @@ Confirmed `rules-ctl apply --provider sloth` requires `--confirm`, a reviewed
 `--manifest`, `--output-dir`, and `--journal-dir`. It writes the reviewed engine
 manifest plus native Sloth YAML input files under
 `<dir>/<service>/sloth/generated/`. The durable journal records file outcomes
-and marks the external `sloth generate` handoff as intentionally skipped; the
-engine still does not execute the Sloth CLI or mutate downstream Prometheus
-resources.
+and verified engine-owned file fingerprints, then marks the external
+`sloth generate` handoff as intentionally skipped and pending; the engine still
+does not execute the Sloth CLI or mutate downstream Prometheus resources.
 
 ## Prometheus Stack Provider Generation
 
@@ -123,11 +125,11 @@ The provider also renders a native Prometheus Operator `PrometheusRule`, a
 Grafana sidecar-compatible dashboard `ConfigMap`, and a credential-free
 Alertmanager route-intent document. Confirmed file apply validates all three
 resource shapes, requires `--journal-dir`, writes them beside the reviewed
-provider manifest, and emits durable per-file outcomes with verification
-pending. `plan`, `diff`, `import`, and `prune` cover every file in that managed
-bundle. The route-intent document deliberately requires downstream receiver
-configuration; it does not invent an Alertmanager webhook host, secret, or
-credential.
+provider manifest, and emits durable per-file outcomes with completed local
+verification. `plan`, `diff`, `import`, and `prune` cover every file in that
+managed bundle. The route-intent document deliberately requires downstream
+receiver configuration; it does not invent an Alertmanager webhook host,
+secret, or credential.
 
 Selector-based SLOs calculate success ratios from scoped counter rates. Threshold-based SLOs generate boolean time-slice ratios and require a numeric threshold plus `time_slice` calculation basis; unsupported threshold intent is rejected during provider validation rather than emitted as a misleading success ratio.
 

@@ -25,9 +25,10 @@ Current state-manager status: confirmed Prometheus Stack and Sloth apply/prune
 requires `--journal-dir`, persists atomic per-operation transitions and attempt
 evidence, stops after the first file failure, and emits a linked
 `ProviderStateResult`. Managed paths are recorded as resource identifiers.
-Post-apply observed-state verification remains explicitly pending, live Datadog
-execution is not journal-backed yet, and exact-plan/resume behavior is still a
-later phase.
+Every attempted engine-owned file is refreshed after execution with
+expected/actual state fingerprints and stable findings. Sloth keeps downstream
+generation explicitly pending. Live Datadog execution is not journal-backed
+yet, and exact-plan/resume behavior is still a later phase.
 
 ## Non-Negotiable Working Rules
 
@@ -175,12 +176,22 @@ Implemented by the latest feature slices:
   than claiming downstream execution
 - Repeated converged file-backed apply reuses an identical all-noop journal;
   journals containing execution evidence are never overwritten
-- File-backed result verification remains `pending` because post-operation
-  observed-state refresh is not implemented yet
+- File-backed apply/prune refreshes every attempted engine-owned JSON/YAML path
+  and records expected/actual presence and canonical content fingerprints
+- Managed-file verification records terminal timestamps and stable findings for
+  missing, unreadable, unexpectedly present, or mismatched paths
+- A verification mismatch adds `post_apply_verification_failed`, fails an
+  otherwise successful provider result, and makes the CLI exit nonzero
+- All-noop results report verification `not_required` because the live plan
+  already observed convergence immediately before execution
+- Sloth reports verified engine-owned manifest/input state separately from its
+  still-pending downstream generator and Prometheus state
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: journal-backed Prometheus Stack and Sloth execution
+- latest checkpoint: post-operation Prometheus Stack and Sloth managed-file
+  convergence evidence
+- previous checkpoint: journal-backed Prometheus Stack and Sloth execution
   outcomes with partial-failure capture
 - previous checkpoint: deterministic provider operation journals and
   intent/output-checked engineering use cases
@@ -237,9 +248,9 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Refresh and verify post-apply Prometheus Stack and Sloth managed-file state
-2. Record live Datadog operation outcomes and returned backend identifiers in durable journals
-3. Validate remaining Datadog resource semantics against safe real-backend evidence after shared state contracts are stronger
+1. Record live Datadog operation outcomes and returned backend identifiers in durable journals
+2. Refresh Datadog state after mutation and emit provider verification evidence without weakening ownership gates
+3. Validate remaining Datadog resource semantics against safe real-backend evidence
 4. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
 5. Expose live SLO and error-budget status without weakening provider-neutral intent
 
@@ -253,29 +264,28 @@ Secondary gaps:
 
 Next recommended slice:
 
-- continue Phase 10 with provider-neutral post-apply verification evidence for
-  managed-file execution
-- refresh every engine-owned file after successful/partial apply or prune and
-  compare canonical observed content or expected absence with the live plan
-- record verification timestamp, per-resource expected/actual fingerprints,
-  status, and stable findings in the journal and `ProviderStateResult`
-- let Prometheus Stack reach verified convergence only when every managed file
-  matches; distinguish Sloth engine-owned file verification from its still
-  external downstream-generator state
-- keep live Datadog journaling, automatic resume, exact-plan execution, and
-  `bundle apply` outside this slice
+- begin production-grade Datadog reconciliation by routing confirmed apply and
+  prune outcomes through the durable journal/result contract
+- preserve current ownership, source-ref, payload validation, and risk gates
+  before every mutation
+- capture returned backend identifiers and public-safe request outcomes per
+  operation, then reread managed backend state and compare it with the live plan
+- characterize all behavior first with the existing fake Datadog client; use a
+  real backend only when safe credentials and explicit evidence are available
+- keep automatic resume, exact-plan execution, `bundle apply`, and live SLO
+  status outside this slice
 
 Rationale:
 
-- deterministic file-backed outcome capture and partial-failure reporting are
-  now proven through CLI and managed-file lifecycle tests
-- managed paths are available as stable resource identifiers, but current
-  result verification correctly remains `pending`
-- an observed-state refresh is the next requirement before file-backed results
-  may claim convergence
-- Sloth needs an explicit split between verified engine-owned inputs and
-  unverified downstream Prometheus state
-- exact-plan execution remains a separate Phase 12 guarantee and must not be implied by journal creation alone
+- the provider-neutral plan, journal, attempt, result, and verification
+  contracts are now proven by deterministic file-backed execution
+- Datadog already has the strongest live mutation, ownership, payload, risk,
+  retry, and state-reading baseline, so it is the next provider to adopt those
+  contracts
+- backend identifiers and post-mutation state evidence are required before
+  Datadog execution can truthfully claim production-grade reconciliation
+- exact-plan execution remains a separate Phase 12 guarantee and must not be
+  implied by immediate live replanning or operation journals
 
 ## Next Session Handoff
 
@@ -284,38 +294,37 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `9e8f98e feat: journal file-backed
-  execution outcomes`
-- expected startup state: `git status --short --branch` should show clean
-  `main...origin/main`
+- latest verified feature checkpoint: managed-file convergence worktree,
+  pending checkpoint commit
+- expected startup state after checkpoint commit/push: `git status --short
+  --branch` should show clean `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree containing journal-backed file execution
+- target: local `main` worktree containing managed-file convergence evidence
 - command: `./scripts/verify.sh`
-- timestamp: `2026-07-26T12:11:09Z`
+- timestamp: `2026-07-26T12:29:37Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 349 tests, 1,995 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 353 tests, 2,070 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- blast radius: confirmed Prometheus Stack and Sloth apply/prune now requires
-  `--journal-dir`, persists execution evidence, stops after the first failed
-  file operation, and emits a result; Datadog behavior is unchanged
-- rollback path: revert the journal-backed file-execution checkpoint; managed
-  files already written or deleted would need to be reconciled from their last
-  reviewed manifests
+- blast radius: confirmed Prometheus Stack and Sloth apply/prune refreshes
+  attempted managed paths, persists verification evidence, and exits nonzero on
+  convergence failure; Datadog behavior is unchanged
+- rollback path: revert the managed-file verification checkpoint; managed files
+  remain reconcilable from their last reviewed manifests
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Continue Phase 10 with post-apply managed-file state refresh and
-   verification evidence.
-5. Use TDD for expected/actual fingerprints, apply and prune convergence,
-   partial execution, and Sloth downstream-pending findings.
-6. Preserve current journal/review gates; do not add Datadog execution changes,
-   exact-plan execution, automatic resume, or `bundle apply`.
+4. Begin Datadog journal/result parity using fake-client characterization before
+   changing live mutation behavior.
+5. Preserve current ownership, payload, review, and risk gates while recording
+   backend identifiers and post-mutation state evidence.
+6. Do not add automatic resume, exact-plan execution, `bundle apply`, or live
+   SLO/error-budget status in the same slice.
 
 ## Verification Commands
 

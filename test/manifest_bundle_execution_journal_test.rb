@@ -27,6 +27,17 @@ class ManifestBundleExecutionJournalTest < Minitest::Test
       assert_equal journal.dig(:plan, :fingerprint), result.fetch(:plan_fingerprint)
       assert_equal journal.fetch(:journal_id), execution.dig(:operation_journal, :journal_id)
       assert_equal journal_path, execution.dig(:operation_journal, :path)
+      assert_equal 'succeeded', result.dig(:verification, :status)
+      assert_equal 'succeeded', result.dig(:verification, :engine_owned_status)
+      assert_equal 'not_required', result.dig(:verification, :external_status)
+      assert_equal 4, result.dig(:verification, :summary, :succeeded_resources)
+      journal.fetch(:entries).each do |entry|
+        verification = entry.fetch(:verification)
+        assert_equal 'succeeded', verification.fetch(:status)
+        assert_match(/\A2026-07-26T12:00:\d{2}\.000000Z\z/, verification.fetch(:checked_at))
+        assert_equal verification.dig(:expected, :fingerprint),
+                     verification.dig(:actual, :fingerprint)
+      end
       result.fetch(:operation_results).each do |operation_result|
         assert File.exist?(operation_result.fetch(:provider_resource_id))
       end
@@ -62,6 +73,10 @@ class ManifestBundleExecutionJournalTest < Minitest::Test
       refute File.exist?(File.join(generated_path, 'prometheus-rules.yaml'))
       assert_includes execution.dig(:result, :findings).map { |finding| finding.fetch(:code) },
                       'partial_failure'
+      assert_equal 'failed', execution.dig(:result, :verification, :status)
+      assert_operator execution.dig(:result, :verification, :summary, :failed_resources), :>=, 1
+      assert_includes execution.dig(:result, :findings).map { |finding| finding.fetch(:code) },
+                      'post_apply_verification_failed'
     end
   end
 
@@ -83,6 +98,10 @@ class ManifestBundleExecutionJournalTest < Minitest::Test
                    journal.fetch(:entries).map { |entry| entry.fetch(:status) }
       assert_equal 'external_handoff_required', handoff.dig(:skip, :reason)
       assert_equal 'succeeded', execution.dig(:result, :status)
+      assert_equal 'pending', execution.dig(:result, :verification, :status)
+      assert_equal 'succeeded', execution.dig(:result, :verification, :engine_owned_status)
+      assert_equal 'pending', execution.dig(:result, :verification, :external_status)
+      assert_equal 'pending', handoff.dig(:verification, :status)
       assert_includes execution.dig(:result, :findings).map { |finding| finding.fetch(:code) },
                       'non_resumable_operation'
     end
@@ -103,8 +122,13 @@ class ManifestBundleExecutionJournalTest < Minitest::Test
       execution = prune_plan.to_h.fetch(:execution)
 
       assert_equal 'succeeded', execution.dig(:result, :status)
+      assert_equal 'succeeded', execution.dig(:result, :verification, :status)
       assert_equal %w[succeeded succeeded succeeded succeeded],
                    execution.dig(:result, :operation_results).map { |result| result.fetch(:status) }
+      execution.dig(:result, :verification, :resources).each do |verification|
+        assert_equal false, verification.dig(:expected, :present)
+        assert_equal false, verification.dig(:actual, :present)
+      end
       paths.each { |path| refute File.exist?(path) }
     end
   end
@@ -127,10 +151,83 @@ class ManifestBundleExecutionJournalTest < Minitest::Test
                    repeated_noop.dig(:operation_journal, :journal_id)
       assert_equal first_noop.dig(:operation_journal, :path),
                    repeated_noop.dig(:operation_journal, :path)
+      assert_equal 'not_required', first_noop.dig(:result, :verification, :status)
+    end
+  end
+
+  def test_post_write_content_drift_fails_verification_and_the_provider_result
+    Dir.mktmpdir do |dir|
+      verifier = TamperingVerifier.new(
+        SloRulesEngine::ProviderState::ManagedFileVerifier.new
+      )
+      plan = SloRulesEngine::Appliers::ManifestBundle.new(
+        output_dir: File.join(dir, 'managed'),
+        journal_dir: File.join(dir, 'journals'),
+        clock: fixed_clock,
+        verifier: verifier
+      ).apply(valid_prometheus_manifest)
+      execution = plan.to_h.fetch(:execution)
+      journal = JSON.parse(
+        File.read(execution.dig(:operation_journal, :path)),
+        symbolize_names: true
+      )
+
+      assert_equal 'succeeded', journal.fetch(:status)
+      assert_equal 'failed', execution.dig(:result, :status)
+      assert_equal 'failed', execution.dig(:result, :verification, :status)
+      assert_equal 'managed_file_content_mismatch',
+                   journal.dig(:entries, 0, :verification, :findings, 0, :code)
+      refute_equal journal.dig(:entries, 0, :verification, :expected, :fingerprint),
+                   journal.dig(:entries, 0, :verification, :actual, :fingerprint)
+    end
+  end
+
+  def test_failed_delete_verification_records_that_the_managed_path_remains
+    Dir.mktmpdir do |dir|
+      managed_dir = File.join(dir, 'managed')
+      manifest = valid_prometheus_manifest
+      initial = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: managed_dir).apply(manifest)
+      manifest_path = initial.operations.fetch(0).payload.fetch(:path)
+      File.delete(manifest_path)
+      Dir.mkdir(manifest_path)
+
+      plan = SloRulesEngine::Appliers::ManifestBundle.new(
+        output_dir: managed_dir,
+        journal_dir: File.join(dir, 'journals'),
+        clock: fixed_clock
+      ).prune(manifest, mode: 'live')
+      execution = plan.to_h.fetch(:execution)
+      journal = JSON.parse(
+        File.read(execution.dig(:operation_journal, :path)),
+        symbolize_names: true
+      )
+
+      assert_equal 'failed', execution.dig(:result, :status)
+      assert_equal 'failed', execution.dig(:result, :verification, :status)
+      assert_equal 'managed_file_present_after_delete',
+                   journal.dig(:entries, 0, :verification, :findings, 0, :code)
+      assert_equal true, journal.dig(:entries, 0, :verification, :actual, :present)
+      assert_includes execution.dig(:result, :findings).map { |finding| finding.fetch(:code) },
+                      'post_apply_verification_failed'
     end
   end
 
   private
+
+  class TamperingVerifier
+    def initialize(delegate)
+      @delegate = delegate
+      @tampered = false
+    end
+
+    def verify(entry, checked_at:)
+      unless @tampered
+        File.write(entry.dig(:desired, :path), JSON.generate(tampered: true))
+        @tampered = true
+      end
+      @delegate.verify(entry, checked_at: checked_at)
+    end
+  end
 
   def fixed_clock
     tick = 0

@@ -57,6 +57,34 @@ module SloRulesEngine
         current
       end
 
+      def record_verification(journal, entry_id:, occurred_at:, evidence:)
+        current = validated_copy(journal)
+        entries = Value.fetch(current, :entries)
+        index = entries.index { |entry| Value.fetch(entry, :entry_id) == entry_id }
+        raise ContractError.new('entry_id', 'does not identify a journal entry') unless index
+
+        entry = entries.fetch(index)
+        verification = Value.fetch(entry, :verification)
+        unless Value.fetch(verification, :required)
+          raise ContractError.new(
+            "entries[#{index}].verification.required",
+            'must be true before verification can be recorded'
+          )
+        end
+        unless Value.fetch(verification, :status) == 'pending'
+          raise ContractError.new(
+            "entries[#{index}].verification.status",
+            'must be pending before terminal evidence is recorded'
+          )
+        end
+
+        evidence = Value.copy(evidence || {})
+        Value.require_one_of!('verification.status', Value.fetch(evidence, :status), %w[succeeded failed])
+        entry[:verification] = verification.merge(evidence).merge(checked_at: occurred_at)
+        refresh_rollups!(current)
+        current
+      end
+
       private
 
       def validated_copy(journal)
@@ -115,7 +143,6 @@ module SloRulesEngine
             Value.fetch(finding, :message)
           )
         end
-
       end
     end
 
@@ -156,6 +183,21 @@ module SloRulesEngine
             entry_id: entry_id,
             to: to,
             occurred_at: timestamp,
+            evidence: evidence
+          )
+          write_atomic(path, updated)
+          updated
+        end
+      end
+
+      def record_verification(path, entry_id:, evidence:)
+        with_lock(path) do
+          current = JSON.parse(File.read(path), symbolize_names: true)
+          occurred_at = Value.fetch(evidence, :checked_at) || timestamp
+          updated = @transitioner.record_verification(
+            current,
+            entry_id: entry_id,
+            occurred_at: occurred_at,
             evidence: evidence
           )
           write_atomic(path, updated)
@@ -240,12 +282,13 @@ module SloRulesEngine
           )
         end
         require_plan_identity!(plan, journal)
+        verification = verification(journal)
 
         Result.new(
           provider: plan.provider,
           service: plan.service,
           mode: 'live',
-          status: result_status(evaluation, journal),
+          status: result_status(evaluation, journal, verification),
           desired_state_fingerprint: plan.desired_state.fingerprint,
           observed_state_fingerprint: plan.observed_state.fingerprint,
           plan_fingerprint: plan.fingerprint,
@@ -253,7 +296,7 @@ module SloRulesEngine
           findings: evaluation.fetch(:findings).map do |finding|
             Finding.from_hash(finding, provider: plan.provider)
           end,
-          verification: verification(journal)
+          verification: verification
         )
       end
 
@@ -272,11 +315,13 @@ module SloRulesEngine
         end
       end
 
-      def result_status(evaluation, journal)
+      def result_status(evaluation, journal, verification)
         case evaluation.fetch(:status)
         when 'succeeded'
           entries = Value.fetch(journal, :entries)
-          entries.any? { |entry| Value.fetch(entry, :status) == 'succeeded' } ? 'succeeded' : 'noop'
+          return 'noop' unless entries.any? { |entry| Value.fetch(entry, :status) == 'succeeded' }
+
+          verification.fetch(:status) == 'failed' ? 'failed' : 'succeeded'
         when 'partial' then 'partial'
         when 'failed' then 'failed'
         else 'blocked'
@@ -296,29 +341,83 @@ module SloRulesEngine
             provider_resource_id: Value.fetch(result, :provider_resource_id) ||
               Value.fetch(entry, :provider_resource_id),
             attempts: Value.copy(Value.fetch(entry, :attempts)),
-            skip: Value.copy(Value.fetch(entry, :skip))
+            skip: Value.copy(Value.fetch(entry, :skip)),
+            verification: Value.copy(Value.fetch(entry, :verification))
           )
         end
       end
 
       def verification(journal)
-        requirements = Value.fetch(journal, :entries).flat_map do |entry|
-          verification = Value.fetch(entry, :verification)
-          Array(Value.fetch(verification, :requirements))
-        end.uniq
+        entries = Value.fetch(journal, :entries)
+        resources = entries.filter_map do |entry|
+          entry_verification = Value.fetch(entry, :verification)
+          next unless Value.fetch(entry_verification, :required)
+
+          Value.compact(
+            entry_id: Value.fetch(entry, :entry_id),
+            target: Value.fetch(entry, :target),
+            name: Value.fetch(entry, :name),
+            source: Value.fetch(entry, :source),
+            status: Value.fetch(entry_verification, :status),
+            checked_at: Value.fetch(entry_verification, :checked_at),
+            path: Value.fetch(entry_verification, :path),
+            expected: Value.copy(Value.fetch(entry_verification, :expected)),
+            actual: Value.copy(Value.fetch(entry_verification, :actual)),
+            findings: Value.copy(Value.fetch(entry_verification, :findings))
+          )
+        end
+        statuses = entries.map do |entry|
+          Value.fetch(Value.fetch(entry, :verification), :status)
+        end
         {
-          status: 'pending',
-          requirements: requirements,
-          reason: 'post-apply observed-state refresh is not implemented yet'
+          status: verification_status(entries),
+          engine_owned_status: verification_status(
+            entries.reject { |entry| Value.fetch(entry, :target) == 'external_generator' }
+          ),
+          external_status: verification_status(
+            entries.select { |entry| Value.fetch(entry, :target) == 'external_generator' }
+          ),
+          checked_at: resources.filter_map { |resource| Value.fetch(resource, :checked_at) }.max,
+          requirements: entries.flat_map do |entry|
+            Array(Value.fetch(Value.fetch(entry, :verification), :requirements))
+          end.uniq,
+          summary: {
+            required_resources: resources.length,
+            pending_resources: statuses.count('pending'),
+            succeeded_resources: statuses.count('succeeded'),
+            failed_resources: statuses.count('failed'),
+            not_required_resources: statuses.count('not_required')
+          },
+          resources: resources
         }
+      end
+
+      def verification_status(entries)
+        required = entries.select do |entry|
+          Value.fetch(Value.fetch(entry, :verification), :required)
+        end
+        return 'not_required' if required.empty?
+
+        statuses = required.map do |entry|
+          Value.fetch(Value.fetch(entry, :verification), :status)
+        end
+        return 'failed' if statuses.include?('failed')
+        return 'pending' if statuses.include?('pending')
+
+        'succeeded'
       end
     end
 
     class JournaledExecutor
-      def initialize(journal_store: nil, clock: -> { Time.now.utc })
+      def initialize(
+        journal_store: nil,
+        clock: -> { Time.now.utc },
+        verifier: ManagedFileVerifier.new
+      )
         @journal_store = journal_store
         @clock = clock
         @transitioner = JournalTransitioner.new
+        @verifier = verifier
       end
 
       def execute(apply_plan)
@@ -384,6 +483,7 @@ module SloRulesEngine
           end
         end
 
+        journal = verify_engine_owned_entries(journal, journal_path)
         result = ResultBuilder.new.build(plan: plan, journal: journal)
         apply_plan.execution = {
           operation_journal: Value.compact(
@@ -399,6 +499,44 @@ module SloRulesEngine
 
       private
 
+      def verify_engine_owned_entries(journal, path)
+        Value.fetch(journal, :entries).each do |entry|
+          verification = Value.fetch(entry, :verification)
+          next unless Value.fetch(verification, :required)
+          next if Value.fetch(entry, :target) == 'external_generator'
+
+          evidence = @verifier.verify(entry, checked_at: timestamp)
+          journal = record_verification(
+            journal,
+            path,
+            entry_id: Value.fetch(entry, :entry_id),
+            evidence: evidence
+          )
+        end
+        journal
+      end
+
+      def record_verification(journal, path, entry_id:, evidence:)
+        if @journal_store
+          return @journal_store.record_verification(
+            path,
+            entry_id: entry_id,
+            evidence: evidence
+          )
+        end
+
+        @transitioner.record_verification(
+          journal,
+          entry_id: entry_id,
+          occurred_at: Value.fetch(evidence, :checked_at),
+          evidence: evidence
+        )
+      end
+
+      def timestamp
+        @clock.call.utc.iso8601(6)
+      end
+
       def transition(journal, path, entry_id:, to:, evidence: {})
         if @journal_store
           return @journal_store.transition(
@@ -413,7 +551,7 @@ module SloRulesEngine
           journal,
           entry_id: entry_id,
           to: to,
-          occurred_at: @clock.call.utc.iso8601(6),
+          occurred_at: timestamp,
           evidence: evidence
         )
       end

@@ -86,6 +86,16 @@ class ProviderStateJournalTransitionTest < Minitest::Test
     assert_equal 'summary.pending_entries', summary_result.fetch(:findings).fetch(0).fetch(:path)
   end
 
+  def test_evaluator_accepts_v1_journal_without_additive_verification_rollups
+    journal = operation_journal
+    journal.fetch(:summary).delete_if { |key, _value| key.to_s.start_with?('verification_') }
+
+    result = SloRulesEngine::ProviderState::JournalEvaluator.new.evaluate(journal)
+
+    assert_equal true, result.fetch(:valid)
+    assert_equal 1, result.dig(:summary, :verification_pending_entries)
+  end
+
   def test_transitioner_rejects_credential_like_attempt_evidence
     initial = operation_journal
     entry_id = initial.fetch(:entries).fetch(0).fetch(:entry_id)
@@ -197,6 +207,49 @@ class ProviderStateJournalTransitionTest < Minitest::Test
       assert_equal 1, values.count { |value| value.is_a?(SloRulesEngine::ProviderState::ContractError) }
       assert_equal 'running', persisted.dig(:entries, 0, :status)
       assert_equal 1, persisted.dig(:entries, 0, :attempts).length
+    end
+  end
+
+  def test_store_records_terminal_verification_evidence_once
+    Dir.mktmpdir do |dir|
+      store = SloRulesEngine::ProviderState::JournalStore.new(
+        root_dir: dir,
+        clock: -> { Time.utc(2026, 7, 26, 12, 0, 0) }
+      )
+      initial = operation_journal
+      path = store.create(initial)
+      entry_id = initial.fetch(:entries).fetch(0).fetch(:entry_id)
+      fingerprint = 'a' * 64
+
+      updated = store.record_verification(
+        path,
+        entry_id: entry_id,
+        evidence: {
+          status: 'succeeded',
+          path: '/managed/manifest.json',
+          expected: { present: true, fingerprint: fingerprint },
+          actual: { present: true, fingerprint: fingerprint },
+          findings: []
+        }
+      )
+
+      assert_equal 'succeeded', updated.dig(:entries, 0, :verification, :status)
+      assert_equal STARTED_AT, updated.dig(:entries, 0, :verification, :checked_at)
+      assert_equal 1, updated.dig(:summary, :verification_succeeded_entries)
+      error = assert_raises(SloRulesEngine::ProviderState::ContractError) do
+        store.record_verification(
+          path,
+          entry_id: entry_id,
+          evidence: {
+            status: 'failed',
+            path: '/managed/manifest.json',
+            expected: { present: true, fingerprint: fingerprint },
+            actual: { present: false, fingerprint: 'b' * 64 },
+            findings: [{ code: 'managed_file_missing_after_write' }]
+          }
+        )
+      end
+      assert_equal 'entries[0].verification.status', error.path
     end
   end
 

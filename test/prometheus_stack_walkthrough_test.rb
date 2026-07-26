@@ -62,6 +62,9 @@ class PrometheusStackWalkthroughTest < Minitest::Test
       ).fetch(0)
       assert_equal %w[write write write write], actions(applied)
       assert_equal 'succeeded', applied.dig('execution', 'result', 'status')
+      assert_equal 'succeeded', applied.dig('execution', 'result', 'verification', 'status')
+      assert_equal 4,
+                   applied.dig('execution', 'result', 'verification', 'summary', 'succeeded_resources')
       assert File.exist?(applied.dig('execution', 'operation_journal', 'path'))
 
       resources = applied.fetch('operations').to_h do |operation|
@@ -124,6 +127,9 @@ class PrometheusStackWalkthroughTest < Minitest::Test
       ).fetch(0)
       assert_equal %w[noop write noop noop], actions(repaired)
       assert_equal 'succeeded', repaired.dig('execution', 'result', 'status')
+      assert_equal 'succeeded', repaired.dig('execution', 'result', 'verification', 'status')
+      assert_equal 1,
+                   repaired.dig('execution', 'result', 'verification', 'summary', 'succeeded_resources')
       refute_equal 'stale_expr',
                    load_yaml(prometheus_rule_path).fetch('spec').fetch('groups').fetch(0).fetch('rules').fetch(0).fetch('expr')
 
@@ -138,6 +144,10 @@ class PrometheusStackWalkthroughTest < Minitest::Test
       ).fetch(0)
       assert_equal %w[delete delete delete delete], actions(pruned)
       assert_equal 'succeeded', pruned.dig('execution', 'result', 'status')
+      assert_equal 'succeeded', pruned.dig('execution', 'result', 'verification', 'status')
+      assert pruned.dig('execution', 'result', 'verification', 'resources').all? do |resource|
+        resource.dig('actual', 'present') == false
+      end
       pruned.fetch('operations').each do |operation|
         refute File.exist?(operation.fetch('payload').fetch('path'))
       end
