@@ -8,13 +8,15 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Telemetry-first onboarding path
-2. Provider-state follow-up hardening if new backend evidence exposes a concrete safety gap
-3. Provider breadth after the telemetry-first baseline is stronger
+1. First-class onboarding and release bundle
+2. Provider-neutral state-manager hardening
+3. Production-grade Datadog reconciliation
+4. Apply-exact-plan workflow
+5. Live SLO and error-budget status
 
-The provider-state deepening checkpoint is now at a safe commit/push boundary. New slices should default to telemetry-first onboarding unless fresh Datadog evidence reveals a concrete backend-contract gap.
+The Prometheus Stack completion checkpoint is at a safe commit/push boundary. New slices should follow the accepted sequence above and should not resume housekeeping or opportunistic provider work.
 
-Current telemetry-first status: the onboarding path now carries saved discovery evidence through candidate confidence, handoff review, reviewed draft generation, provider manifest review, saved report freshness checks, live mutation gates, a compact artifact index with next-action, saved-report-validity, and provider-level saved-report validation and refresh guidance across all current manifests, and an end-to-end public-safe walkthrough smoke test. A provider-breadth checkpoint now strengthens Sloth external-generator handoff by writing native Sloth spec input files. Housekeeping has now extracted Datadog payload translation, Datadog state planning, Datadog state reading, Datadog request transport, and onboarding/catalog/telemetry/report CLI command families. Further housekeeping is paused unless a future change exposes a clean seam without reducing readability.
+Current Prometheus Stack status: the provider emits one base observation recording rule per SLI instance, derived success/error/objective/error-budget recording rules and burn-rate rules per SLO, a native Prometheus Operator `PrometheusRule`, a Grafana sidecar dashboard `ConfigMap`, and an explicit Alertmanager route-intent document. Schema validation and `plan`, `apply`, `diff`, `import`, and `prune` cover the complete local bundle. The public-safe walkthrough proves reviewed generation, fresh-report validation, dry-run, apply, zero drift, import, drift repair, and prune without backend calls.
 
 ## Non-Negotiable Working Rules
 
@@ -65,8 +67,18 @@ Implemented and already pushed:
 - `onboarding-summary <discovery-index.json>` ranks saved discovery scopes as `ready`, `partial`, `insufficient`, or `failed`
 - `.forbidden-terms` has been removed from repo history and is now local-only and gitignored
 
-Implemented by the latest telemetry-first and provider-breadth slices:
+Implemented by the latest feature slices:
 
+- Prometheus Stack generation now emits one non-duplicated base observation recording rule per SLI instance
+- Each reviewed Prometheus SLO now has derived success-ratio, error-ratio, objective-ratio, error-budget-ratio, and burn-rate recording rules
+- Generated recording names satisfy the Prometheus metric-name contract
+- Threshold-based Prometheus SLOs require numeric `time_slice` semantics and fail validation otherwise
+- Prometheus Stack manifests now include a native Prometheus Operator `PrometheusRule`
+- Prometheus Stack manifests now include a Grafana sidecar-compatible dashboard `ConfigMap`
+- Alertmanager handoff now uses an explicit route-intent document that requires downstream receiver configuration and does not invent credentials
+- Native Prometheus Stack resource shapes are validated before managed-file mutation
+- Prometheus Stack `plan`, `apply`, `diff`, `import`, and `prune` now cover the reviewed manifest and every generated native file
+- `docs/prometheus-stack-walkthrough.md` and `test/prometheus_stack_walkthrough_test.rb` prove the complete public-safe managed-file lifecycle
 - Candidate review output includes confidence scores, reasons, caveats, and explanations for telemetry-derived drafts
 - `onboarding-summary --handoff-dir` writes per-scope handoff packets preserving discovery evidence, candidate reasoning, and review state placeholders
 - `review-handoff` records accepted and rejected candidate decisions in saved handoff packets while preserving discovery and candidate evidence
@@ -111,7 +123,10 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: reproducible provider-level manifest-review validation and refresh commands for multi-scope bundles
+- latest checkpoint: public-safe reviewed Prometheus Stack bundle walkthrough
+- previous checkpoint: managed PrometheusRule, Grafana dashboard, and Alertmanager route-intent file lifecycle
+- previous checkpoint: complete Prometheus SLI and SLO recording-rule coverage
+- previous checkpoint: reproducible provider-level manifest-review validation and refresh commands for multi-scope bundles
 - previous checkpoint: onboarding artifact index provider-level saved report freshness for multi-scope bundles
 - previous checkpoint: onboarding artifact index saved report freshness/staleness guidance
 - previous checkpoint: onboarding artifact index saved report validity and blocking next-action guidance
@@ -157,63 +172,33 @@ Implemented by the latest telemetry-first and provider-breadth slices:
 
 Highest-value remaining gaps:
 
-1. Validate remaining Datadog resource semantics against the real backend contract only when safe backend evidence is available
-2. Keep provider-state hardening evidence-driven rather than roadmap-leading
-3. Avoid further housekeeping unless a concrete command or backend change exposes a clean seam
+1. Package the existing saved onboarding and provider artifacts into one versioned first-class bundle with deterministic identity and lifecycle state
+2. Harden provider-neutral state contracts only after the bundle boundary is explicit
+3. Validate remaining Datadog resource semantics against safe real-backend evidence after shared state contracts are stronger
+4. Persist and execute an exact reviewed plan with stale-state rejection
+5. Expose live SLO and error-budget status without weakening provider-neutral intent
 
 Secondary gaps:
 
-1. Broader state-management parity for future providers after the Datadog baseline is stronger
-2. Additional CLI command extraction only as command families change; onboarding, catalog, telemetry, and report command families are already split, and the remaining state/generate/review commands still share provider-manifest/review helpers
-3. Additional provider breadth when a concrete reviewed handoff gap appears
+1. Broader state-management parity for future providers after Datadog and Prometheus Stack prove the shared contract
+2. Additional CLI command extraction only when the bundle or state features expose a clean ownership boundary
+3. Additional provider breadth only after the accepted feature sequence above
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- continue telemetry-first saved-artifact handoff only if the next reviewer gap can be derived from existing discovery, handoff, manifest, and manifest-review files without backend calls
-- otherwise pause housekeeping and return only to provider-breadth or backend-evidence work when a concrete reviewed handoff gap or live backend finding creates a clean, behavior-tested seam
+- define a versioned first-class bundle schema with stable bundle identity, lifecycle state, artifact inventory, and fingerprints
+- add the smallest `bundle create` and `bundle status` path over existing saved discovery, handoff, reviewed definition, provider manifest, manifest-review report, and change-plan artifacts
+- keep the first slice local and deterministic; do not add bundle apply or backend mutation until create/status contracts and stale-artifact findings are proven
 
 Rationale:
 
-- batch discovery now captures reusable normalized evidence for many scopes in one run
-- onboarding summary now turns those saved results into a ranked review queue and can write handoff packets
-- handoff review now records accepted/rejected candidate decisions
-- reviewed drafts can now be generated from accepted handoff state without rerunning backend discovery
-- handoff packets can now be validated before draft/provider handoff
-- reviewed handoff provenance now flows through generated provider manifests
-- live apply now requires reviewed handoff provenance before provider mutation or file-backed apply
-- review summaries and model reports now make reviewed handoff provenance visible before provider generation
-- manifest-review now checks provider artifact queues for missing or stale provenance before reviewers reach live apply
-- saved manifest-review reports now persist next to generated manifests and can be written explicitly from saved manifest input
-- handoff packet labels and files are now included in manifest-review findings when available
-- manifest-review now detects when a manifest's embedded provenance no longer matches the latest reviewed handoff packet
-- saved report path metadata now gives handoff tooling a stable pointer to the review artifact
-- confirmed apply and prune now block stale-provenance evidence when handoff packets are available
-- deterministic manifest and handoff fingerprints now provide the basis for saved report freshness checks
-- saved manifest-review reports can now be validated against current artifacts before reviewers rely on them
-- external-generator handoffs now tell reviewers how to validate manifest-review freshness before downstream generation
-- the artifact index now reduces operator glue by publishing a single map of saved onboarding and provider handoff artifacts
-- artifact indexes now show the next reviewer actions needed to advance incomplete saved handoff bundles
-- artifact indexes now expose whether saved manifest-review reports are valid or still blocking provider handoff
-- artifact indexes now inline saved manifest-review freshness/staleness status and stale finding codes from current saved artifacts without rerunning telemetry discovery or contacting backends
-- artifact indexes now validate provider-level saved manifest-review report freshness against the full provider manifest set in multi-scope generated bundles
-- provider-level saved report validation and refresh commands now pass every current provider manifest through repeatable `--manifest` inputs, so following artifact-index guidance reproduces the same freshness scope
-- the full saved-artifact walkthrough now starts from saved discovery evidence and ends at reviewed provider artifact gates
-- housekeeping reviews now identify concrete compaction and layering follow-ups
-- Sloth external-generator handoff now writes native provider input files instead of relying on the engine manifest as generator input
-- CLI, onboarding, and Datadog fake test guardrails now exist
-- onboarding CLI command extraction proves the CLI can be split safely in small command-family modules
-- the Datadog characterization suite is now split by behavior and can guard smaller internal extractions
-- Datadog risk signaling has moved behind a focused policy collaborator
-- catalog CLI extraction shows the command-family module pattern can be repeated incrementally
-- Datadog payload translation now sits behind a focused translator collaborator
-- telemetry CLI commands now follow the same small command-family module pattern as onboarding and catalog
-- Datadog state planning and backend state reading now sit behind focused collaborators
-- report CLI commands now follow the same small command-family module pattern
-- Datadog request transport and retry behavior now sit behind a focused collaborator
-- the remaining CLI state/generate/review commands are coupled through shared provider-manifest and review helpers, so extracting them now would reduce clarity more than it improves structure
-- Datadog remains the reference live provider, but follow-up hardening can stay evidence-driven instead of roadmap-leading
+- all first-class bundle inputs already exist as saved, fingerprintable artifacts
+- the current artifact index is a useful read model but is not a versioned lifecycle or release boundary
+- making bundle identity and state explicit first avoids leaking CLI file conventions into provider-neutral state-manager contracts
+- Prometheus Stack now proves complete deterministic file-backed reconciliation while Datadog proves live-provider reconciliation
+- exact-plan execution and live status should consume stable bundle and state contracts rather than define them implicitly
 
 ## Next Session Handoff
 
@@ -222,34 +207,38 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `2e2a8ae fix: refresh provider reports across manifests`
+- latest verified feature checkpoint: `01f5f23 docs: add prometheus stack bundle walkthrough`
 - expected startup state: `git status --short --branch` should show clean `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree at `2e2a8ae`
+- target: local `main` worktree at `01f5f23`
 - command: `./scripts/verify.sh`
-- timestamp: `2026-07-26T08:50:49Z`
+- timestamp: `2026-07-26T09:24:47Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 276 tests, 1,373 assertions, 0 failures, 0 errors
-- metric/log/trace names: none; this slice used saved public-safe artifacts and made no backend calls
-- rollback path: `git revert 2e2a8ae`
+- result: exit 0, `verification ok`, 293 tests, 1,540 assertions, 0 failures, 0 errors
+- metric names: `sli:checkout_api:http_requests:public_api:observations`, SLO success/error/objective/error-budget ratios, and 1h/6h burn-rate records
+- log/trace names: none; this slice made no backend calls
+- blast radius: deterministic files below `<output-dir>/checkout-api/prometheus_stack` plus provider manifest/schema code
+- rollback path: revert `01f5f23`, `d438f07`, and `1b5e1d1`; restore managed files by applying the last reviewed manifest
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Look only for a concrete telemetry-first saved-artifact reviewer gap that can be proven from saved discovery, handoff, manifest, and manifest-review files without backend calls.
-5. If a concrete gap is found, use TDD: add a failing test first, implement the smallest behavior, run the verification commands below, update this handoff, commit, and push.
-6. If no concrete saved-artifact reviewer gap is evident, stop and report that the repo is at a safe boundary rather than inventing provider-state or housekeeping work.
+4. Start Phase 9 with a versioned first-class bundle schema and deterministic bundle identity over existing saved artifacts.
+5. Use TDD to add the smallest `bundle create` and `bundle status` behavior with explicit incomplete/stale findings and no backend calls.
+6. Run the verification commands below, update this handoff, commit, and push before adding bundle plan/apply behavior.
 
 ## Verification Commands
 
 Use these before claiming a checkpoint:
 
 ```bash
+ruby -Ilib test/prometheus_stack_provider_test.rb
+ruby -Ilib test/prometheus_stack_walkthrough_test.rb
 ruby -Ilib test/onboarding_summary_test.rb
 ruby -Ilib test/onboarding_handoff_test.rb
 ruby -Ilib test/onboarding_artifact_index_test.rb
@@ -273,7 +262,7 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/onboarding/summary_builder.rb`
-6. Inspect `lib/slo_rules_engine/onboarding/artifact_index_builder.rb`, `lib/slo_rules_engine/manifest_review_queue.rb`, and `test/onboarding_artifact_index_test.rb`
-7. If the user says `proceed`, follow the `Next Session Handoff` above; only continue if a concrete saved-artifact reviewer gap is evident from local artifacts and tests
-8. Do not resume housekeeping by default; only do it if a concrete command-family or backend-evidence change exposes a clean seam
+5. Inspect `lib/slo_rules_engine/onboarding/artifact_index_builder.rb`, `lib/slo_rules_engine/manifest_review_queue.rb`, and their tests
+6. Inspect `lib/slo_rules_engine/apply.rb`, `lib/slo_rules_engine/appliers/manifest_bundle.rb`, and `docs/prometheus-stack-walkthrough.md`
+7. If the user says `proceed`, follow the Phase 9 handoff above
+8. Do not start provider-neutral state-manager hardening until the first-class bundle boundary is tested and pushed
