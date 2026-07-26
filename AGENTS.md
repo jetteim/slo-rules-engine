@@ -256,15 +256,14 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: deterministic provider operation journal
-  worktree, pending checkpoint commit
-- expected startup state after checkpoint commit/push: `git status --short
-  --branch` should show clean `main...origin/main`
+- latest verified feature checkpoint: `fdd5888 feat: add provider operation journals`
+- expected startup state: `git status --short --branch` should show clean
+  `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree containing the provider operation-journal checkpoint
+- target: local `main` worktree at `fdd5888`
 - command: `./scripts/verify.sh`
 - timestamp: `2026-07-26T11:41:03Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
@@ -273,8 +272,8 @@ Verification evidence:
 - blast radius: additive plan loading, operation-journal persistence/status
   commands, and documentation contract tests; live provider and managed-file
   mutation behavior is unchanged
-- rollback path: revert the operation-journal checkpoint; no provider or
-  managed-file rollback is required
+- rollback path: revert `fdd5888`; no provider or managed-file rollback is
+  required
 
 When the user types `proceed` in a fresh session:
 
