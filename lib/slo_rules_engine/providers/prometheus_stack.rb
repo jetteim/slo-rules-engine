@@ -29,7 +29,10 @@ module SloRulesEngine
           missing_telemetry_rules: [],
           alert_rules: [],
           alertmanager_routes: [],
-          grafana_dashboards: []
+          grafana_dashboards: [],
+          prometheus_rule_resources: [],
+          grafana_dashboard_resources: [],
+          alertmanager_route_bundles: []
         }
 
         each_sli_instance(definition) do |sli, instance|
@@ -44,6 +47,7 @@ module SloRulesEngine
           end
         end
 
+        artifacts.merge!(SloRulesEngine::PrometheusStack::ResourceRenderer.new.render(definition, artifacts))
         manifest(artifacts, definition: definition)
       end
 

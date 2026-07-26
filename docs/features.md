@@ -105,6 +105,8 @@ Explicit features:
 
 `rules-ctl generate --provider prometheus_stack` emits one base observation recording rule for every SLI instance and derived success-ratio, error-ratio, objective-ratio, and error-budget-ratio recording rules for every reviewed SLO. Burn-rate recording rules remain SLO-specific. Record names are normalized to valid Prometheus metric identifiers while reviewed service, owner, SLI, instance, SLO, objective, and calculation-basis identity remains available as labels.
 
+The provider also renders a native Prometheus Operator `PrometheusRule`, a Grafana sidecar-compatible dashboard `ConfigMap`, and a credential-free Alertmanager route-intent document. Confirmed file apply validates all three resource shapes and writes them beside the reviewed provider manifest. `plan`, `diff`, `import`, and `prune` cover every file in that managed bundle. The route-intent document deliberately requires downstream receiver configuration; it does not invent an Alertmanager webhook host, secret, or credential.
+
 Selector-based SLOs calculate success ratios from scoped counter rates. Threshold-based SLOs generate boolean time-slice ratios and require a numeric threshold plus `time_slice` calculation basis; unsupported threshold intent is rejected during provider validation rather than emitted as a misleading success ratio.
 
 ## Change

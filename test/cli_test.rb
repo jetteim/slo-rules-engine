@@ -640,13 +640,76 @@ class CLITest < Minitest::Test
 
       assert status.success?, stderr
       payload = JSON.parse(stdout).fetch(0)
-      operation = payload.fetch('operations').fetch(0)
+      operations = payload.fetch('operations')
       manifest_path = File.join(dir, 'checkout-api', 'prometheus_stack', 'manifest.json')
       assert_equal 'prometheus_stack', payload.fetch('provider')
       assert_equal 'dry_run', payload.fetch('mode')
-      assert_equal 'write', operation.fetch('action')
-      assert_equal manifest_path, operation.fetch('payload').fetch('path')
-      refute File.exist?(manifest_path), "expected dry-run not to write #{manifest_path}"
+      assert_equal %w[write write write write], operations.map { |operation| operation.fetch('action') }
+      assert_equal(
+        [
+          'manifest_file',
+          'prometheus_stack.prometheus_rule',
+          'prometheus_stack.grafana_dashboard',
+          'prometheus_stack.alertmanager_route_intent'
+        ],
+        operations.map { |operation| operation.fetch('target') }
+      )
+      assert_equal manifest_path, operations.fetch(0).fetch('payload').fetch('path')
+      operations.each do |operation|
+        path = operation.fetch('payload').fetch('path')
+        refute File.exist?(path), "expected dry-run not to write #{path}"
+      end
+    end
+  end
+
+  def test_apply_prometheus_stack_confirm_writes_reviewed_native_bundle
+    generate_stdout, generate_stderr, generate_status = Open3.capture3(
+      'ruby',
+      "#{ROOT}/bin/rules-ctl",
+      'generate',
+      '--provider=prometheus_stack',
+      "#{ROOT}/examples/services/checkout.rb"
+    )
+    assert generate_status.success?, generate_stderr
+    manifest = with_review_provenance(JSON.parse(generate_stdout).fetch(0))
+
+    Tempfile.create(['prometheus-stack-live-manifest', '.json']) do |file|
+      file.write(JSON.generate(manifest))
+      file.flush
+
+      Dir.mktmpdir do |dir|
+        stdout, stderr, status = Open3.capture3(
+          'ruby',
+          "#{ROOT}/bin/rules-ctl",
+          'apply',
+          '--provider=prometheus_stack',
+          '--confirm',
+          "--output-dir=#{dir}",
+          "--manifest=#{file.path}"
+        )
+
+        assert status.success?, stderr
+        payload = JSON.parse(stdout).fetch(0)
+        generated_dir = File.join(dir, 'checkout-api', 'prometheus_stack', 'generated')
+        assert_equal 'live', payload.fetch('mode')
+        assert_equal %w[write write write write],
+                     payload.fetch('operations').map { |operation| operation.fetch('action') }
+        assert_equal 'PrometheusRule', YAML.safe_load(
+          File.read(File.join(generated_dir, 'prometheus-rules.yaml')),
+          permitted_classes: [],
+          aliases: false
+        ).fetch('kind')
+        assert_equal 'ConfigMap', YAML.safe_load(
+          File.read(File.join(generated_dir, 'grafana-dashboards.yaml')),
+          permitted_classes: [],
+          aliases: false
+        ).fetch('kind')
+        assert_equal 'AlertmanagerRouteIntent', YAML.safe_load(
+          File.read(File.join(generated_dir, 'alertmanager-routes.yaml')),
+          permitted_classes: [],
+          aliases: false
+        ).fetch('kind')
+      end
     end
   end
 

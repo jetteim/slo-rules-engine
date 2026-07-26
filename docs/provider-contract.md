@@ -148,8 +148,10 @@ Expected artifacts:
 
 Expected state behavior:
 
-- dry-run manifest write plan
-- confirmed file write into an output directory
+- dry-run plans the reviewed manifest, PrometheusRule, Grafana dashboard ConfigMap, and Alertmanager route-intent files
+- confirmed file apply validates and writes the complete deterministic bundle into an output directory
+- diff compares every managed file, import reports missing native files, and prune covers the complete bundle
+- the Alertmanager route-intent file records notification-router matcher and webhook-path requirements without claiming receiver endpoint or credential ownership
 - direct backend mutation only through a future dedicated adapter
 
 Recording-rule behavior:

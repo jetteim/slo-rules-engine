@@ -108,6 +108,93 @@ class PrometheusStackProviderTest < Minitest::Test
     assert result.errors.any? { |error| error.path.end_with?('.calculation_basis') && error.message.include?('time_slice') }
   end
 
+  def test_renders_native_prometheus_rule_resource
+    artifacts = @provider.generate(@definition).to_h.fetch(:artifacts)
+    resource = artifacts.fetch(:prometheus_rule_resources).fetch(0)
+
+    assert_equal 'monitoring.coreos.com/v1', resource.fetch(:apiVersion)
+    assert_equal 'PrometheusRule', resource.fetch(:kind)
+    assert_equal 'checkout-api-slo-rules', resource.fetch(:metadata).fetch(:name)
+    assert_equal 'slo-rules-engine', resource.fetch(:metadata).fetch(:labels).fetch('app.kubernetes.io/managed-by')
+    assert_equal 'service/checkout-api',
+                 resource.fetch(:metadata).fetch(:annotations).fetch('slo-rules-engine.io/source-ref')
+
+    groups = resource.fetch(:spec).fetch(:groups)
+    assert_equal(
+      %w[
+        checkout-api.sli-recording
+        checkout-api.slo-recording
+        checkout-api.slo-burn-rate
+        checkout-api.slo-alerts
+      ],
+      groups.map { |group| group.fetch(:name) }
+    )
+    assert_equal [1, 4, 2, 2], groups.map { |group| group.fetch(:rules).length }
+
+    recording_rule = groups.fetch(0).fetch(:rules).fetch(0)
+    assert_equal %i[expr labels record], recording_rule.keys.sort
+    refute_includes recording_rule, :kind
+    refute_includes recording_rule, :metric
+
+    burn_rule = groups.fetch(2).fetch(:rules).fetch(0)
+    assert_equal %i[expr labels record], burn_rule.keys.sort
+    refute_includes burn_rule, :threshold
+
+    alert_rule = groups.fetch(3).fetch(:rules).fetch(0)
+    assert_equal %i[alert annotations expr for labels], alert_rule.keys.sort
+    refute_includes alert_rule, :classification
+  end
+
+  def test_renders_grafana_sidecar_config_map
+    artifacts = @provider.generate(@definition).to_h.fetch(:artifacts)
+    resource = artifacts.fetch(:grafana_dashboard_resources).fetch(0)
+
+    assert_equal 'v1', resource.fetch(:apiVersion)
+    assert_equal 'ConfigMap', resource.fetch(:kind)
+    assert_equal 'checkout-api-slo-dashboards', resource.fetch(:metadata).fetch(:name)
+    assert_equal '1', resource.fetch(:metadata).fetch(:labels).fetch('grafana_dashboard')
+
+    dashboard_json = resource.fetch(:data).fetch('checkout-api-slo.json')
+    dashboard = JSON.parse(dashboard_json)
+    assert_equal 'checkout-api-slo', dashboard.fetch('uid')
+    assert_equal 'checkout-api SLO decision dashboard', dashboard.fetch('title')
+    assert_equal 39, dashboard.fetch('schemaVersion')
+    assert_equal %w[
+      Success\ Ratio
+      Error\ Ratio
+      Error\ Budget\ Ratio
+      Burn\ Rate
+      SLI\ Observations
+    ], dashboard.fetch('panels').map { |panel| panel.fetch('title').split(' - ').last }
+    dashboard.fetch('panels').each do |panel|
+      assert_equal 'prometheus', panel.fetch('datasource').fetch('type')
+      refute_empty panel.fetch('targets').fetch(0).fetch('expr')
+    end
+  end
+
+  def test_renders_alertmanager_route_intent_without_inventing_receiver_credentials
+    artifacts = @provider.generate(@definition).to_h.fetch(:artifacts)
+    bundle = artifacts.fetch(:alertmanager_route_bundles).fetch(0)
+
+    assert_equal 'slo-rules-engine/alertmanager-route-intent/v1', bundle.fetch(:version)
+    assert_equal 'AlertmanagerRouteIntent', bundle.fetch(:kind)
+    assert_equal 'checkout-api', bundle.fetch(:service)
+    assert_equal true, bundle.fetch(:receiver_contract).fetch(:configuration_required)
+    assert_equal '/api/alertmanager/:route_key', bundle.fetch(:receiver_contract).fetch(:endpoint_path)
+    refute_includes bundle.fetch(:receiver_contract), :url
+    assert_equal(
+      {
+        matchers: {
+          service: 'checkout-api',
+          route_key: 'checkout-api'
+        },
+        receiver: 'notification-router',
+        webhook_path: '/api/alertmanager/checkout-api'
+      },
+      bundle.fetch(:routes).fetch(0)
+    )
+  end
+
   private
 
   def deep_copy(value)

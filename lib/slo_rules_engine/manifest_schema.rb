@@ -132,6 +132,127 @@ module SloRulesEngine
         validate_hash(result, "#{path}.variables", fetch_value(dashboard, :variables))
         validate_array(result, "#{path}.panels", fetch_value(dashboard, :panels))
       end
+
+      validate_prometheus_rule_resources(result, artifacts)
+      validate_grafana_dashboard_resources(result, artifacts)
+      validate_alertmanager_route_bundles(result, artifacts)
+    end
+
+    def validate_prometheus_rule_resources(result, artifacts)
+      resources = validate_collection(result, artifacts, :prometheus_rule_resources)
+      result.error('artifacts.prometheus_rule_resources', 'must contain at least one resource') if resources.empty?
+      resources.each_with_index do |resource, index|
+        path = "artifacts.prometheus_rule_resources[#{index}]"
+        validate_exact(result, "#{path}.apiVersion", fetch_value(resource, :apiVersion), 'monitoring.coreos.com/v1')
+        validate_exact(result, "#{path}.kind", fetch_value(resource, :kind), 'PrometheusRule')
+        validate_kubernetes_metadata(result, "#{path}.metadata", fetch_value(resource, :metadata))
+        spec = fetch_value(resource, :spec)
+        validate_hash(result, "#{path}.spec", spec)
+        next unless spec.is_a?(Hash)
+
+        groups = validate_collection(result, spec, :groups, path: "#{path}.spec.groups")
+        result.error("#{path}.spec.groups", 'must contain at least one rule group') if groups.empty?
+        groups.each_with_index do |group, group_index|
+          group_path = "#{path}.spec.groups[#{group_index}]"
+          validate_presence(result, "#{group_path}.name", fetch_value(group, :name))
+          rules = validate_collection(result, group, :rules, path: "#{group_path}.rules")
+          rules.each_with_index do |rule, rule_index|
+            validate_prometheus_rule(result, rule, "#{group_path}.rules[#{rule_index}]")
+          end
+        end
+      end
+    end
+
+    def validate_prometheus_rule(result, rule, path)
+      validate_hash(result, path, rule)
+      return unless rule.is_a?(Hash)
+
+      record = fetch_value(rule, :record)
+      alert = fetch_value(rule, :alert)
+      if blank?(record) == blank?(alert)
+        result.error(path, 'must define exactly one of record or alert')
+      elsif !blank?(record) && !record.to_s.match?(PROMETHEUS_METRIC_NAME)
+        result.error("#{path}.record", 'must be a valid Prometheus metric name')
+      end
+      validate_presence(result, "#{path}.expr", fetch_value(rule, :expr))
+      validate_hash(result, "#{path}.labels", fetch_value(rule, :labels))
+      return if blank?(alert)
+
+      validate_presence(result, "#{path}.for", fetch_value(rule, :for))
+      validate_hash(result, "#{path}.annotations", fetch_value(rule, :annotations))
+    end
+
+    def validate_grafana_dashboard_resources(result, artifacts)
+      resources = validate_collection(result, artifacts, :grafana_dashboard_resources)
+      result.error('artifacts.grafana_dashboard_resources', 'must contain at least one resource') if resources.empty?
+      resources.each_with_index do |resource, index|
+        path = "artifacts.grafana_dashboard_resources[#{index}]"
+        validate_exact(result, "#{path}.apiVersion", fetch_value(resource, :apiVersion), 'v1')
+        validate_exact(result, "#{path}.kind", fetch_value(resource, :kind), 'ConfigMap')
+        validate_kubernetes_metadata(result, "#{path}.metadata", fetch_value(resource, :metadata))
+        data = fetch_value(resource, :data)
+        validate_hash(result, "#{path}.data", data)
+        next unless data.is_a?(Hash)
+
+        result.error("#{path}.data", 'must contain at least one Grafana dashboard') if data.empty?
+        data.each do |filename, dashboard_json|
+          dashboard_path = "#{path}.data.#{filename}"
+          begin
+            dashboard = JSON.parse(dashboard_json)
+            validate_presence(result, "#{dashboard_path}.uid", dashboard['uid'])
+            validate_presence(result, "#{dashboard_path}.title", dashboard['title'])
+            validate_numeric(result, "#{dashboard_path}.schemaVersion", dashboard['schemaVersion'])
+            validate_array(result, "#{dashboard_path}.panels", dashboard['panels'])
+          rescue JSON::ParserError, TypeError
+            result.error(dashboard_path, 'must be valid Grafana dashboard JSON')
+          end
+        end
+      end
+    end
+
+    def validate_alertmanager_route_bundles(result, artifacts)
+      bundles = validate_collection(result, artifacts, :alertmanager_route_bundles)
+      result.error('artifacts.alertmanager_route_bundles', 'must contain at least one route intent') if bundles.empty?
+      bundles.each_with_index do |bundle, index|
+        path = "artifacts.alertmanager_route_bundles[#{index}]"
+        validate_exact(
+          result,
+          "#{path}.version",
+          fetch_value(bundle, :version),
+          'slo-rules-engine/alertmanager-route-intent/v1'
+        )
+        validate_exact(result, "#{path}.kind", fetch_value(bundle, :kind), 'AlertmanagerRouteIntent')
+        validate_presence(result, "#{path}.service", fetch_value(bundle, :service))
+        validate_kubernetes_metadata(result, "#{path}.metadata", fetch_value(bundle, :metadata))
+        receiver = fetch_value(bundle, :receiver_contract)
+        validate_hash(result, "#{path}.receiver_contract", receiver)
+        if receiver.is_a?(Hash)
+          validate_presence(result, "#{path}.receiver_contract.name", fetch_value(receiver, :name))
+          validate_exact(result, "#{path}.receiver_contract.type", fetch_value(receiver, :type), 'webhook')
+          validate_presence(result, "#{path}.receiver_contract.endpoint_path", fetch_value(receiver, :endpoint_path))
+          validate_exact(
+            result,
+            "#{path}.receiver_contract.configuration_required",
+            fetch_value(receiver, :configuration_required),
+            true
+          )
+        end
+        validate_collection(result, bundle, :routes, path: "#{path}.routes").each_with_index do |route, route_index|
+          route_path = "#{path}.routes[#{route_index}]"
+          validate_hash(result, "#{route_path}.matchers", fetch_value(route, :matchers))
+          validate_presence(result, "#{route_path}.receiver", fetch_value(route, :receiver))
+          validate_presence(result, "#{route_path}.webhook_path", fetch_value(route, :webhook_path))
+        end
+      end
+    end
+
+    def validate_kubernetes_metadata(result, path, metadata)
+      validate_hash(result, path, metadata)
+      return unless metadata.is_a?(Hash)
+
+      validate_presence(result, "#{path}.name", fetch_value(metadata, :name))
+      validate_hash(result, "#{path}.labels", fetch_value(metadata, :labels))
+      validate_hash(result, "#{path}.annotations", fetch_value(metadata, :annotations))
     end
 
     def validate_sloth(result, artifacts)
@@ -263,6 +384,10 @@ module SloRulesEngine
 
     def validate_numeric(result, path, value)
       result.error(path, 'must be numeric') unless value.is_a?(Numeric)
+    end
+
+    def validate_exact(result, path, value, expected)
+      result.error(path, "must equal #{expected.inspect}") unless value == expected
     end
 
     def validate_objective_ratio(result, path, value)

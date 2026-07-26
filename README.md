@@ -29,7 +29,7 @@ A provider must be capable of fueling SLI/SLO operation end to end:
 Initial providers:
 
 - `datadog`: Datadog metric SLOs, counter-ratio and threshold-based time-slice SLOs, monitors, dashboards, route references, query validation, source-tagged state reconciliation, and live API apply support.
-- `prometheus_stack`: Prometheus-compatible recording/alert rules, Alertmanager routing, Grafana dashboards, PromQL reality checks, and manifest-bundle apply support.
+- `prometheus_stack`: validated `PrometheusRule` YAML, Grafana sidecar `ConfigMap` YAML, explicit Alertmanager route-intent YAML, PromQL reality checks, and drift-aware manifest-bundle state operations.
 - `sloth`: Sloth `prometheus/v1` SLO specs for Prometheus rule generation and external-generator apply handoff.
 
 Initial delivery integration:

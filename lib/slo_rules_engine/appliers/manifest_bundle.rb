@@ -14,6 +14,7 @@ module SloRulesEngine
       def plan(manifest, mode: 'dry_run')
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         operations = [managed_manifest_operation(manifest, plan_action: true)]
+        operations.concat(managed_bundle_resource_operations(manifest, plan_action: true))
         operations.concat(external_generator_input_operations(manifest, plan_action: true))
         operations << handoff_operation(manifest) if manifest.fetch(:provider) == 'sloth'
 
@@ -37,6 +38,8 @@ module SloRulesEngine
               File.write(path, JSON.pretty_generate(operation.payload.fetch(:manifest)))
             when 'external_generator_input'
               File.write(path, YAML.dump(json_safe(operation.payload.fetch(:spec))))
+            when /\Aprometheus_stack\./
+              File.write(path, YAML.dump(json_safe(operation.payload.fetch(:resource))))
             end
           end
         end
@@ -49,6 +52,7 @@ module SloRulesEngine
           mode: 'diff',
           operations: [
             managed_manifest_operation(manifest, plan_action: false),
+            *managed_bundle_resource_operations(manifest, plan_action: false),
             *external_generator_input_operations(manifest, plan_action: false)
           ]
         )
@@ -59,12 +63,29 @@ module SloRulesEngine
         path = manifest_path(manifest)
         actual = File.exist?(path) ? JSON.parse(File.read(path), symbolize_names: true) : nil
         findings = actual.nil? ? [missing_manifest_finding(path)] : []
+        return imported_manifest_state(manifest, actual, findings) unless manifest.fetch(:provider) == 'prometheus_stack'
+
+        bundle_files = managed_bundle_resource_entries(manifest).map do |entry|
+          resource = read_yaml(entry.fetch(:path))
+          if resource.nil?
+            findings << missing_bundle_file_finding(entry)
+          end
+          {
+            target: entry.fetch(:target),
+            source: entry.fetch(:source),
+            path: entry.fetch(:path),
+            resource: resource
+          }
+        end
 
         ImportedState.new(
           provider: manifest.fetch(:provider),
           service: manifest.fetch(:service),
-          source: 'manifest_file',
-          state: actual,
+          source: 'manifest_bundle',
+          state: {
+            manifest: actual,
+            bundle_files: bundle_files
+          },
           findings: findings
         )
       end
@@ -127,6 +148,27 @@ module SloRulesEngine
         end
       end
 
+      def managed_bundle_resource_operations(manifest, plan_action:)
+        managed_bundle_resource_entries(manifest).map do |entry|
+          desired = json_safe(entry.fetch(:resource))
+          actual = read_yaml(entry.fetch(:path))
+          changes = actual ? SloRulesEngine::StateDiff.changed_paths(desired, actual) : ['managed_bundle_resource']
+
+          ApplyOperation.new(
+            action: file_action(actual, changes, plan_action: plan_action),
+            target: entry.fetch(:target),
+            name: entry.fetch(:name),
+            source: entry.fetch(:source),
+            payload: {
+              path: entry.fetch(:path),
+              resource: entry.fetch(:resource)
+            },
+            actual: actual,
+            changes: changes
+          )
+        end
+      end
+
       def file_action(actual, changes, plan_action:)
         return 'write' if plan_action && (actual.nil? || !changes.empty?)
         return 'noop' if plan_action
@@ -153,6 +195,9 @@ module SloRulesEngine
             source: "artifacts.sloth_specs[#{index}]"
           }
         end)
+        paths.concat(managed_bundle_resource_entries(manifest).map do |entry|
+          entry.reject { |key, _value| key == :resource }
+        end)
 
         paths.map do |entry|
           exists = File.exist?(entry.fetch(:path))
@@ -178,6 +223,59 @@ module SloRulesEngine
       def sloth_spec_path(manifest, index)
         filename = sloth_specs(manifest).length == 1 ? 'sloth.yaml' : "sloth-#{index + 1}.yaml"
         File.join(@output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'generated', filename)
+      end
+
+      def managed_bundle_resource_entries(manifest)
+        return [] unless manifest.fetch(:provider) == 'prometheus_stack'
+
+        [
+          {
+            artifact: :prometheus_rule_resources,
+            basename: 'prometheus-rules',
+            target: 'prometheus_stack.prometheus_rule',
+            description: 'PrometheusRule'
+          },
+          {
+            artifact: :grafana_dashboard_resources,
+            basename: 'grafana-dashboards',
+            target: 'prometheus_stack.grafana_dashboard',
+            description: 'Grafana dashboard ConfigMap'
+          },
+          {
+            artifact: :alertmanager_route_bundles,
+            basename: 'alertmanager-routes',
+            target: 'prometheus_stack.alertmanager_route_intent',
+            description: 'Alertmanager route intent'
+          }
+        ].flat_map do |spec|
+          resources = artifact_collection(manifest, spec.fetch(:artifact))
+          resources.each_with_index.map do |resource, index|
+            filename = indexed_filename(spec.fetch(:basename), resources.length, index)
+            {
+              path: File.join(
+                @output_dir,
+                manifest.fetch(:service),
+                manifest.fetch(:provider),
+                'generated',
+                filename
+              ),
+              target: spec.fetch(:target),
+              name: "#{manifest.fetch(:service)} #{spec.fetch(:description)} #{index + 1}",
+              source: "artifacts.#{spec.fetch(:artifact)}[#{index}]",
+              resource: resource
+            }
+          end
+        end
+      end
+
+      def artifact_collection(manifest, key)
+        artifacts = manifest.fetch(:artifacts)
+        Array(artifacts[key] || artifacts[key.to_s])
+      end
+
+      def indexed_filename(basename, count, index)
+        suffix = count == 1 ? '' : "-#{index + 1}"
+        "#{basename}#{suffix}.yaml"
       end
 
       def handoff_operation(manifest)
@@ -213,6 +311,22 @@ module SloRulesEngine
         JSON.parse(JSON.generate(value))
       end
 
+      def read_yaml(path)
+        return nil unless File.exist?(path)
+
+        YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
+      end
+
+      def imported_manifest_state(manifest, actual, findings)
+        ImportedState.new(
+          provider: manifest.fetch(:provider),
+          service: manifest.fetch(:service),
+          source: 'manifest_file',
+          state: actual,
+          findings: findings
+        )
+      end
+
       def manifest_review_command(manifest)
         "rules-ctl manifest-review --provider=#{manifest.fetch(:provider)} --manifest=#{manifest_path(manifest)} --report=#{manifest_review_report_path(manifest)}"
       end
@@ -226,6 +340,16 @@ module SloRulesEngine
           code: 'missing_managed_manifest',
           path: path,
           message: "managed manifest does not exist at #{path}"
+        }
+      end
+
+      def missing_bundle_file_finding(entry)
+        {
+          code: 'missing_managed_bundle_file',
+          target: entry.fetch(:target),
+          source: entry.fetch(:source),
+          path: entry.fetch(:path),
+          message: "managed bundle file does not exist at #{entry.fetch(:path)}"
         }
       end
     end

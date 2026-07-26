@@ -144,7 +144,115 @@ class ApplyTest < Minitest::Test
 
       assert_equal 'live', plan.mode
       assert_equal 'noop', plan.operations.fetch(0).action
-      assert_equal manifest, JSON.parse(File.read(path), symbolize_names: true)
+      assert_equal JSON.parse(JSON.generate(manifest), symbolize_names: true),
+                   JSON.parse(File.read(path), symbolize_names: true)
+    end
+  end
+
+  def test_prometheus_stack_plan_includes_every_native_bundle_file
+    manifest = valid_prometheus_manifest
+    applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: '/tmp/generated')
+
+    plan = applier.plan(manifest)
+
+    assert_equal(
+      [
+        'manifest_file',
+        'prometheus_stack.prometheus_rule',
+        'prometheus_stack.grafana_dashboard',
+        'prometheus_stack.alertmanager_route_intent'
+      ],
+      plan.operations.map(&:target)
+    )
+    assert_equal(
+      [
+        '/tmp/generated/checkout-api/prometheus_stack/manifest.json',
+        '/tmp/generated/checkout-api/prometheus_stack/generated/prometheus-rules.yaml',
+        '/tmp/generated/checkout-api/prometheus_stack/generated/grafana-dashboards.yaml',
+        '/tmp/generated/checkout-api/prometheus_stack/generated/alertmanager-routes.yaml'
+      ],
+      plan.operations.map { |operation| operation.payload.fetch(:path) }
+    )
+    assert_equal %w[write write write write], plan.operations.map(&:action)
+  end
+
+  def test_prometheus_stack_apply_writes_native_bundle_files
+    manifest = valid_prometheus_manifest
+
+    Dir.mktmpdir do |dir|
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      plan = applier.apply(manifest)
+      generated_dir = File.join(dir, 'checkout-api', 'prometheus_stack', 'generated')
+
+      assert_equal %w[write write write write], plan.operations.map(&:action)
+      prometheus_rule = load_yaml(File.join(generated_dir, 'prometheus-rules.yaml'))
+      grafana_config_map = load_yaml(File.join(generated_dir, 'grafana-dashboards.yaml'))
+      route_intent = load_yaml(File.join(generated_dir, 'alertmanager-routes.yaml'))
+
+      assert_equal 'PrometheusRule', prometheus_rule.fetch('kind')
+      assert_equal 'ConfigMap', grafana_config_map.fetch('kind')
+      assert_equal 'AlertmanagerRouteIntent', route_intent.fetch('kind')
+      assert_equal 'checkout-api-slo', JSON.parse(
+        grafana_config_map.fetch('data').fetch('checkout-api-slo.json')
+      ).fetch('uid')
+    end
+  end
+
+  def test_prometheus_stack_diff_reports_native_resource_drift
+    manifest = valid_prometheus_manifest
+
+    Dir.mktmpdir do |dir|
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      applier.apply(manifest)
+      path = File.join(dir, 'checkout-api', 'prometheus_stack', 'generated', 'prometheus-rules.yaml')
+      stale = load_yaml(path)
+      stale.fetch('spec').fetch('groups').fetch(0).fetch('rules').fetch(0)['expr'] = 'stale_expr'
+      File.write(path, YAML.dump(stale))
+
+      plan = applier.diff(manifest)
+      operation = plan.operations.find { |entry| entry.target == 'prometheus_stack.prometheus_rule' }
+
+      assert_equal 'update', operation.action
+      assert_equal ['spec.groups[0].rules[0].expr'], operation.changes
+      assert_equal path, operation.payload.fetch(:path)
+    end
+  end
+
+  def test_prometheus_stack_import_reads_bundle_and_reports_missing_native_files
+    manifest = valid_prometheus_manifest
+
+    Dir.mktmpdir do |dir|
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      applier.apply(manifest)
+      route_path = File.join(dir, 'checkout-api', 'prometheus_stack', 'generated', 'alertmanager-routes.yaml')
+      File.delete(route_path)
+
+      imported = applier.import(manifest)
+
+      assert_equal 'manifest_bundle', imported.source
+      assert_equal 'checkout-api', imported.state.fetch(:manifest).fetch(:service)
+      assert_equal 3, imported.state.fetch(:bundle_files).length
+      route_state = imported.state.fetch(:bundle_files).find do |entry|
+        entry.fetch(:target) == 'prometheus_stack.alertmanager_route_intent'
+      end
+      assert_nil route_state.fetch(:resource)
+      assert_equal ['missing_managed_bundle_file'], imported.findings.map { |finding| finding.fetch(:code) }
+      assert_equal route_path, imported.findings.fetch(0).fetch(:path)
+    end
+  end
+
+  def test_prometheus_stack_prune_deletes_manifest_and_native_bundle_files
+    manifest = valid_prometheus_manifest
+
+    Dir.mktmpdir do |dir|
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: dir)
+      apply_plan = applier.apply(manifest)
+      paths = apply_plan.operations.map { |operation| operation.payload.fetch(:path) }
+
+      prune_plan = applier.prune(manifest, mode: 'live')
+
+      assert_equal %w[delete delete delete delete], prune_plan.operations.map(&:action)
+      paths.each { |path| refute File.exist?(path), "expected #{path} to be deleted" }
     end
   end
 
@@ -255,18 +363,19 @@ class ApplyTest < Minitest::Test
   private
 
   def valid_prometheus_manifest
-    {
-      provider: 'prometheus_stack',
-      service: 'checkout-api',
-      artifacts: {
-        recording_rules: [],
-        burn_rate_rules: [],
-        missing_telemetry_rules: [],
-        alert_rules: [],
-        alertmanager_routes: [],
-        grafana_dashboards: []
-      }
-    }
+    @valid_prometheus_manifest ||= begin
+      SloRulesEngine.clear_definitions
+      load File.expand_path('../examples/services/checkout.rb', __dir__)
+      definition = SloRulesEngine.definitions.fetch(0)
+      SloRulesEngine.default_provider_registry.fetch('prometheus_stack').generate(definition).to_h.merge(
+        service: definition.service
+      )
+    end
+    Marshal.load(Marshal.dump(@valid_prometheus_manifest))
+  end
+
+  def load_yaml(path)
+    YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
   end
 
   def valid_sloth_manifest

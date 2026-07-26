@@ -71,6 +71,27 @@ class ManifestSchemaTest < Minitest::Test
     assert result.errors.any? { |error| error.path == 'artifacts.recording_rules[0].record' && error.message.include?('Prometheus metric name') }
   end
 
+  def test_prometheus_native_resources_are_validated_before_file_mutation
+    manifest = SloRulesEngine.default_provider_registry.fetch('prometheus_stack').generate(@definition).to_h.merge(service: @definition.service)
+    artifacts = manifest.fetch(:artifacts)
+    artifacts.fetch(:prometheus_rule_resources).fetch(0)[:apiVersion] = 'v1'
+    artifacts.fetch(:grafana_dashboard_resources).fetch(0).fetch(:data)['checkout-api-slo.json'] = '{invalid'
+    artifacts.fetch(:alertmanager_route_bundles).fetch(0).fetch(:receiver_contract).delete(:configuration_required)
+
+    result = SloRulesEngine::ManifestSchemaValidator.validate(manifest)
+
+    refute result.valid?
+    assert result.errors.any? do |error|
+      error.path == 'artifacts.prometheus_rule_resources[0].apiVersion'
+    end
+    assert result.errors.any? do |error|
+      error.path == 'artifacts.grafana_dashboard_resources[0].data.checkout-api-slo.json'
+    end
+    assert result.errors.any? do |error|
+      error.path == 'artifacts.alertmanager_route_bundles[0].receiver_contract.configuration_required'
+    end
+  end
+
   def test_manifest_review_evidence_requires_review_provenance
     manifest = SloRulesEngine.default_provider_registry.fetch('datadog').generate(@definition).to_h.merge(service: @definition.service)
 
