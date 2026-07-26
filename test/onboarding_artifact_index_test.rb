@@ -500,9 +500,39 @@ class OnboardingArtifactIndexTest < Minitest::Test
       assert_equal 2, artifact_index.fetch(:summary).fetch(:fresh_manifest_review_reports)
       assert_equal 0, artifact_index.fetch(:summary).fetch(:stale_manifest_review_reports)
       assert_equal({}, artifact_index.fetch(:summary).fetch(:next_action_counts))
+      manifest_options = scopes.map do |scope|
+        "--manifest=#{File.join(manifest_dir, scope.fetch(:service), 'datadog', 'manifest.json')}"
+      end.join(' ')
       artifact_index.fetch(:scopes).each do |scope|
         assert_equal 'complete', scope.fetch(:status)
-        assert_equal true, scope.fetch(:providers).fetch(0).fetch(:manifest_review_report).fetch(:fresh)
+        provider = scope.fetch(:providers).fetch(0)
+        assert_equal true, provider.fetch(:manifest_review_report).fetch(:fresh)
+        assert_equal(
+          "rules-ctl manifest-review --provider=datadog #{manifest_options} --handoff-dir=#{handoff_dir} --report=#{report_path}",
+          provider.fetch(:manifest_review_command)
+        )
+      end
+
+      stale_report = JSON.parse(File.read(report_path))
+      stale_report.fetch('freshness')['manifest_fingerprint'] = 'outdated'
+      write_json(report_path, stale_report)
+      artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
+        index_path,
+        handoff_dir: handoff_dir,
+        draft_dir: draft_dir,
+        manifest_dir: manifest_dir,
+        providers: ['datadog']
+      )
+
+      assert_equal 2, artifact_index.fetch(:summary).fetch(:partial_scopes)
+      assert_equal({ refresh_manifest_review_report: 2 }, artifact_index.fetch(:summary).fetch(:next_action_counts))
+      artifact_index.fetch(:scopes).each do |scope|
+        action = scope.fetch(:next_actions).fetch(0)
+        assert_equal :refresh_manifest_review_report, action.fetch(:code)
+        assert_equal(
+          "rules-ctl manifest-review --provider=datadog #{manifest_options} --handoff-dir=#{handoff_dir} --output=#{report_path}",
+          action.fetch(:command)
+        )
       end
     end
   end

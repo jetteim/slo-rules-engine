@@ -145,6 +145,30 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_manifest_review_accepts_multiple_reviewed_manifest_inputs
+    Dir.mktmpdir do |dir|
+      manifest_paths = %w[checkout-api payments-api].map do |service|
+        manifest = reviewed_manifest
+        manifest['service'] = service
+        manifest.fetch('review_provenance')['label'] = service
+        path = File.join(dir, "#{service}.json")
+        File.write(path, JSON.pretty_generate(manifest))
+        path
+      end
+
+      stdout, stderr, status = rules_ctl(
+        'manifest-review',
+        '--provider=datadog',
+        *manifest_paths.map { |path| "--manifest=#{path}" }
+      )
+
+      assert status.success?, stderr
+      payload = JSON.parse(stdout)
+      assert_equal 2, payload.fetch('summary').fetch('reviewed_manifests')
+      assert_equal %w[checkout-api payments-api], payload.fetch('manifests').map { |manifest| manifest.fetch('service') }
+    end
+  end
+
   def test_manifest_review_links_findings_to_handoff_dir
     manifest = reviewed_manifest
     manifest.fetch('review_provenance')['accepted_candidate_uids'] = []

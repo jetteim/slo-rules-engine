@@ -123,6 +123,7 @@ module SloRulesEngine
 
         providers.map do |provider|
           manifest_path = service ? File.join(manifest_dir, service, provider, 'manifest.json') : nil
+          review_manifest_paths = provider_manifest_paths(provider, manifest_dir, manifest_path)
           report_path = File.join(manifest_dir, 'manifest-review', "#{provider}.json")
           {
             provider: provider,
@@ -137,7 +138,7 @@ module SloRulesEngine
               manifest_dir: manifest_dir,
               handoff_dir: handoff_dir
             ),
-            manifest_review_command: manifest_review_command(provider, manifest_path, report_path, handoff_dir)
+            manifest_review_command: manifest_review_command(provider, review_manifest_paths, report_path, handoff_dir)
           }.compact
         end
       end
@@ -187,11 +188,13 @@ module SloRulesEngine
       end
 
       def current_provider_manifests(provider, manifest_dir)
+        current_provider_manifest_paths(provider, manifest_dir).map { |path| json_payload(path) }
+      end
+
+      def current_provider_manifest_paths(provider, manifest_dir)
         return [] if manifest_dir.to_s.empty?
 
-        Dir.glob(File.join(manifest_dir, '*', provider, 'manifest.json')).sort.map do |path|
-          json_payload(path)
-        end
+        Dir.glob(File.join(manifest_dir, '*', provider, 'manifest.json')).sort
       end
 
       def manifest_review_finding_codes(payload)
@@ -200,22 +203,28 @@ module SloRulesEngine
         end.compact.uniq
       end
 
-      def manifest_review_command(provider, manifest_path, report_path, handoff_dir)
-        return nil if manifest_path.to_s.empty?
+      def manifest_review_command(provider, manifest_paths, report_path, handoff_dir)
+        return nil if manifest_paths.empty?
 
-        manifest_review_command_with_option(provider, manifest_path, report_path, handoff_dir, option: 'report')
+        manifest_review_command_with_option(provider, manifest_paths, report_path, handoff_dir, option: 'report')
       end
 
-      def manifest_review_refresh_command(provider, manifest_path, report_path, handoff_dir)
-        return nil if manifest_path.to_s.empty?
+      def manifest_review_refresh_command(provider, manifest_paths, report_path, handoff_dir)
+        return nil if manifest_paths.empty?
 
-        manifest_review_command_with_option(provider, manifest_path, report_path, handoff_dir, option: 'output')
+        manifest_review_command_with_option(provider, manifest_paths, report_path, handoff_dir, option: 'output')
       end
 
-      def manifest_review_command_with_option(provider, manifest_path, report_path, handoff_dir, option:)
-        command = "rules-ctl manifest-review --provider=#{provider} --manifest=#{manifest_path}"
+      def manifest_review_command_with_option(provider, manifest_paths, report_path, handoff_dir, option:)
+        manifest_options = manifest_paths.map { |path| "--manifest=#{path}" }.join(' ')
+        command = "rules-ctl manifest-review --provider=#{provider} #{manifest_options}"
         command += " --handoff-dir=#{handoff_dir}" unless handoff_dir.to_s.empty?
         "#{command} --#{option}=#{report_path}"
+      end
+
+      def provider_manifest_paths(provider, manifest_dir, fallback_path)
+        paths = current_provider_manifest_paths(provider, manifest_dir)
+        paths.empty? ? [fallback_path].compact : paths
       end
 
       def missing_artifacts(discovery, handoff, draft, provider_artifacts)
@@ -303,12 +312,13 @@ module SloRulesEngine
           end
           if report[:exists]
             if report[:fresh] == false
+              review_manifest_paths = provider_manifest_paths(provider_key, manifest_dir, manifest[:path])
               actions << next_action(
                 :refresh_manifest_review_report,
                 "refresh the #{provider_key} manifest-review report for #{label}",
                 provider: provider_key,
                 path: report[:path],
-                command: manifest_review_refresh_command(provider_key, manifest[:path], report[:path], handoff_dir)
+                command: manifest_review_refresh_command(provider_key, review_manifest_paths, report[:path], handoff_dir)
               )
               next
             end

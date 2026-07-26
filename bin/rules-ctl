@@ -111,13 +111,13 @@ module RulesCtl
 
   def manifest_review(argv)
     provider_key = nil
-    manifest_path = nil
+    manifest_paths = []
     handoff_dir = nil
     output_path = nil
     report_path = nil
     parser = OptionParser.new do |opts|
       opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
-      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to inspect instead of regenerating from definitions') { |value| manifest_path = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to inspect; repeat for provider-level reports') { |value| manifest_paths << value }
       opts.on('--handoff-dir=DIR', 'Link review findings to onboarding handoff packets') { |value| handoff_dir = value }
       opts.on('--output=FILE', 'Write the manifest review report to FILE') { |value| output_path = value }
       opts.on('--report=FILE', 'Validate an existing manifest review report against current inputs') { |value| report_path = value }
@@ -126,7 +126,7 @@ module RulesCtl
     abort_usage('missing --provider') unless provider_key
 
     provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
-    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    manifests = resolve_review_manifests(argv, provider, manifest_paths)
     report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
       manifests,
       provider: provider.key,
@@ -453,6 +453,13 @@ module RulesCtl
     manifests
   end
 
+  def resolve_review_manifests(argv, provider, manifest_paths)
+    return resolve_state_manifests(argv, provider, nil) if manifest_paths.empty?
+
+    abort_usage('manifest input does not accept definition files') unless argv.empty?
+    manifest_paths.flat_map { |path| load_apply_manifests(path, provider) }
+  end
+
   def load_definitions(paths)
     abort_usage('missing definition file') if paths.empty?
 
@@ -634,7 +641,7 @@ module RulesCtl
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl validate-handoff <handoff.json>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] [--handoff-dir=<dir>] <definitionfile...>
-        bin/rules-ctl manifest-review --provider=<provider> [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--output=<file>] [--report=<file>] <definitionfile...>
+        bin/rules-ctl manifest-review --provider=<provider> [--manifest=<manifest.json> ...] [--handoff-dir=<dir>] [--output=<file>] [--report=<file>] <definitionfile...>
         bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
