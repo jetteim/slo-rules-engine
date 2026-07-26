@@ -284,10 +284,10 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: journal-backed file execution worktree,
-  pending checkpoint commit
-- expected startup state after checkpoint commit/push: `git status --short
-  --branch` should show clean `main...origin/main`
+- latest verified feature checkpoint: `9e8f98e feat: journal file-backed
+  execution outcomes`
+- expected startup state: `git status --short --branch` should show clean
+  `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
