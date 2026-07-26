@@ -294,10 +294,10 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: managed-file convergence worktree,
-  pending checkpoint commit
-- expected startup state after checkpoint commit/push: `git status --short
-  --branch` should show clean `main...origin/main`
+- latest verified feature checkpoint: `395263a feat: verify file-backed
+  convergence`
+- expected startup state: `git status --short --branch` should show clean
+  `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
