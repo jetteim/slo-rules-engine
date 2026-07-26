@@ -21,6 +21,14 @@ opportunistic provider work.
 
 Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages discovery evidence, reviewed handoffs and definitions, provider manifests, fresh manifest-review reports, and dry-run plans into a content-addressed JSON document. It records explicit reviewer attestation, lifecycle state, provider targets, artifact fingerprints, transition lineage, and provider-level change and risk summaries without credentials. `bundle create` is fail-closed for incomplete, stale, invalid, or credential-bearing input. `bundle plan` rechecks predecessor freshness, requires explicit runtime configuration for every target, leaves the predecessor immutable, performs no provider mutation, and writes a new content-addressed `apply_ready` bundle. `bundle status` detects schema errors, embedded tampering, identity mismatch, missing sources, and source drift.
 
+Current state-manager status: confirmed Prometheus Stack and Sloth apply/prune
+requires `--journal-dir`, persists atomic per-operation transitions and attempt
+evidence, stops after the first file failure, and emits a linked
+`ProviderStateResult`. Managed paths are recorded as resource identifiers.
+Post-apply observed-state verification remains explicitly pending, live Datadog
+execution is not journal-backed yet, and exact-plan/resume behavior is still a
+later phase.
+
 ## Non-Negotiable Working Rules
 
 - Keep the repo public-safe. Private/internal rules are reference material only and must not be copied in.
@@ -151,10 +159,30 @@ Implemented by the latest feature slices:
   conflicting existing output, and performs no provider mutation
 - Engineering use cases now state exact stdout, saved-file, provider-read,
   provider-write, and refusal behavior for every supported workflow
+- Confirmed Prometheus Stack and Sloth apply/prune now require durable journal
+  storage before mutation
+- File-backed journal transitions are serialized with exclusive locks and
+  persisted through atomic replacement
+- Journal entry transitions enforce `pending` to `running` to `succeeded` or
+  `failed`, with unstarted operations allowed to become `skipped`
+- Competing and terminal-state transitions, malformed attempt lifecycles,
+  invalid timestamps, identity tampering, and credential-like keys are rejected
+- Successful file operations record managed paths, byte/delete evidence, and
+  timestamps; a failure records public-safe error evidence and skips later work
+- File-backed apply/prune emits `ProviderStateResult` with `succeeded`,
+  `partial`, `failed`, or `noop` status linked to live plan identity
+- Sloth records the external-generator handoff as intentionally skipped rather
+  than claiming downstream execution
+- Repeated converged file-backed apply reuses an identical all-noop journal;
+  journals containing execution evidence are never overwritten
+- File-backed result verification remains `pending` because post-operation
+  observed-state refresh is not implemented yet
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: deterministic provider operation journals and
+- latest checkpoint: journal-backed Prometheus Stack and Sloth execution
+  outcomes with partial-failure capture
+- previous checkpoint: deterministic provider operation journals and
   intent/output-checked engineering use cases
 - previous checkpoint: provider-neutral state value contracts across Datadog, Prometheus Stack, and Sloth
 - previous checkpoint: immutable bundle-native provider planning and provider-level impact/risk summaries
@@ -209,10 +237,10 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Record real apply/prune operation transitions and attempts in durable journals
-2. Add provider-specific post-apply verification evidence and managed resource identifiers
+1. Refresh and verify post-apply Prometheus Stack and Sloth managed-file state
+2. Record live Datadog operation outcomes and returned backend identifiers in durable journals
 3. Validate remaining Datadog resource semantics against safe real-backend evidence after shared state contracts are stronger
-4. Persist and execute an exact reviewed plan with stale-state rejection
+4. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
 5. Expose live SLO and error-budget status without weakening provider-neutral intent
 
 Secondary gaps:
@@ -225,28 +253,28 @@ Secondary gaps:
 
 Next recommended slice:
 
-- continue Phase 10 with an atomic journal transition store and legal
-  per-operation state machine
-- record attempts, provider errors, and successful resource identifiers without
-  placing credentials in the journal
-- make current apply/prune execution publish truthful per-operation outcomes,
-  starting with deterministic Prometheus Stack file operations and preserving
-  all existing review gates
-- emit a `ProviderStateResult` linked to the journal and plan while leaving
-  post-apply verification explicitly pending
-- do not add automatic resume, separately approved exact-plan execution, or
-  `bundle apply` in this slice
+- continue Phase 10 with provider-neutral post-apply verification evidence for
+  managed-file execution
+- refresh every engine-owned file after successful/partial apply or prune and
+  compare canonical observed content or expected absence with the live plan
+- record verification timestamp, per-resource expected/actual fingerprints,
+  status, and stable findings in the journal and `ProviderStateResult`
+- let Prometheus Stack reach verified convergence only when every managed file
+  matches; distinguish Sloth engine-owned file verification from its still
+  external downstream-generator state
+- keep live Datadog journaling, automatic resume, exact-plan execution, and
+  `bundle apply` outside this slice
 
 Rationale:
 
-- deterministic initial journals and resume classifications are now proven for
-  Datadog and Prometheus Stack plans
-- the current apply output still describes the pre-mutation plan and does not
-  claim per-operation outcomes
-- atomic legal transitions are the next prerequisite for truthful partial
-  failure and `ProviderStateResult` emission
-- file-backed execution is the lowest-risk place to prove journal-backed
-  outcome capture before changing live Datadog execution
+- deterministic file-backed outcome capture and partial-failure reporting are
+  now proven through CLI and managed-file lifecycle tests
+- managed paths are available as stable resource identifiers, but current
+  result verification correctly remains `pending`
+- an observed-state refresh is the next requirement before file-backed results
+  may claim convergence
+- Sloth needs an explicit split between verified engine-owned inputs and
+  unverified downstream Prometheus state
 - exact-plan execution remains a separate Phase 12 guarantee and must not be implied by journal creation alone
 
 ## Next Session Handoff
@@ -256,36 +284,38 @@ Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `fdd5888 feat: add provider operation journals`
-- expected startup state: `git status --short --branch` should show clean
-  `main...origin/main`
+- latest verified feature checkpoint: journal-backed file execution worktree,
+  pending checkpoint commit
+- expected startup state after checkpoint commit/push: `git status --short
+  --branch` should show clean `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: local `main` worktree at `fdd5888`
+- target: local `main` worktree containing journal-backed file execution
 - command: `./scripts/verify.sh`
-- timestamp: `2026-07-26T11:41:03Z`
+- timestamp: `2026-07-26T12:11:09Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 330 tests, 1,884 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 349 tests, 1,995 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- blast radius: additive plan loading, operation-journal persistence/status
-  commands, and documentation contract tests; live provider and managed-file
-  mutation behavior is unchanged
-- rollback path: revert `fdd5888`; no provider or managed-file rollback is
-  required
+- blast radius: confirmed Prometheus Stack and Sloth apply/prune now requires
+  `--journal-dir`, persists execution evidence, stops after the first failed
+  file operation, and emits a result; Datadog behavior is unchanged
+- rollback path: revert the journal-backed file-execution checkpoint; managed
+  files already written or deleted would need to be reconciled from their last
+  reviewed manifests
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Continue Phase 10 with atomic journal transitions and truthful
-   per-operation outcome capture.
-5. Use TDD for legal transitions, attempt evidence, partial failure,
-   result-contract linkage, and Prometheus Stack file execution.
-6. Preserve current replanning/review gates; do not imply exact-plan execution,
-   automatic resume, or post-apply verification.
+4. Continue Phase 10 with post-apply managed-file state refresh and
+   verification evidence.
+5. Use TDD for expected/actual fingerprints, apply and prune convergence,
+   partial execution, and Sloth downstream-pending findings.
+6. Preserve current journal/review gates; do not add Datadog execution changes,
+   exact-plan execution, automatic resume, or `bundle apply`.
 
 ## Verification Commands
 
@@ -299,6 +329,9 @@ ruby -Ilib test/release_bundle_cli_test.rb
 ruby -Ilib test/provider_state_contract_test.rb
 ruby -Ilib test/provider_state_journal_test.rb
 ruby -Ilib test/provider_state_journal_cli_test.rb
+ruby -Ilib test/provider_state_journal_transition_test.rb
+ruby -Ilib test/manifest_bundle_execution_journal_test.rb
+ruby -Ilib test/manifest_bundle_execution_cli_test.rb
 ruby -Ilib test/use_cases_documentation_test.rb
 ruby -Ilib test/onboarding_summary_test.rb
 ruby -Ilib test/onboarding_handoff_test.rb
@@ -324,7 +357,7 @@ If a new session needs to resume quickly:
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
 5. Inspect `lib/slo_rules_engine/provider_state/operation_journal.rb`,
-   `lib/slo_rules_engine/provider_state/plan_loader.rb`, and their tests
+   `lib/slo_rules_engine/provider_state/journal_execution.rb`, and their tests
 6. Inspect `lib/slo_rules_engine/apply.rb`, both provider appliers, and
    `docs/provider-state-contract.md`
 7. If the user says `proceed`, follow the Phase 10 handoff above

@@ -82,18 +82,38 @@ class ProviderStateJournalTest < Minitest::Test
 
   def test_evaluator_reports_partial_failure_and_blocks_non_resumable_retry
     journal = SloRulesEngine::ProviderState::JournalBuilder.new.build(datadog_plan).to_h
-    journal[:entries][0][:status] = 'failed'
-    journal[:entries][0][:attempts] = [
-      {
-        attempt: 1,
-        status: 'failed',
+    first_id, second_id = journal.fetch(:entries).map { |entry| entry.fetch(:entry_id) }
+    transitioner = SloRulesEngine::ProviderState::JournalTransitioner.new
+    journal = transitioner.transition(
+      journal,
+      entry_id: first_id,
+      to: 'running',
+      occurred_at: '2026-07-26T12:00:00Z'
+    )
+    journal = transitioner.transition(
+      journal,
+      entry_id: first_id,
+      to: 'failed',
+      occurred_at: '2026-07-26T12:00:01Z',
+      evidence: {
         error: {
           code: 'provider_request_failed',
           message: 'request outcome is unknown'
         }
       }
-    ]
-    journal[:entries][1][:status] = 'succeeded'
+    )
+    journal = transitioner.transition(
+      journal,
+      entry_id: second_id,
+      to: 'running',
+      occurred_at: '2026-07-26T12:00:02Z'
+    )
+    journal = transitioner.transition(
+      journal,
+      entry_id: second_id,
+      to: 'succeeded',
+      occurred_at: '2026-07-26T12:00:03Z'
+    )
 
     status = SloRulesEngine::ProviderState::JournalEvaluator.new.evaluate(journal)
 

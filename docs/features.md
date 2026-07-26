@@ -94,7 +94,12 @@ Explicit features:
 - **Traffic-floor inference for Datadog time-slice SLOs:** reviewed threshold-based counter bindings can infer Datadog `sum:...as_count()` query expressions from metric name and selector scope when explicit provider query text is absent.
 - **Selector-aware Datadog dashboard evidence:** generated Datadog dashboard timeseries queries merge reviewed selector scope into provider query expressions so dashboard evidence stays aligned with the reviewed SLI instance rather than drifting to backend-binding-only scope.
 - **Dashboard payload contract:** generated Datadog dashboards validate the expected template variables (`service`, `sli`, `sli_instance`, `slo`) and the generated note/timeseries widget structure before live mutation.
-- **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs use the same apply command but manage deterministic files and handoff plans rather than mutating live backends. Sloth apply writes both the reviewed engine manifest and native Sloth `prometheus/v1` generator input files.
+- **Manifest-backed providers:** Prometheus-compatible bundles and Sloth specs
+  use the same apply command but manage deterministic files and handoff plans
+  rather than mutating live backends. Confirmed mutation requires
+  `--journal-dir`, persists operation attempts, and emits a
+  `ProviderStateResult`. Sloth apply writes both the reviewed engine manifest
+  and native Sloth `prometheus/v1` generator input files.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 
@@ -102,13 +107,27 @@ Explicit features:
 
 `rules-ctl generate --provider sloth` emits Sloth `prometheus/v1` SLO specs from reviewed service definitions. The provider uses Prometheus-compatible query bindings and keeps OpenSLO as a future interchange/export path, not as a backend provider.
 
-`rules-ctl apply --provider sloth --confirm --manifest=<reviewed-manifest> --output-dir=<dir>` writes the reviewed engine manifest plus native Sloth YAML input files under `<dir>/<service>/sloth/generated/`. The apply plan records the external `sloth generate` command pointed at those native input files; the engine still does not execute the Sloth CLI or mutate downstream Prometheus resources.
+Confirmed `rules-ctl apply --provider sloth` requires `--confirm`, a reviewed
+`--manifest`, `--output-dir`, and `--journal-dir`. It writes the reviewed engine
+manifest plus native Sloth YAML input files under
+`<dir>/<service>/sloth/generated/`. The durable journal records file outcomes
+and marks the external `sloth generate` handoff as intentionally skipped; the
+engine still does not execute the Sloth CLI or mutate downstream Prometheus
+resources.
 
 ## Prometheus Stack Provider Generation
 
 `rules-ctl generate --provider prometheus_stack` emits one base observation recording rule for every SLI instance and derived success-ratio, error-ratio, objective-ratio, and error-budget-ratio recording rules for every reviewed SLO. Burn-rate recording rules remain SLO-specific. Record names are normalized to valid Prometheus metric identifiers while reviewed service, owner, SLI, instance, SLO, objective, and calculation-basis identity remains available as labels.
 
-The provider also renders a native Prometheus Operator `PrometheusRule`, a Grafana sidecar-compatible dashboard `ConfigMap`, and a credential-free Alertmanager route-intent document. Confirmed file apply validates all three resource shapes and writes them beside the reviewed provider manifest. `plan`, `diff`, `import`, and `prune` cover every file in that managed bundle. The route-intent document deliberately requires downstream receiver configuration; it does not invent an Alertmanager webhook host, secret, or credential.
+The provider also renders a native Prometheus Operator `PrometheusRule`, a
+Grafana sidecar-compatible dashboard `ConfigMap`, and a credential-free
+Alertmanager route-intent document. Confirmed file apply validates all three
+resource shapes, requires `--journal-dir`, writes them beside the reviewed
+provider manifest, and emits durable per-file outcomes with verification
+pending. `plan`, `diff`, `import`, and `prune` cover every file in that managed
+bundle. The route-intent document deliberately requires downstream receiver
+configuration; it does not invent an Alertmanager webhook host, secret, or
+credential.
 
 Selector-based SLOs calculate success ratios from scoped counter rates. Threshold-based SLOs generate boolean time-slice ratios and require a numeric threshold plus `time_slice` calculation basis; unsupported threshold intent is rejected during provider validation rather than emitted as a misleading success ratio.
 

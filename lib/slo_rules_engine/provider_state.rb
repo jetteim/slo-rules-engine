@@ -111,6 +111,27 @@ module SloRulesEngine
       end
     end
 
+    module CredentialScanner
+      FORBIDDEN_KEY = /\A(?:api[_-]?key|app[_-]?key|access[_-]?key|secret|password|token|authorization|credential|credentials)\z/i
+
+      module_function
+
+      def paths(value, path)
+        case value
+        when Hash
+          value.flat_map do |key, entry|
+            key_path = "#{path}.#{key}"
+            matches = key.to_s.match?(FORBIDDEN_KEY) ? [key_path] : []
+            matches + paths(entry, key_path)
+          end
+        when Array
+          value.each_with_index.flat_map { |entry, index| paths(entry, "#{path}[#{index}]") }
+        else
+          []
+        end
+      end
+    end
+
     class Snapshot
       attr_reader :provider, :service, :source, :resources, :fingerprint
 
@@ -229,7 +250,18 @@ module SloRulesEngine
 
     class Finding
       SEVERITIES = %w[finding warning error].freeze
-      KNOWN_KEYS = %w[provider code severity message path target source evidence].freeze
+      KNOWN_KEYS = %w[
+        schema_version
+        kind
+        provider
+        code
+        severity
+        message
+        path
+        target
+        source
+        evidence
+      ].freeze
 
       attr_reader :provider, :code, :severity, :message, :path, :target, :source, :evidence
 

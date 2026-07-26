@@ -31,6 +31,7 @@ The route-intent document leaves `receiver_contract.configuration_required` set 
 tmpdir="$(mktemp -d)"
 generated_dir="$tmpdir/generated"
 managed_dir="$tmpdir/managed"
+journal_dir="$tmpdir/journals"
 definition="./examples/prometheus-stack/reviewed-checkout.rb"
 
 bin/rules-ctl validate "$definition"
@@ -72,6 +73,7 @@ bin/rules-ctl apply \
   --provider=prometheus_stack \
   --confirm \
   --output-dir="$managed_dir" \
+  --journal-dir="$journal_dir" \
   --manifest="$manifest" \
   --review-report="$report"
 ```
@@ -84,6 +86,12 @@ The generated files are:
 <managed-dir>/checkout-api/prometheus_stack/generated/grafana-dashboards.yaml
 <managed-dir>/checkout-api/prometheus_stack/generated/alertmanager-routes.yaml
 ```
+
+Stdout also contains `execution.operation_journal.path` and a
+`ProviderStateResult`. The journal records four successful write attempts and
+the result records each managed path as `provider_resource_id`.
+`verification.status` remains `pending` until post-apply state refresh is
+implemented.
 
 ## Verify And Reconcile
 
@@ -103,7 +111,10 @@ bin/rules-ctl import \
 
 A clean `diff` reports four `noop` operations. A complete `import` reports an empty `findings` array and returns the three parsed native bundle files beside the managed manifest.
 
-When a managed YAML file drifts, `diff` identifies its exact changed paths. Re-running the confirmed apply rewrites only the drifted file; unchanged files remain `noop`.
+When a managed YAML file drifts, `diff` identifies its exact changed paths.
+Re-running the confirmed apply with `--journal-dir="$journal_dir"` rewrites only
+the drifted file; unchanged files remain `noop`. A write failure persists
+`failed` or `partial`, skips later writes, and exits nonzero.
 
 ## Prune
 
@@ -120,9 +131,14 @@ bin/rules-ctl prune \
   --provider=prometheus_stack \
   --confirm \
   --output-dir="$managed_dir" \
+  --journal-dir="$journal_dir" \
   --manifest="$manifest" \
   --review-report="$report"
 ```
+
+Confirmed prune records one delete attempt per managed path in a separate
+operation journal. There is no automatic rollback, resume, or post-delete
+verification.
 
 The automated verification for this flow is:
 

@@ -24,9 +24,9 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 
 | Provider | Generation output | Dry-run planning output | Confirmed state output |
 | --- | --- | --- | --- |
-| `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog SLO, monitor, and dashboard resources through the live API |
-| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | `manifest.json`, Prometheus Operator `PrometheusRule` YAML, Grafana dashboard `ConfigMap` YAML, and Alertmanager route-intent YAML |
-| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | `manifest.json` and native Sloth YAML input; the engine does not run Sloth or mutate Prometheus |
+| `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources plus the immediate live plan; live execution journaling is not wired yet |
+| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and `ProviderStateResult` with pending verification |
+| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Managed manifest/input files, durable journal/result, and a skipped external handoff that remains operator-owned |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
 
@@ -133,9 +133,26 @@ bin/rules-ctl journal status ./work/prometheus-stack-journal.json
 
 The initial journal is deterministic, verifies the saved state and plan
 fingerprints, records every operation as `pending` or `skipped`, and states
-whether an uncertain failure could be retried after a state refresh. Journal
-creation and status assessment are read-only; execution, entry-state updates,
-resume, and post-apply verification are not wired yet.
+whether an uncertain failure could be retried after a state refresh. Standalone
+journal creation and status assessment are read-only.
+
+Confirmed Prometheus Stack and Sloth mutations require a durable journal
+directory and record live file-operation outcomes automatically:
+
+```bash
+bin/rules-ctl apply \
+  --provider=prometheus_stack \
+  --confirm \
+  --output-dir=./managed \
+  --journal-dir=./work/journals \
+  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json
+```
+
+The command writes one journal under
+`./work/journals/<service>/<provider>/`, transitions each operation atomically,
+and includes a linked `ProviderStateResult` in stdout. It stops on the first
+failure and exits nonzero with persisted partial-failure evidence. Automatic
+resume and post-apply verification are not implemented.
 
 ### Inspect or reconcile provider state
 
@@ -156,12 +173,16 @@ bin/rules-ctl apply \
   --provider=prometheus_stack \
   --confirm \
   --output-dir=./managed \
+  --journal-dir=./work/journals \
   --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json \
   --handoff-dir=./work/handoff \
   --review-report=./work/generated/manifest-review/prometheus_stack.json
 ```
 
-`diff`, `import`, and dry-run planning are observational. Confirmed `apply` and `prune` are the mutation boundaries and require reviewed manifests; current handoff and report evidence can be required as additional gates.
+`diff`, `import`, and dry-run planning are observational. Confirmed `apply` and
+`prune` are the mutation boundaries and require reviewed manifests; current
+handoff and report evidence can be required as additional gates. Confirmed
+file-backed mutation also requires `--journal-dir`.
 
 ### Check whether the SLO is supported by real telemetry
 
@@ -202,6 +223,8 @@ The initial delivery integration is `notification_router`, which generates conte
 - Journal creation accepts exactly one verified dry-run provider plan and never executes it.
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
 - Confirmed apply and prune require reviewed manifest input.
+- Confirmed Prometheus Stack and Sloth mutations require durable journal
+  persistence and stop after the first failed file operation.
 - Datadog reconciliation requires managed ownership evidence for risky updates or deletes.
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 

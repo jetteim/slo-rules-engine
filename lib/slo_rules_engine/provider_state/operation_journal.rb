@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'time'
+
 module SloRulesEngine
   module ProviderState
     JOURNAL_SCHEMA_VERSION = 'slo-rules-engine/provider-operation-journal/v1'
@@ -68,6 +70,19 @@ module SloRulesEngine
             ENTRY_STATUSES
           )
         end
+        credential_paths = CredentialScanner.paths(
+          {
+            provider: provider,
+            service: service,
+            plan: plan,
+            entries: entries,
+            findings: findings.map(&:to_h)
+          },
+          'journal'
+        )
+        unless credential_paths.empty?
+          raise ContractError.new(credential_paths.first, 'credential-like keys are forbidden')
+        end
 
         @provider = provider.to_s.freeze
         @service = service.to_s.freeze
@@ -132,10 +147,14 @@ module SloRulesEngine
     class JournalBuilder
       RESUMABLE_ACTIONS = %w[update write].freeze
 
+      def initialize(accepted_modes: ['dry_run'])
+        @accepted_modes = accepted_modes
+      end
+
       def build(plan)
         raise ContractError.new('plan', 'must be a ProviderStatePlan') unless plan.is_a?(Plan)
-        unless plan.mode == 'dry_run'
-          raise ContractError.new('plan.mode', 'must be dry_run for journal creation')
+        unless @accepted_modes.include?(plan.mode)
+          raise ContractError.new('plan.mode', "must be one of #{@accepted_modes.inspect} for journal creation")
         end
 
         entries = plan.changes.each_with_index.map { |change, index| build_entry(plan, change, index) }
@@ -270,11 +289,10 @@ module SloRulesEngine
       def evaluate(journal)
         validate!(journal)
         entries = Value.fetch(journal, :entries)
-        counts = OperationJournal::ENTRY_STATUSES.to_h { |entry_status| [entry_status, 0] }
-        entries.each { |entry| counts[Value.fetch(entry, :status)] += 1 }
+        rollup = rollup(entries)
         failed = entries.select { |entry| Value.fetch(entry, :status) == 'failed' }
         blocked = failed.reject { |entry| Value.fetch(Value.fetch(entry, :resume), :eligible) }
-        effective_status = effective_status(counts)
+        effective_status = rollup.fetch(:status)
         findings = Array(Value.fetch(journal, :findings)).map { |finding| Value.copy(finding) }
         findings.concat(runtime_findings(Value.fetch(journal, :provider), effective_status, failed, blocked))
 
@@ -286,14 +304,7 @@ module SloRulesEngine
           service: Value.fetch(journal, :service),
           status: effective_status,
           plan: Value.copy(Value.fetch(journal, :plan)),
-          summary: {
-            total_entries: entries.length,
-            pending_entries: counts.fetch('pending'),
-            running_entries: counts.fetch('running'),
-            succeeded_entries: counts.fetch('succeeded'),
-            failed_entries: counts.fetch('failed'),
-            skipped_entries: counts.fetch('skipped')
-          },
+          summary: rollup.fetch(:summary),
           resume: {
             required: failed.any?,
             eligible: failed.any? && blocked.empty?,
@@ -319,6 +330,22 @@ module SloRulesEngine
               path: error.path
             }
           ]
+        }
+      end
+
+      def rollup(entries)
+        counts = OperationJournal::ENTRY_STATUSES.to_h { |entry_status| [entry_status, 0] }
+        entries.each { |entry| counts[Value.fetch(entry, :status)] += 1 }
+        {
+          status: effective_status(counts),
+          summary: {
+            total_entries: entries.length,
+            pending_entries: counts.fetch('pending'),
+            running_entries: counts.fetch('running'),
+            succeeded_entries: counts.fetch('succeeded'),
+            failed_entries: counts.fetch('failed'),
+            skipped_entries: counts.fetch('skipped')
+          }
         }
       end
 
@@ -359,10 +386,25 @@ module SloRulesEngine
           validate_verification_policy!(Value.fetch(entry, :verification), index)
           attempts = Value.fetch(entry, :attempts)
           raise ContractError.new("entries[#{index}].attempts", 'must be an array') unless attempts.is_a?(Array)
+          validate_attempts!(entry, attempts, index)
           entry_id
         end
         unless entry_ids.uniq.length == entry_ids.length
           raise ContractError.new('entries.entry_id', 'must be unique')
+        end
+        findings = Value.fetch(journal, :findings)
+        raise ContractError.new('findings', 'must be an array') unless findings.is_a?(Array)
+        summary = Value.fetch(journal, :summary)
+        raise ContractError.new('summary', 'must be a hash') unless summary.is_a?(Hash)
+        Value.require_one_of!(
+          'status',
+          Value.fetch(journal, :status),
+          OperationJournal::STATUSES
+        )
+        expected_rollup = rollup(entries)
+        require_equal!('status', Value.fetch(journal, :status), expected_rollup.fetch(:status))
+        expected_rollup.fetch(:summary).each do |key, expected|
+          require_equal!("summary.#{key}", Value.fetch(summary, key), expected)
         end
 
         expected_id = OperationJournal.journal_id_for(
@@ -372,6 +414,60 @@ module SloRulesEngine
           entries: entries
         )
         require_equal!('journal_id', Value.fetch(journal, :journal_id), expected_id)
+        credential_paths = CredentialScanner.paths(journal, 'journal')
+        unless credential_paths.empty?
+          raise ContractError.new(credential_paths.first, 'credential-like keys are forbidden')
+        end
+      end
+
+      def validate_attempts!(entry, attempts, index)
+        attempts.each_with_index do |attempt, attempt_index|
+          path = "entries[#{index}].attempts[#{attempt_index}]"
+          raise ContractError.new(path, 'must be a hash') unless attempt.is_a?(Hash)
+          unless Value.fetch(attempt, :attempt) == attempt_index + 1
+            raise ContractError.new("#{path}.attempt", 'must be sequential')
+          end
+          attempt_status = Value.fetch(attempt, :status)
+          Value.require_one_of!("#{path}.status", attempt_status, %w[running succeeded failed])
+          validate_timestamp!("#{path}.started_at", Value.fetch(attempt, :started_at))
+          if %w[succeeded failed].include?(attempt_status)
+            validate_timestamp!("#{path}.finished_at", Value.fetch(attempt, :finished_at))
+          elsif Value.fetch(attempt, :finished_at)
+            raise ContractError.new("#{path}.finished_at", 'must be absent while running')
+          end
+          if attempt_status == 'failed' && !Value.fetch(attempt, :error).is_a?(Hash)
+            raise ContractError.new("#{path}.error", 'must be a hash for a failed attempt')
+          end
+          if attempt_index < attempts.length - 1 && attempt_status == 'running'
+            raise ContractError.new("#{path}.status", 'only the latest attempt may be running')
+          end
+        end
+
+        entry_status = Value.fetch(entry, :status)
+        expected_attempt_status = {
+          'running' => 'running',
+          'succeeded' => 'succeeded',
+          'failed' => 'failed'
+        }[entry_status]
+        if expected_attempt_status && Value.fetch(attempts.last, :status) != expected_attempt_status
+          raise ContractError.new(
+            "entries[#{index}].attempts",
+            "#{entry_status} requires a matching latest attempt"
+          )
+        end
+        if %w[pending skipped].include?(entry_status) && !attempts.empty?
+          raise ContractError.new(
+            "entries[#{index}].attempts",
+            "must be empty while entry status is #{entry_status}"
+          )
+        end
+      end
+
+      def validate_timestamp!(path, value)
+        Value.require_presence!(path, value)
+        Time.iso8601(value.to_s)
+      rescue ArgumentError
+        raise ContractError.new(path, 'must be an ISO 8601 timestamp')
       end
 
       def validate_plan_reference!(plan)
@@ -379,7 +475,7 @@ module SloRulesEngine
 
         require_equal!('plan.schema_version', Value.fetch(plan, :schema_version), SCHEMA_VERSION)
         require_equal!('plan.kind', Value.fetch(plan, :kind), 'ProviderStatePlanReference')
-        require_equal!('plan.mode', Value.fetch(plan, :mode), 'dry_run')
+        Value.require_one_of!('plan.mode', Value.fetch(plan, :mode), %w[dry_run live])
         %i[fingerprint desired_state_fingerprint observed_state_fingerprint].each do |key|
           value = required("plan.#{key}", plan, key)
           next if value.to_s.match?(/\A[0-9a-f]{64}\z/)

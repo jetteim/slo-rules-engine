@@ -7,8 +7,15 @@ require 'yaml'
 module SloRulesEngine
   module Appliers
     class ManifestBundle
-      def initialize(output_dir:)
+      def initialize(output_dir:, journal_dir: nil, clock: -> { Time.now.utc })
         @output_dir = output_dir
+        journal_store = if journal_dir
+                          ProviderState::JournalStore.new(root_dir: journal_dir, clock: clock)
+                        end
+        @executor = ProviderState::JournaledExecutor.new(
+          journal_store: journal_store,
+          clock: clock
+        )
       end
 
       def plan(manifest, mode: 'dry_run')
@@ -23,21 +30,8 @@ module SloRulesEngine
 
       def apply(manifest)
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
-        plan(manifest, mode: 'live').tap do |apply_plan|
-          apply_plan.operations.each do |operation|
-            next unless operation.action == 'write'
-
-            path = operation.payload.fetch(:path)
-            FileUtils.mkdir_p(File.dirname(path))
-            case operation.target
-            when 'manifest_file'
-              File.write(path, JSON.pretty_generate(operation.payload.fetch(:manifest)))
-            when 'external_generator_input'
-              File.write(path, YAML.dump(json_safe(operation.payload.fetch(:spec))))
-            when /\Aprometheus_stack\./
-              File.write(path, YAML.dump(json_safe(operation.payload.fetch(:resource))))
-            end
-          end
+        @executor.execute(plan(manifest, mode: 'live')) do |operation|
+          write_operation(operation)
         end
       end
 
@@ -118,18 +112,43 @@ module SloRulesEngine
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         operations = prune_operations(manifest)
 
-        apply_plan(manifest, mode: mode, operations: operations).tap do |plan|
-          next unless mode == 'live'
+        plan = apply_plan(manifest, mode: mode, operations: operations)
+        return plan unless mode == 'live'
 
-          plan.operations.each do |operation|
-            next unless operation.action == 'delete'
-
-            File.delete(operation.payload.fetch(:path))
-          end
-        end
+        @executor.execute(plan) { |operation| delete_operation(operation) }
       end
 
       private
+
+      def write_operation(operation)
+        path = operation.payload.fetch(:path)
+        FileUtils.mkdir_p(File.dirname(path))
+        bytes_written = case operation.target
+                        when 'manifest_file'
+                          File.write(path, JSON.pretty_generate(operation.payload.fetch(:manifest)))
+                        when 'external_generator_input'
+                          File.write(path, YAML.dump(json_safe(operation.payload.fetch(:spec))))
+                        when /\Aprometheus_stack\./
+                          File.write(path, YAML.dump(json_safe(operation.payload.fetch(:resource))))
+                        else
+                          raise UnsupportedApplyAction, "unsupported manifest-bundle target #{operation.target.inspect}"
+                        end
+        {
+          provider_resource_id: path,
+          path: path,
+          bytes_written: bytes_written
+        }
+      end
+
+      def delete_operation(operation)
+        path = operation.payload.fetch(:path)
+        File.delete(path)
+        {
+          provider_resource_id: path,
+          path: path,
+          deleted: true
+        }
+      end
 
       def apply_plan(manifest, mode:, operations:, findings: [])
         ApplyPlan.new(

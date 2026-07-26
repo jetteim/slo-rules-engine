@@ -40,6 +40,7 @@ module SloRulesEngine
     :desired_state,
     :observed_state,
     :findings,
+    :execution,
     keyword_init: true
   ) do
     DESTRUCTIVE_ACTIONS = %w[delete recreate recreate_and_wait].freeze
@@ -64,9 +65,25 @@ module SloRulesEngine
         summary: summary,
         operations: operations.map(&:to_h)
       }.compact
-      contract = state_contract
+      contract = provider_state_plan
       payload[:state_contract] = contract.to_h if contract
+      payload[:execution] = ProviderState::Value.copy(execution) if execution
       payload
+    end
+
+    def provider_state_plan
+      return nil unless desired_state && observed_state
+
+      ProviderState::Plan.new(
+        provider: provider,
+        service: service,
+        mode: mode,
+        desired_state: desired_state,
+        observed_state: observed_state,
+        changes: operations.map { |operation| ProviderState::Change.from_apply_operation(operation) },
+        findings: findings.map { |finding| ProviderState::Finding.from_hash(finding, provider: provider) },
+        summary: summary
+      )
     end
 
     def summary
@@ -84,21 +101,6 @@ module SloRulesEngine
     end
 
     private
-
-    def state_contract
-      return nil unless desired_state && observed_state
-
-      ProviderState::Plan.new(
-        provider: provider,
-        service: service,
-        mode: mode,
-        desired_state: desired_state,
-        observed_state: observed_state,
-        changes: operations.map { |operation| ProviderState::Change.from_apply_operation(operation) },
-        findings: findings.map { |finding| ProviderState::Finding.from_hash(finding, provider: provider) },
-        summary: summary
-      )
-    end
 
     def counts_by
       operations.each_with_object(Hash.new(0)) do |operation, counts|

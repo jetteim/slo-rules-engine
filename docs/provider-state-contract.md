@@ -96,7 +96,11 @@ Existing `ApplyPlan#to_h` and `ImportedState#to_h` fields remain available. The 
 - findings
 - verification evidence
 
-The value contract exists, but current apply commands do not emit it yet.
+Confirmed Prometheus Stack and Sloth apply/prune now emit this value under
+`execution.result`. Their operation results carry managed paths as provider
+resource identifiers. The observed-state fingerprint still identifies the
+pre-execution snapshot, so `verification.status` remains explicitly `pending`.
+Live Datadog apply/prune does not emit this result yet.
 
 ### Operation Journal
 
@@ -138,13 +142,34 @@ Current resume classification is deliberately conservative:
 
 `JournalEvaluator` derives effective `pending`, `running`, `succeeded`,
 `partial`, or `failed` state from entries and reports `partial_failure`,
-`resume_blocked`, or `resume_state_recheck_required` findings. This is an
-assessment contract only; current commands do not write execution transitions.
+`resume_blocked`, or `resume_state_recheck_required` findings. It rejects
+terminal states without matching attempt evidence, non-sequential attempts,
+invalid timestamps, static-identity tampering, and credential-like keys.
 
 `journal create` verifies the saved provider-state snapshots and plan
 fingerprint before writing the initial journal atomically. Recreating the same
 journal at the same path is idempotent. Existing different content is never
 overwritten.
+
+Confirmed file-backed apply/prune uses `JournalStore` and requires
+`--journal-dir`. The store:
+
+- creates one live-mode journal before the first mutation
+- serializes transitions with an exclusive journal lock
+- replaces journal JSON atomically after every transition
+- permits `pending` to `running` to `succeeded` or `failed`
+- permits an unstarted operation to become `skipped`
+- rejects competing or terminal-state transitions
+- refuses to replace an existing journal with execution evidence; an identical
+  all-`skipped` noop journal is reused safely
+
+Execution stops after the first failed file operation. Later actionable entries
+become `skipped` with `prior_operation_failed`; the result becomes `failed` or
+`partial` and the CLI exits nonzero. Successful write/delete attempts record
+the managed path, byte/delete evidence, and completion timestamp.
+
+Sloth's external-generator handoff is not executed. Its entry becomes
+`skipped` with `external_handoff_required` after engine-owned files are written.
 
 ## Provider Evidence
 
@@ -179,6 +204,14 @@ Import:
 - observed snapshot: managed manifest and every expected native resource file
 - findings: missing manifest or native bundle files
 
+Confirmed apply and prune:
+
+- durable journal required before mutation
+- managed JSON/YAML paths recorded as successful resource identifiers
+- per-operation write/delete attempts and failure evidence
+- `ProviderStateResult` linked to the immediate live plan
+- post-operation observed-state refresh still pending
+
 ### Sloth
 
 Plan and diff:
@@ -194,27 +227,34 @@ Import:
 
 The engine does not execute the Sloth CLI or claim downstream generated Prometheus state as observed Sloth state.
 
+Confirmed Sloth apply/prune uses the same managed-file journal/result contract
+as Prometheus Stack. Apply records the external generator as an intentionally
+skipped handoff rather than claiming downstream execution.
+
 ## Safety And Compatibility
 
 - State values are immutable after construction.
 - Snapshot fingerprints are derived from canonicalized content.
 - Provider and service identity must match across plan/import envelopes and snapshots.
 - Provider-specific payloads, resource IDs, identity confidence, and risk remain intact.
-- Credentials are not part of the state contract.
-- Existing apply, prune, and ownership gates are unchanged.
+- Credentials and credential-like keys are forbidden in journals.
+- Existing review and ownership gates remain in force; confirmed file-backed
+  apply/prune additionally requires `--journal-dir`.
 - Release-bundle plans now package the state contract inside each generated change-plan artifact.
 - Journal creation accepts exactly one `dry_run` plan and revalidates all
   content fingerprints before persistence.
 - Journal identity excludes mutable entry status and attempts while covering
   provider, service, plan, operation, resume-policy, and verification identity.
 - Journal commands do not contact providers or managed-file targets.
+- Journal entry transitions and attempt evidence do not change journal
+  identity.
+- File-backed `ProviderStateResult` never claims post-apply verification.
 
 ## Not Yet Implemented
 
-- live execution writes to operation journals
-- automatic operation-state transitions
+- live Datadog execution journals and results
 - actual resume execution after partial failure
-- post-apply observed-state refresh and verification result emission
+- post-apply observed-state refresh and completed verification evidence
 - compensating rollback plans
 - exact execution of a separately reviewed plan
 - concurrent-apply protection

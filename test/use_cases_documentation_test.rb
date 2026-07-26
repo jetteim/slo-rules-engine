@@ -4,6 +4,7 @@ require 'minitest/autorun'
 
 class UseCasesDocumentationTest < Minitest::Test
   USE_CASES_PATH = File.expand_path('../docs/use-cases.md', __dir__)
+  README_PATH = File.expand_path('../README.md', __dir__)
 
   def test_every_use_case_names_expected_outputs_and_intent_boundary
     sections.each do |heading, body|
@@ -23,6 +24,17 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, '| `prometheus_stack` |'
     assert_includes document, '| `sloth` |'
     assert_includes document, '| Operation journal |'
+  end
+
+  def test_usage_covers_durable_file_execution_results
+    document = File.read(USE_CASES_PATH)
+    readme = File.read(README_PATH)
+
+    assert_operator document.scan('--journal-dir').length, :>=, 3
+    assert_includes document, 'ProviderStateResult'
+    assert_includes document, 'partial_failure'
+    assert_includes readme, '--journal-dir=./work/journals'
+    assert_includes readme, 'ProviderStateResult'
   end
 
   private

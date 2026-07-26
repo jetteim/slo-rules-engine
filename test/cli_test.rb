@@ -685,6 +685,7 @@ class CLITest < Minitest::Test
           '--provider=prometheus_stack',
           '--confirm',
           "--output-dir=#{dir}",
+          "--journal-dir=#{File.join(dir, 'journals')}",
           "--manifest=#{file.path}"
         )
 
@@ -736,6 +737,7 @@ class CLITest < Minitest::Test
           '--provider=sloth',
           '--confirm',
           "--output-dir=#{dir}",
+          "--journal-dir=#{File.join(dir, 'journals')}",
           "--manifest=#{file.path}"
         )
 
@@ -849,6 +851,7 @@ class CLITest < Minitest::Test
           '--provider=sloth',
           '--confirm',
           "--output-dir=#{dir}",
+          "--journal-dir=#{File.join(dir, 'journals')}",
           "--manifest=#{file.path}"
         )
 
@@ -1038,6 +1041,7 @@ class CLITest < Minitest::Test
           '--provider=sloth',
           '--confirm',
           "--output-dir=#{dir}",
+          "--journal-dir=#{File.join(dir, 'journals')}",
           "--manifest=#{file.path}"
         )
 

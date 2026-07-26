@@ -15,6 +15,7 @@ class PrometheusStackWalkthroughTest < Minitest::Test
     Dir.mktmpdir do |dir|
       generated_dir = File.join(dir, 'generated')
       managed_dir = File.join(dir, 'managed')
+      journal_dir = File.join(dir, 'journals')
 
       validation = json_command('validate', definition)
       assert_equal true, validation.fetch(0).fetch('valid')
@@ -55,10 +56,13 @@ class PrometheusStackWalkthroughTest < Minitest::Test
         '--provider=prometheus_stack',
         '--confirm',
         "--output-dir=#{managed_dir}",
+        "--journal-dir=#{journal_dir}",
         "--manifest=#{manifest_path}",
         "--review-report=#{report_path}"
       ).fetch(0)
       assert_equal %w[write write write write], actions(applied)
+      assert_equal 'succeeded', applied.dig('execution', 'result', 'status')
+      assert File.exist?(applied.dig('execution', 'operation_journal', 'path'))
 
       resources = applied.fetch('operations').to_h do |operation|
         [operation.fetch('target'), operation.fetch('payload').fetch('path')]
@@ -114,10 +118,12 @@ class PrometheusStackWalkthroughTest < Minitest::Test
         '--provider=prometheus_stack',
         '--confirm',
         "--output-dir=#{managed_dir}",
+        "--journal-dir=#{journal_dir}",
         "--manifest=#{manifest_path}",
         "--review-report=#{report_path}"
       ).fetch(0)
       assert_equal %w[noop write noop noop], actions(repaired)
+      assert_equal 'succeeded', repaired.dig('execution', 'result', 'status')
       refute_equal 'stale_expr',
                    load_yaml(prometheus_rule_path).fetch('spec').fetch('groups').fetch(0).fetch('rules').fetch(0).fetch('expr')
 
@@ -126,10 +132,12 @@ class PrometheusStackWalkthroughTest < Minitest::Test
         '--provider=prometheus_stack',
         '--confirm',
         "--output-dir=#{managed_dir}",
+        "--journal-dir=#{journal_dir}",
         "--manifest=#{manifest_path}",
         "--review-report=#{report_path}"
       ).fetch(0)
       assert_equal %w[delete delete delete delete], actions(pruned)
+      assert_equal 'succeeded', pruned.dig('execution', 'result', 'status')
       pruned.fetch('operations').each do |operation|
         refute File.exist?(operation.fetch('payload').fetch('path'))
       end
