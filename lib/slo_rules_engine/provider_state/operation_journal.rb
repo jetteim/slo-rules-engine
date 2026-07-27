@@ -161,7 +161,7 @@ module SloRulesEngine
         @accepted_modes = accepted_modes
       end
 
-      def build(plan)
+      def build(plan, approved_plan_reference: nil)
         raise ContractError.new('plan', 'must be a ProviderStatePlan') unless plan.is_a?(Plan)
         unless @accepted_modes.include?(plan.mode)
           raise ContractError.new('plan.mode', "must be one of #{@accepted_modes.inspect} for journal creation")
@@ -171,7 +171,7 @@ module SloRulesEngine
         OperationJournal.new(
           provider: plan.provider,
           service: plan.service,
-          plan: plan_reference(plan),
+          plan: plan_reference(plan, approved_plan_reference),
           entries: entries,
           findings: journal_findings(plan, entries)
         )
@@ -202,8 +202,8 @@ module SloRulesEngine
         )
       end
 
-      def plan_reference(plan)
-        {
+      def plan_reference(plan, approved_plan_reference)
+        reference = {
           schema_version: SCHEMA_VERSION,
           kind: 'ProviderStatePlanReference',
           fingerprint: plan.fingerprint,
@@ -211,6 +211,8 @@ module SloRulesEngine
           desired_state_fingerprint: plan.desired_state.fingerprint,
           observed_state_fingerprint: plan.observed_state.fingerprint
         }
+        reference[:approved_plan] = Value.copy(approved_plan_reference) if approved_plan_reference
+        reference
       end
 
       def operation_id(plan, change, index)
@@ -521,6 +523,52 @@ module SloRulesEngine
           next if value.to_s.match?(/\A[0-9a-f]{64}\z/)
 
           raise ContractError.new("plan.#{key}", 'must be a SHA-256 fingerprint')
+        end
+        approved_plan = Value.fetch(plan, :approved_plan)
+        validate_approved_plan_reference!(approved_plan) if approved_plan
+      end
+
+      def validate_approved_plan_reference!(reference)
+        unless reference.is_a?(Hash)
+          raise ContractError.new('plan.approved_plan', 'must be a hash')
+        end
+        require_equal!(
+          'plan.approved_plan.schema_version',
+          Value.fetch(reference, :schema_version),
+          ApprovedPlan::SCHEMA_VERSION
+        )
+        require_equal!(
+          'plan.approved_plan.kind',
+          Value.fetch(reference, :kind),
+          'ApprovedProviderPlanReference'
+        )
+        approved_plan_id = required(
+          'plan.approved_plan.approved_plan_id',
+          reference,
+          :approved_plan_id
+        )
+        unless approved_plan_id.to_s.match?(/\Aapproved-provider-plan-[0-9a-f]{64}\z/)
+          raise ContractError.new(
+            'plan.approved_plan.approved_plan_id',
+            'must be a content-addressed approved-plan identity'
+          )
+        end
+        source_bundle_id = required(
+          'plan.approved_plan.source_bundle_id',
+          reference,
+          :source_bundle_id
+        )
+        unless source_bundle_id.to_s.match?(/\Aslo-bundle-[0-9a-f]{64}\z/)
+          raise ContractError.new(
+            'plan.approved_plan.source_bundle_id',
+            'must be a content-addressed release-bundle identity'
+          )
+        end
+        %i[provider_plan_fingerprint evidence_fingerprint].each do |key|
+          value = required("plan.approved_plan.#{key}", reference, key)
+          next if value.to_s.match?(/\A[0-9a-f]{64}\z/)
+
+          raise ContractError.new("plan.approved_plan.#{key}", 'must be a SHA-256 fingerprint')
         end
       end
 

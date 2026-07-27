@@ -80,6 +80,29 @@ class ProviderStateJournalTest < Minitest::Test
     assert_equal ['refresh_managed_file_state', 'compare_desired_state'], entry.dig(:verification, :requirements)
   end
 
+  def test_evaluator_validates_approved_plan_reference_integrity
+    journal = SloRulesEngine::ProviderState::JournalBuilder.new.build(
+      prometheus_plan,
+      approved_plan_reference: {
+        schema_version: 'slo-rules-engine/approved-provider-plan/v1',
+        kind: 'ApprovedProviderPlanReference',
+        approved_plan_id: "approved-provider-plan-#{'a' * 64}",
+        provider_plan_fingerprint: 'b' * 64,
+        source_bundle_id: "slo-bundle-#{'c' * 64}",
+        evidence_fingerprint: 'd' * 64
+      }
+    ).to_h
+    assert_equal "approved-provider-plan-#{'a' * 64}",
+                 journal.dig(:plan, :approved_plan, :approved_plan_id)
+    journal[:plan][:approved_plan][:provider_plan_fingerprint] = 'tampered'
+
+    status = SloRulesEngine::ProviderState::JournalEvaluator.new.evaluate(journal)
+
+    assert_equal false, status.fetch(:valid)
+    assert_equal 'plan.approved_plan.provider_plan_fingerprint',
+                 status.fetch(:findings).fetch(0).fetch(:path)
+  end
+
   def test_evaluator_reports_partial_failure_and_blocks_non_resumable_retry
     journal = SloRulesEngine::ProviderState::JournalBuilder.new.build(datadog_plan).to_h
     first_id, second_id = journal.fetch(:entries).map { |entry| entry.fetch(:entry_id) }

@@ -8,6 +8,7 @@ require_relative '../lib/slo_rules_engine/cli/catalog_commands'
 require_relative '../lib/slo_rules_engine/cli/bundle_commands'
 require_relative '../lib/slo_rules_engine/cli/journal_commands'
 require_relative '../lib/slo_rules_engine/cli/onboarding_commands'
+require_relative '../lib/slo_rules_engine/cli/plan_commands'
 require_relative '../lib/slo_rules_engine/cli/report_commands'
 require_relative '../lib/slo_rules_engine/cli/telemetry_commands'
 
@@ -16,6 +17,7 @@ module RulesCtl
   extend SloRulesEngine::CLI::BundleCommands
   extend SloRulesEngine::CLI::JournalCommands
   extend SloRulesEngine::CLI::OnboardingCommands
+  extend SloRulesEngine::CLI::PlanCommands
   extend SloRulesEngine::CLI::ReportCommands
   extend SloRulesEngine::CLI::TelemetryCommands
 
@@ -46,6 +48,8 @@ module RulesCtl
       bundle(argv)
     when 'journal'
       journal(argv)
+    when 'plan'
+      plan(argv)
     when 'lookup-telemetry'
       lookup_telemetry(argv)
     when 'discover-telemetry'
@@ -740,6 +744,9 @@ module RulesCtl
         bin/rules-ctl bundle status <bundle.json>
         bin/rules-ctl journal create <provider-plan.json> --output=<journal.json>
         bin/rules-ctl journal status <journal.json>
+        bin/rules-ctl plan approve <apply-ready-bundle.json> --target=<service/provider> --reviewer=<identity> --reviewed-at=<timestamp> --output=<approved-plan.json> [--note=<text> ...]
+        bin/rules-ctl plan status <approved-plan.json>
+        bin/rules-ctl plan apply <approved-plan.json> --confirm --journal-dir=<dir>
         bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
         bin/rules-ctl providers list
         bin/rules-ctl integrations list

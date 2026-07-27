@@ -41,6 +41,55 @@ module SloRulesEngine
         end
       end
 
+      def apply_exact(approved_plan)
+        unless approved_plan.is_a?(ProviderState::ApprovedPlan::Document)
+          raise ProviderState::ApprovedPlan::Error.new(
+            'invalid_approved_plan',
+            'exact apply requires an approved provider plan'
+          )
+        end
+        approved_provider_plan = approved_plan.provider_plan
+        approved_output_dir = File.expand_path(
+          ProviderState::Value.fetch(approved_plan.runtime, :output_dir)
+        )
+        unless File.expand_path(@output_dir) == approved_output_dir
+          raise ProviderState::ApprovedPlan::Error.new(
+            'invalid_approved_plan_runtime',
+            'approved output directory does not match the exact-plan executor',
+            path: 'runtime.output_dir'
+          )
+        end
+
+        manifest = ProviderState::Value.copy(approved_provider_plan.desired_state.resources)
+        current_provider_plan = plan(manifest).provider_state_plan
+        unless current_provider_plan.fingerprint == approved_provider_plan.fingerprint
+          raise ProviderState::ApprovedPlan::Error.new(
+            'stale_approved_plan',
+            'managed-file state changed after plan approval; create and approve a new plan',
+            path: 'provider_plan.observed_state',
+            findings: [
+              {
+                code: 'approved_plan_state_changed',
+                path: 'provider_plan.observed_state',
+                message: 'immediate managed-file state does not match the approved plan',
+                expected_plan_fingerprint: approved_provider_plan.fingerprint,
+                actual_plan_fingerprint: current_provider_plan.fingerprint,
+                expected_observed_state_fingerprint: approved_provider_plan.observed_state.fingerprint,
+                actual_observed_state_fingerprint: current_provider_plan.observed_state.fingerprint
+              }
+            ]
+          )
+        end
+
+        exact_plan = exact_apply_plan(approved_provider_plan)
+        @executor.execute(
+          exact_plan,
+          approved_plan_reference: approved_plan.reference
+        ) do |operation|
+          write_operation(operation)
+        end
+      end
+
       def diff(manifest)
         manifest = SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         operations = [
@@ -125,6 +174,40 @@ module SloRulesEngine
       end
 
       private
+
+      def exact_apply_plan(provider_plan)
+        operations = provider_plan.changes.map.with_index do |change, index|
+          unless %w[write noop handoff].include?(change.action)
+            raise ProviderState::ApprovedPlan::Error.new(
+              'unsupported_approved_operation',
+              "file-backed exact apply cannot execute #{change.action.inspect}",
+              path: "provider_plan.changes[#{index}].action"
+            )
+          end
+
+          ApplyOperation.new(
+            action: change.action,
+            target: change.target,
+            name: change.name,
+            source: change.source,
+            payload: ProviderState::Value.copy(change.desired),
+            backend_id: ProviderState::Value.copy(change.provider_resource_id),
+            actual: ProviderState::Value.copy(change.observed),
+            changes: ProviderState::Value.copy(change.changed_paths),
+            match_identity: ProviderState::Value.copy(change.match_identity),
+            risk: ProviderState::Value.copy(change.risk)
+          )
+        end
+        ApplyPlan.new(
+          provider: provider_plan.provider,
+          service: provider_plan.service,
+          mode: 'live',
+          operations: operations,
+          findings: provider_plan.findings.map(&:to_h),
+          desired_state: provider_plan.desired_state,
+          observed_state: provider_plan.observed_state
+        )
+      end
 
       def write_operation(operation)
         path = operation.payload.fetch(:path)

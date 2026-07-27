@@ -422,12 +422,15 @@ module SloRulesEngine
         @error_evidence = error_evidence || method(:file_error_evidence)
       end
 
-      def execute(apply_plan)
+      def execute(apply_plan, approved_plan_reference: nil)
         plan = apply_plan.provider_state_plan
         raise ContractError.new('plan', 'must include provider state') unless plan
         raise ContractError.new('plan.mode', 'must be live for execution') unless plan.mode == 'live'
 
-        journal = JournalBuilder.new(accepted_modes: ['live']).build(plan).to_h
+        journal = JournalBuilder.new(accepted_modes: ['live']).build(
+          plan,
+          approved_plan_reference: approved_plan_reference
+        ).to_h
         journal_path = @journal_store&.create(journal)
         failed = false
 
@@ -490,6 +493,7 @@ module SloRulesEngine
           ),
           result: result.to_h
         }
+        apply_plan.execution[:approved_plan] = Value.copy(approved_plan_reference) if approved_plan_reference
         apply_plan
       end
 
