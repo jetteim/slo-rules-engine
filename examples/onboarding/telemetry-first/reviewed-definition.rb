@@ -55,6 +55,7 @@ SRE.define do
       slo do
         uid 'fast-enough'
         objective 0.99
+        evaluation_window '30d'
         success_threshold '<=', '0.5'
         calculation_basis 'time_slice'
         alert_route_key 'checkout-api'

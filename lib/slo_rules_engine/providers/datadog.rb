@@ -39,6 +39,7 @@ module SloRulesEngine
             sli_instance: instance.uid,
             slo: slo.uid,
             objective_ratio: slo.objective,
+            evaluation_window: slo.evaluation_window,
             calculation_basis: slo.calculation_basis,
             query: datadog_query(sli.metric, instance, slo)
           }
@@ -48,6 +49,23 @@ module SloRulesEngine
         end
 
         manifest(artifacts, definition: definition)
+      end
+
+      def validate(definition)
+        super.tap do |result|
+          definition.slis.each_with_index do |sli, sli_index|
+            sli.instances.each_with_index do |instance, instance_index|
+              instance.slos.each_with_index do |slo, slo_index|
+                next if slo.evaluation_window == SloRulesEngine::Datadog::PayloadTranslator::DEFAULT_SLO_TIMEFRAME
+
+                result.error(
+                  "slis[#{sli_index}].instances[#{instance_index}].slos[#{slo_index}].evaluation_window",
+                  'must equal "30d" for the verified Datadog provider contract'
+                )
+              end
+            end
+          end
+        end
       end
 
       private

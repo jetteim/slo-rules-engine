@@ -55,7 +55,7 @@ Measured telemetry is evidence, not authority. A metric becomes an SLI only when
 
 ## Reliability Modeling
 
-The reliability model records SLI/SLO intent before backend generation. It includes measurement details, user-visible rationale, miss-policy, reality-check notes, and observability handoff requests. Providers may consume these fields, but they do not decide whether an SLO is appropriate.
+The reliability model records SLI/SLO intent before backend generation. It includes the objective, evaluation window, calculation basis, success condition, measurement details, user-visible rationale, miss-policy, reality-check notes, and observability handoff requests. Providers may consume these fields, but they do not decide whether an SLO is appropriate.
 
 ## Contextual Alerts
 

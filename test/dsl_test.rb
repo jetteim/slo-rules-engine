@@ -28,6 +28,7 @@ class DSLTest < Minitest::Test
     slo = sli.instances.fetch(0).slos.fetch(0)
 
     assert_equal 'server-side request boundary', sli.measurement_details.measurement_point
+    assert_equal '30d', slo.evaluation_window
     assert_equal 'error budget exhausted', slo.miss_policy.trigger
     assert_equal ['bind provider queries', 'generate decision dashboard'], slo.observability_handoff.requests
   end

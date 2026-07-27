@@ -19,6 +19,8 @@ Use the toolkit to:
 - persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
 - run telemetry reality checks before treating an SLO as operationally ready
+- read current Prometheus-compatible SLO attainment, remaining error budget,
+  burn rate, and telemetry freshness from one reviewed manifest
 - validate Datadog credentials and dashboard reconciliation in an isolated
   sandbox before relying on live provider behavior
 
@@ -29,7 +31,7 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 | Provider | Generation output | Dry-run planning output | Confirmed state output |
 | --- | --- | --- | --- |
 | `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources, durable operation journal, and a `ProviderStateResult` with backend identity and canonical payload/absence verification |
-| `prometheus_stack` | Reviewed manifest containing recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and a `ProviderStateResult` with post-write/delete convergence evidence |
+| `prometheus_stack` | Reviewed manifest containing evaluation-window SLI/SLO/remaining-budget recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and a `ProviderStateResult` with post-write/delete convergence evidence |
 | `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned manifest/input files, durable journal/result, and a skipped external handoff that remains pending and operator-owned |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
@@ -313,6 +315,30 @@ bin/rules-ctl reality-check \
 
 The report identifies missing metrics, absent series, incomplete histogram evidence, and other provider-binding gaps. It does not silently adjust the reviewed objective or calculation basis.
 
+### Inspect live SLO and error-budget status
+
+Read the generated recording-rule series for one reviewed Prometheus Stack
+manifest:
+
+```bash
+bin/rules-ctl status \
+  --provider=prometheus_stack \
+  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json \
+  --base-url=http://localhost:9090 \
+  --max-age-seconds=300 \
+  --output=./work/checkout-api-status.json
+```
+
+The command prints and optionally saves the same
+`slo-rules-engine/live-slo-status/v1` report. Each SLO is classified as
+`healthy`, `at_risk`, `exhausted`, `missing_telemetry`, or `unverifiable` and
+includes reviewed identity, owner, dashboard, playbook, objective attainment,
+remaining budget, burn windows, source timestamps, freshness, generated
+recording-rule identifiers, and query evidence. It performs only Prometheus
+`GET /api/v1/query` reads. Operationally unhealthy states still exit zero when
+the report was produced; invalid/unreviewed input and unsupported providers
+exit nonzero. Datadog, release-bundle, and portfolio status remain deferred.
+
 ### Validate Datadog against an isolated sandbox
 
 Run the credential and dashboard read contract without mutation:
@@ -362,6 +388,8 @@ The initial delivery integration is `notification_router`, which generates conte
 - Discovery evidence proposes candidates; maintainers accept or reject them.
 - Cross-provider evidence reuse never implies automatic metric or query translation.
 - Provider generation is deterministic and read-only.
+- Neutral SLO intent has an explicit evaluation window, defaulting to `30d`;
+  Prometheus Stack uses it for attainment and remaining-budget rules.
 - Bundle planning is read-only and rejects stale or invalid predecessors.
 - Journal creation accepts exactly one verified dry-run provider plan and never executes it.
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
@@ -378,6 +406,8 @@ The initial delivery integration is `notification_router`, which generates conte
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 - Exact file-backed apply rejects changed observed state and same-scope
   concurrency before executing the stored operation list.
+- Live status is read-only, requires reviewed manifest provenance, and does not
+  infer provider queries outside the provider reader.
 
 ## Documentation
 
@@ -386,6 +416,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Prometheus Stack Walkthrough](docs/prometheus-stack-walkthrough.md)
 - [Release Bundle Contract](docs/release-bundle-contract.md)
 - [Provider State Contract](docs/provider-state-contract.md)
+- [Live SLO Status Contract](docs/live-status-contract.md)
 - [Datadog Public Contract Evidence](docs/datadog-contract-evidence.md)
 - [Datadog Sandbox Testing](docs/datadog-sandbox-testing.md)
 - [Provider Contract](docs/provider-contract.md)

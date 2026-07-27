@@ -125,7 +125,7 @@ This is the running plan for the long refactor.
 ## Phase 8: Prometheus Stack Provider Completion
 
 - [x] Generate base recording rules for every Prometheus-bound SLI instance independently of the number of attached SLOs.
-- [x] Generate derived SLO success-ratio, error-ratio, objective, error-budget, and burn-rate recording rules for every reviewed SLO.
+- [x] Generate derived evaluation-window SLO success-ratio, error-ratio, objective, allowed/remaining error-budget, and policy-window burn-rate recording rules for every reviewed SLO.
 - [x] Emit deterministic native PrometheusRule resources for recording, burn-rate, missing-telemetry, and alert rules.
 - [x] Emit deterministic Grafana dashboard and Alertmanager routing bundle files while preserving reviewed manifest provenance.
 - [x] Include every native Prometheus Stack bundle file in `plan`, `apply`, `diff`, `import`, and `prune`.
@@ -186,12 +186,16 @@ This is the running plan for the long refactor.
 
 ## Phase 13: Live SLO And Error-Budget Status
 
-- [ ] Define a provider-neutral live SLO status model for objective attainment, error-budget remaining, burn rate, and telemetry freshness.
-- [ ] Add Datadog and Prometheus-compatible status readers without moving provider query syntax into the neutral model.
-- [ ] Add a `status` command for one manifest, one bundle, or a portfolio scope.
-- [ ] Distinguish healthy, at-risk, exhausted, missing-telemetry, and unverifiable states with machine-readable findings.
-- [ ] Link status output to reviewed SLO identity, owner, dashboard, playbook, and current provider resource identifiers.
-- [ ] Persist optional status reports with source timestamps and freshness metadata for later bundle review.
+- [x] Add an explicit neutral SLO evaluation window with a `30d` compatibility default.
+- [x] Generate window-correct Prometheus attainment, remaining-budget, and burn-rate recording rules.
+- [x] Define a provider-neutral live SLO status model for objective attainment, error-budget remaining, burn rate, and telemetry freshness.
+- [x] Add the read-only Prometheus-compatible status reader without moving PromQL into the neutral model.
+- [ ] Add the Datadog status reader after safe live backend evidence is available.
+- [x] Add a `status` command for exactly one reviewed Prometheus Stack manifest.
+- [ ] Extend `status` to one release bundle and a portfolio scope.
+- [x] Distinguish healthy, at-risk, exhausted, missing-telemetry, and unverifiable states with machine-readable findings.
+- [x] Link status output to reviewed SLO identity, owner, dashboard, playbook, and current provider resource identifiers.
+- [x] Persist optional status reports with source timestamps and freshness metadata for later bundle review.
 
 ## Project Backlog: Atomic Coherence-Preserving Simplification
 

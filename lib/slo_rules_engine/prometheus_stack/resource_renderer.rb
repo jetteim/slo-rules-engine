@@ -95,6 +95,7 @@ module SloRulesEngine
             ['Success Ratio', [rules.fetch('success_ratio')], 'percentunit'],
             ['Error Ratio', [rules.fetch('error_ratio')], 'percentunit'],
             ['Error Budget Ratio', [rules.fetch('error_budget_ratio')], 'percentunit'],
+            ['Error Budget Remaining', [rules.fetch('error_budget_remaining_ratio')], 'percentunit'],
             ['Burn Rate', rules.fetch('burn_rate'), 'short'],
             ['SLI Observations', [rules.fetch('observations')], 'short']
           ]
@@ -123,6 +124,7 @@ module SloRulesEngine
           'success_ratio' => record_with_metric(recording, labels, 'success_ratio'),
           'error_ratio' => record_with_metric(recording, labels, 'error_ratio'),
           'error_budget_ratio' => record_with_metric(recording, labels, 'error_budget_ratio'),
+          'error_budget_remaining_ratio' => record_with_metric(recording, labels, 'error_budget_remaining_ratio'),
           'burn_rate' => records_with_labels(artifacts.fetch(:burn_rate_rules), labels),
           'observations' => record_with_metric(recording, labels.reject { |key, _value| key == :slo }, 'observations')
         }

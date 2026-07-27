@@ -38,7 +38,7 @@ class PrometheusStackProviderTest < Minitest::Test
       ],
       sli_rules.map { |rule| rule.fetch(:record) }.sort
     )
-    assert_equal 12, artifacts.fetch(:recording_rules).count { |rule| rule[:kind] == 'slo' }
+    assert_equal 15, artifacts.fetch(:recording_rules).count { |rule| rule[:kind] == 'slo' }
     assert_equal 6, artifacts.fetch(:burn_rate_rules).length
   end
 
@@ -54,14 +54,37 @@ class PrometheusStackProviderTest < Minitest::Test
     refute_includes sli_rule.fetch(:labels), :slo
 
     slo_rules = recording_rules.select { |rule| rule[:kind] == 'slo' }
-    assert_equal 4, slo_rules.length
+    assert_equal 5, slo_rules.length
     rules_by_metric = slo_rules.to_h { |rule| [rule.fetch(:metric), rule] }
-    assert_equal %w[error_budget_ratio error_ratio objective_ratio success_ratio], rules_by_metric.keys.sort
+    assert_equal(
+      %w[error_budget_ratio error_budget_remaining_ratio error_ratio objective_ratio success_ratio],
+      rules_by_metric.keys.sort
+    )
+    assert_equal(
+      'sum(rate(http_server_request_duration_seconds_count{service="checkout-api",route="/checkout",status="success"}[30d])) / ' \
+      'sum(rate(http_server_request_duration_seconds_count{service="checkout-api",route="/checkout"}[30d]))',
+      rules_by_metric.fetch('success_ratio').fetch(:expr)
+    )
     assert_equal 'vector(0.999)', rules_by_metric.fetch('objective_ratio').fetch(:expr)
     assert_equal 'vector(0.001)', rules_by_metric.fetch('error_budget_ratio').fetch(:expr)
     assert_equal(
       '1 - slo:checkout_api:http_requests:public_api:successful_requests:success_ratio',
       rules_by_metric.fetch('error_ratio').fetch(:expr)
+    )
+    assert_equal(
+      'clamp(1 - (slo:checkout_api:http_requests:public_api:successful_requests:error_ratio / ' \
+      'slo:checkout_api:http_requests:public_api:successful_requests:error_budget_ratio), 0, 1)',
+      rules_by_metric.fetch('error_budget_remaining_ratio').fetch(:expr)
+    )
+    slo_rules.each do |rule|
+      assert_equal '30d', rule.fetch(:labels).fetch(:evaluation_window)
+    end
+
+    burn_rules = artifacts.fetch(:burn_rate_rules)
+    assert_equal(
+      '(1 - (sum(rate(http_server_request_duration_seconds_count{service="checkout-api",route="/checkout",status="success"}[1h])) / ' \
+      'sum(rate(http_server_request_duration_seconds_count{service="checkout-api",route="/checkout"}[1h])))) / 0.001',
+      burn_rules.find { |rule| rule.fetch(:range) == '1h' }.fetch(:expr)
     )
   end
 
@@ -90,8 +113,16 @@ class PrometheusStackProviderTest < Minitest::Test
 
     assert result.valid?, result.errors.map(&:to_h).inspect
     assert_equal(
-      'avg_over_time(((sum(rate(http_server_request_duration_seconds_count{service="checkout-api"}[5m]))) <= bool 0.5)[5m:])',
+      'avg_over_time(((sum(rate(http_server_request_duration_seconds_count{service="checkout-api"}[5m]))) <= bool 0.5)[30d:])',
       rule.fetch(:expr)
+    )
+
+    burn_rule = @provider.generate(@definition).to_h.fetch(:artifacts).fetch(:burn_rate_rules).find do |entry|
+      entry[:range] == '1h'
+    end
+    assert_equal(
+      '(1 - (avg_over_time(((sum(rate(http_server_request_duration_seconds_count{service="checkout-api"}[5m]))) <= bool 0.5)[1h:]))) / 0.001',
+      burn_rule.fetch(:expr)
     )
   end
 
@@ -129,7 +160,7 @@ class PrometheusStackProviderTest < Minitest::Test
       ],
       groups.map { |group| group.fetch(:name) }
     )
-    assert_equal [1, 4, 2, 2], groups.map { |group| group.fetch(:rules).length }
+    assert_equal [1, 5, 2, 2], groups.map { |group| group.fetch(:rules).length }
 
     recording_rule = groups.fetch(0).fetch(:rules).fetch(0)
     assert_equal %i[expr labels record], recording_rule.keys.sort
@@ -163,6 +194,7 @@ class PrometheusStackProviderTest < Minitest::Test
       Success\ Ratio
       Error\ Ratio
       Error\ Budget\ Ratio
+      Error\ Budget\ Remaining
       Burn\ Rate
       SLI\ Observations
     ], dashboard.fetch('panels').map { |panel| panel.fetch('title').split(' - ').last }

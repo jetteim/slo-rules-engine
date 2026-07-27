@@ -33,6 +33,7 @@ SRE.define do
       slo do
         uid 'completed-runs'
         objective 0.99
+        evaluation_window '30d'
         success_selector status: 'completed'
         calculation_basis 'time_slice'
         documentation 'Scheduled job completes successfully.'

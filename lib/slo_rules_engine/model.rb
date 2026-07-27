@@ -126,6 +126,7 @@ module SloRulesEngine
   SLO = Struct.new(
     :uid,
     :objective,
+    :evaluation_window,
     :success_selector,
     :success_threshold,
     :calculation_basis,
@@ -140,6 +141,7 @@ module SloRulesEngine
   ) do
     def initialize(**kwargs)
       super
+      self.evaluation_window ||= '30d'
       self.calculation_basis ||= 'observations'
       self.line_references ||= {}
     end

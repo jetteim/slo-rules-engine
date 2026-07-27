@@ -419,6 +419,7 @@ module SloRulesEngine
       end
 
       def initialize
+        @evaluation_window = '30d'
         @calculation_basis = 'observations'
         @line_references = {}
       end
@@ -435,6 +436,13 @@ module SloRulesEngine
 
         record_line(:objective)
         @objective = value.to_f
+      end
+
+      def evaluation_window(value = nil)
+        return @evaluation_window if value.nil?
+
+        record_line(:evaluation_window)
+        @evaluation_window = value.to_s
       end
 
       def success_selector(value = nil)
@@ -496,6 +504,7 @@ module SloRulesEngine
         SLO.new(
           uid: @uid,
           objective: @objective,
+          evaluation_window: @evaluation_window,
           success_selector: @success_selector,
           success_threshold: @success_threshold,
           calculation_basis: @calculation_basis,

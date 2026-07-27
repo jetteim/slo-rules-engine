@@ -60,6 +60,14 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'bundle_target_execution_incomplete'
     assert_includes document, 'unsupported_bundle_apply_target'
     assert_includes readme, '--output=./work/applied.json'
+    assert_includes document, 'Inspect Live SLO And Error-Budget Status'
+    assert_includes document, 'slo-rules-engine/live-slo-status/v1'
+    assert_includes document, 'error_budget_remaining_ratio'
+    assert_includes document, 'missing_telemetry'
+    assert_includes document, 'unverifiable'
+    assert_includes document, 'GET /api/v1/query'
+    assert_includes readme, 'bin/rules-ctl status'
+    assert_includes readme, '--max-age-seconds=300'
   end
 
   private

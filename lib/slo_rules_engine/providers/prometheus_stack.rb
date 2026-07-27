@@ -16,6 +16,7 @@ module SloRulesEngine
             parameterized_dashboards
             reality_check
             apply_plan
+            live_slo_status
           ],
           automation_mode: 'manifest_bundle',
           state_actions: %w[plan apply diff import_existing prune]
@@ -97,18 +98,25 @@ module SloRulesEngine
       def slo_recording_rules(definition, sli, instance, slo)
         labels = prometheus_labels(definition, sli, instance, slo)
         success_ratio_record = slo_record_name(definition, sli, instance, slo, 'success_ratio')
+        error_ratio_record = slo_record_name(definition, sli, instance, slo, 'error_ratio')
+        error_budget_record = slo_record_name(definition, sli, instance, slo, 'error_budget_ratio')
         [
           {
             kind: 'slo',
             metric: 'success_ratio',
             record: success_ratio_record,
             labels: labels,
-            expr: success_ratio_expression(sli.metric.binding_for(key), instance, slo)
+            expr: success_ratio_expression(
+              sli.metric.binding_for(key),
+              instance,
+              slo,
+              window: slo.evaluation_window
+            )
           },
           {
             kind: 'slo',
             metric: 'error_ratio',
-            record: slo_record_name(definition, sli, instance, slo, 'error_ratio'),
+            record: error_ratio_record,
             labels: labels,
             expr: "1 - #{success_ratio_record}"
           },
@@ -122,9 +130,16 @@ module SloRulesEngine
           {
             kind: 'slo',
             metric: 'error_budget_ratio',
-            record: slo_record_name(definition, sli, instance, slo, 'error_budget_ratio'),
+            record: error_budget_record,
             labels: labels,
             expr: "vector(#{format_ratio(error_budget(slo))})"
+          },
+          {
+            kind: 'slo',
+            metric: 'error_budget_remaining_ratio',
+            record: slo_record_name(definition, sli, instance, slo, 'error_budget_remaining_ratio'),
+            labels: labels,
+            expr: "clamp(1 - (#{error_ratio_record} / #{error_budget_record}), 0, 1)"
           }
         ]
       end
@@ -137,7 +152,12 @@ module SloRulesEngine
             range: window[:range],
             percent: window[:percent],
             threshold: window[:threshold],
-            expr: "(1 - #{slo_record_name(definition, sli, instance, slo, 'success_ratio')}) / #{format_ratio(error_budget(slo))}"
+            expr: "(1 - (#{success_ratio_expression(
+              sli.metric.binding_for(key),
+              instance,
+              slo,
+              window: window[:range]
+            )})) / #{format_ratio(error_budget(slo))}"
           }
         end
       end
@@ -212,14 +232,14 @@ module SloRulesEngine
         }
       end
 
-      def success_ratio_expression(metric, instance, slo)
+      def success_ratio_expression(metric, instance, slo, window:)
         selector = metric.selector.merge(instance.selector)
         labels = selector.map { |key, value| "#{key}=#{value.inspect}" }.join(',')
         if slo.success_selector
           success = selector.merge(slo.success_selector).map { |key, value| "#{key}=#{value.inspect}" }.join(',')
-          "sum(rate(#{metric.metric}{#{success}}[#{metric.range || '5m'}])) / sum(rate(#{metric.metric}{#{labels}}[#{metric.range || '5m'}]))"
+          "sum(rate(#{metric.metric}{#{success}}[#{window}])) / sum(rate(#{metric.metric}{#{labels}}[#{window}]))"
         elsif slo.success_threshold
-          threshold_success_ratio_expression(metric, instance, slo.success_threshold)
+          threshold_success_ratio_expression(metric, instance, slo.success_threshold, window: window)
         else
           "#{metric.metric}{#{labels}}"
         end
@@ -250,6 +270,7 @@ module SloRulesEngine
         prometheus_sli_labels(definition, sli, instance).merge(
           slo: slo.uid,
           objective_ratio: slo.objective.to_s,
+          evaluation_window: slo.evaluation_window,
           calculation_basis: slo.calculation_basis
         )
       end
@@ -274,11 +295,11 @@ module SloRulesEngine
         format('%.12g', value.to_f)
       end
 
-      def threshold_success_ratio_expression(metric, instance, threshold)
+      def threshold_success_ratio_expression(metric, instance, threshold, window:)
         expression = observation_expression(metric, instance)
         operator = threshold.fetch(:operator)
         value = format_ratio(Float(threshold.fetch(:value)))
-        "avg_over_time(((#{expression}) #{operator} bool #{value})[#{metric.range || '5m'}:])"
+        "avg_over_time(((#{expression}) #{operator} bool #{value})[#{window}:])"
       rescue ArgumentError, TypeError
         expression
       end

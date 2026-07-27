@@ -38,6 +38,7 @@ module SloRulesEngine
 
   class CoreValidator
     NAME_PATTERN = /\A[a-z0-9][a-z0-9-]*\z/
+    DURATION_PATTERN = /\A[1-9][0-9]*(?:ms|s|m|h|d|w|y)\z/
     CALCULATION_BASES = %w[observations time_slice].freeze
 
     def validate(definition)
@@ -94,6 +95,12 @@ module SloRulesEngine
         result.error("#{slo_path}.uid", 'SLO uid must be unique', line_reference: line_reference(slo, :uid)) if slo.uid && seen[slo.uid]
         seen[slo.uid] = true
         validate_objective(result, "#{slo_path}.objective", slo.objective, line_reference: line_reference(slo, :objective))
+        validate_duration(
+          result,
+          "#{slo_path}.evaluation_window",
+          slo.evaluation_window,
+          line_reference: line_reference(slo, :evaluation_window)
+        )
         unless CALCULATION_BASES.include?(slo.calculation_basis)
           result.error("#{slo_path}.calculation_basis", "must be one of: #{CALCULATION_BASES.join(', ')}", line_reference: line_reference(slo, :calculation_basis))
         end
@@ -159,6 +166,12 @@ module SloRulesEngine
         result.error(path, 'objective is required', line_reference: line_reference)
       elsif objective <= 0 || objective >= 1
         result.error(path, 'objective must be a ratio greater than 0 and less than 1', line_reference: line_reference)
+      end
+    end
+
+    def validate_duration(result, path, value, line_reference: nil)
+      unless value.to_s.match?(DURATION_PATTERN)
+        result.error(path, 'must be a positive duration such as 30d', line_reference: line_reference)
       end
     end
 

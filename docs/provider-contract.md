@@ -142,7 +142,7 @@ Automation mode: `manifest_bundle`.
 Expected artifacts:
 
 - one base Prometheus-compatible observation recording rule per SLI instance
-- derived success-ratio, error-ratio, objective-ratio, and error-budget-ratio recording rules per SLO
+- derived evaluation-window success-ratio, error-ratio, objective-ratio, error-budget-ratio, and error-budget-remaining-ratio recording rules per SLO
 - SLO-specific burn-rate recording rules
 - Prometheus-compatible alert rules
 - Alertmanager routing labels and webhook route references
@@ -163,6 +163,8 @@ Recording-rule behavior:
 - record names must satisfy the Prometheus metric-name contract even when neutral service, SLI, instance, or SLO identifiers contain hyphens
 - SLI observation rules must not be duplicated when one SLI instance has multiple SLOs
 - reviewed SLO identity remains in labels and derived series
+- the reviewed evaluation window remains in SLO labels and controls objective-attainment and remaining-budget evaluation
+- burn-rate records calculate over their own policy windows instead of reusing the long-window attainment ratio
 - threshold SLOs must use numeric thresholds and `time_slice` calculation basis
 - unsupported threshold semantics must fail provider validation instead of producing a non-ratio series named as a success ratio
 
@@ -172,6 +174,12 @@ Expected telemetry behavior:
 - service or selector-scoped discovery through metric-name label values
 - normalized lookup output reusable by onboarding and reality-check flows
 - batch discovery through `discover-telemetry --scope-file` for service and selector scopes
+- reviewed one-manifest live status through GET-only instant queries of generated recording-rule identifiers
+- live status normalizes provider evidence into objective attainment, remaining budget, burn windows, source freshness, and stable findings without moving PromQL into the neutral model
+
+Additional capability:
+
+- `live_slo_status` indicates that a provider has an implemented live-status reader; it is currently declared only by `prometheus_stack`
 
 ### `sloth`
 

@@ -14,6 +14,7 @@ module SloRulesEngine
           instance_count: instances.size,
           slo_count: slos.size,
           calculation_basis_distribution: distribution(slos.map(&:calculation_basis)),
+          evaluation_window_distribution: distribution(slos.map(&:evaluation_window)),
           objectives: slos.map(&:objective).compact.sort,
           observability_handoff_requests: slos.flat_map { |slo| slo.observability_handoff&.requests || [] }.uniq.sort,
           review_provenance: definitions.map { |definition| review_provenance(definition) }.compact,

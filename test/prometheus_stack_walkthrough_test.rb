@@ -75,12 +75,12 @@ class PrometheusStackWalkthroughTest < Minitest::Test
       route_path = resources.fetch('prometheus_stack.alertmanager_route_intent')
 
       prometheus_rule = load_yaml(prometheus_rule_path)
-      assert_equal [1, 4, 2, 2],
+      assert_equal [1, 5, 2, 2],
                    prometheus_rule.fetch('spec').fetch('groups').map { |group| group.fetch('rules').length }
 
       dashboard_resource = load_yaml(grafana_path)
       dashboard = JSON.parse(dashboard_resource.fetch('data').fetch('checkout-api-slo.json'))
-      assert_equal 5, dashboard.fetch('panels').length
+      assert_equal 6, dashboard.fetch('panels').length
 
       route_intent = load_yaml(route_path)
       assert_equal true, route_intent.fetch('receiver_contract').fetch('configuration_required')

@@ -8,7 +8,7 @@ See [Telemetry-First Adoption Map](adoption-map.md) for the value-oriented onboa
 ## Keep
 
 - Ruby service level definition DSL.
-- SLI, SLI instance, SLO, objective, success condition, and calculation-basis concepts.
+- SLI, SLI instance, SLO, objective, evaluation-window, success condition, and calculation-basis concepts.
 - Validation of naming, required fields, uniqueness, SLO objective ranges, and metric binding completeness.
 - Validation that SLO alert route keys and provider-specific route sources exist.
 - Reality checks against historical telemetry and measured metric inventories.
@@ -155,7 +155,7 @@ does not execute the Sloth CLI or mutate downstream Prometheus resources.
 
 ## Prometheus Stack Provider Generation
 
-`rules-ctl generate --provider prometheus_stack` emits one base observation recording rule for every SLI instance and derived success-ratio, error-ratio, objective-ratio, and error-budget-ratio recording rules for every reviewed SLO. Burn-rate recording rules remain SLO-specific. Record names are normalized to valid Prometheus metric identifiers while reviewed service, owner, SLI, instance, SLO, objective, and calculation-basis identity remains available as labels.
+`rules-ctl generate --provider prometheus_stack` emits one base observation recording rule for every SLI instance and derived evaluation-window success-ratio, error-ratio, objective-ratio, error-budget-ratio, and error-budget-remaining-ratio recording rules for every reviewed SLO. Burn-rate recording rules remain SLO-specific and calculate each burn value over its own policy window. Record names are normalized to valid Prometheus metric identifiers while reviewed service, owner, SLI, instance, SLO, objective, evaluation window, and calculation-basis identity remains available as labels.
 
 The provider also renders a native Prometheus Operator `PrometheusRule`, a
 Grafana sidecar-compatible dashboard `ConfigMap`, and a credential-free
@@ -168,6 +168,23 @@ receiver configuration; it does not invent an Alertmanager webhook host,
 secret, or credential.
 
 Selector-based SLOs calculate success ratios from scoped counter rates. Threshold-based SLOs generate boolean time-slice ratios and require a numeric threshold plus `time_slice` calculation basis; unsupported threshold intent is rejected during provider validation rather than emitted as a misleading success ratio.
+
+## Live SLO And Error-Budget Status
+
+`rules-ctl status` reads one reviewed `prometheus_stack` manifest and queries
+only the generated recording-rule identifiers through the Prometheus-compatible
+instant-query API. The provider-neutral
+`slo-rules-engine/live-slo-status/v1` report normalizes objective attainment,
+remaining/consumed budget, burn-rate windows, observation count, source age,
+freshness, reviewed context, provider resource identifiers, query evidence, and
+machine-readable findings.
+
+The reader distinguishes `healthy`, `at_risk`, `exhausted`,
+`missing_telemetry`, and `unverifiable`. It treats those classifications as
+operational report data rather than CLI failures. Unreviewed or invalid
+manifests and unsupported providers fail before backend access. Raw backend
+error messages are not copied into the report. Datadog, Sloth, release-bundle,
+and portfolio status remain future Phase 13 increments.
 
 ## Change
 

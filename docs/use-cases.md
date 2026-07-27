@@ -21,6 +21,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Apply reviewed state | Reviewed provider artifacts and mutation gates | Durable journal plus provider result and post-operation verification | Explicit `--confirm` and `--journal-dir` |
 | Remove managed state | Reviewed scope and ownership evidence | Durable journal plus confirmed delete result and absence verification | Explicit `--confirm` and `--journal-dir` |
 | Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
+| Inspect live SLO status | Reviewed SLO identity, evaluation window, objective, budget, burn policy, and response context | Versioned live-status report with per-SLO state and freshness | Prometheus-compatible instant-query reads only |
 | Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
 | Validate Datadog contract | Explicit sandbox credential and dashboard API evidence | Public-safe sandbox smoke JSON | Read-only by default; one temporary dashboard only with explicit confirmation |
 
@@ -43,6 +44,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Bundle execution | New content-addressed `applied` bundle with predecessor lineage and one `execution_result` artifact per target |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
+| Live SLO status | `slo-rules-engine/live-slo-status/v1` JSON with state counts, reviewed identity/context, objective attainment, remaining budget, burn windows, provider resource names, timestamps, freshness, and machine-readable findings |
 | Datadog sandbox smoke | `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with public-safe read checks and optional temporary-dashboard lifecycle evidence |
 
 ### Provider Outputs
@@ -56,6 +58,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Approved exact plan | Deferred until the live backend recheck contract is verified | Immutable reviewed plan with manifest, review, handoff, desired-state, observed-state, and operation fingerprints | The same immutable contract, including the stored external-generator handoff |
 | Operation journal | Confirmed apply/prune persists request method/path, returned resource ID, response fingerprint, sanitized failures, and terminal backend verification | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
 | Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
+| Live status | Deferred until the safe backend read contract is resumed | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records | Deferred until downstream Sloth-generated recording-rule identity is captured |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
@@ -225,7 +228,7 @@ Change `--provider` to `datadog` or `sloth` for another target.
 - All providers print a JSON array of generated manifests to stdout.
 - With `--output-dir`, each service manifest is saved at `./work/generated/<service>/<provider>/manifest.json`, and the provider report is saved at `./work/generated/manifest-review/<provider>.json`.
 - Datadog manifests contain one SLO, burn-rate monitor, missing-telemetry monitor, and decision dashboard intent per reviewed SLO, including owner, playbook, route, and source context.
-- Prometheus Stack manifests contain one base observation recording rule per SLI instance; success-ratio, error-ratio, objective-ratio, error-budget-ratio, and burn-rate recording rules per SLO; telemetry-gap and burn-rate alerts; Grafana dashboards; Alertmanager routes; and rendered PrometheusRule/ConfigMap/route-intent content.
+- Prometheus Stack manifests contain one base observation recording rule per SLI instance; evaluation-window success-ratio, error-ratio, objective-ratio, error-budget-ratio, `error_budget_remaining_ratio`, and window-specific burn-rate recording rules per SLO; telemetry-gap and burn-rate alerts; Grafana dashboards; Alertmanager routes; and rendered PrometheusRule/ConfigMap/route-intent content.
 - Sloth manifests contain `prometheus/v1` SLO specs, error and total event queries, page/ticket alert labels, and owner/dashboard/playbook/miss-policy/route annotations.
 - Generation does not write Prometheus Stack or Sloth native YAML files. Confirmed file-backed apply writes those files from the reviewed manifest.
 
@@ -800,6 +803,76 @@ creates no SLO, monitor, route, or telemetry and does not bypass the reviewed
 manifest, journal, ownership, and verification gates of normal `apply` or
 `prune`.
 
+## Use Case 16: Inspect Live SLO And Error-Budget Status
+
+**Task:** answer whether one reviewed Prometheus Stack SLO is attaining its
+objective, how much error budget remains, whether burn policy is breached, and
+whether the evidence is fresh enough to trust.
+
+The neutral DSL carries an explicit evaluation window:
+
+```ruby
+slo do
+  uid 'successful-requests'
+  objective 0.999
+  evaluation_window '30d'
+  success_selector status: 'success'
+end
+```
+
+`30d` is the compatibility default when the field is omitted. Generation
+evaluates the success ratio over that window, records the allowed
+`error_budget_ratio`, records the current `error_budget_remaining_ratio`, and
+computes each burn-rate record from its own policy window.
+
+Read the live generated series:
+
+```bash
+bin/rules-ctl status \
+  --provider=prometheus_stack \
+  --manifest=./work/generated/checkout-api/prometheus_stack/manifest.json \
+  --base-url=http://localhost:9090 \
+  --max-age-seconds=300 \
+  --output=./work/status/checkout-api.json
+```
+
+`PROMETHEUS_URL` supplies the default base URL when `--base-url` is omitted.
+
+**What to expect:**
+
+- Stdout is one `slo-rules-engine/live-slo-status/v1`
+  `LiveSLOStatusReport`; `--output` writes the same JSON and adds its saved
+  report path.
+- The report summary counts `healthy`, `at_risk`, `exhausted`,
+  `missing_telemetry`, and `unverifiable` SLOs. Each status includes reviewed
+  service/SLI/instance/SLO identity, objective and evaluation window,
+  attainment, allowed/remaining/consumed budget, burn windows, observations,
+  source timestamp, age, freshness limit, owner, dashboard, playbook, generated
+  recording-rule identifiers, provider query evidence, and findings.
+- The reader performs eight `GET /api/v1/query` reads for the one-SLO fixture:
+  observation, success, objective, allowed budget, remaining budget, two burn
+  windows, and `timestamp(success_ratio)`. It performs no write, reload,
+  Kubernetes, Grafana, Alertmanager, or notification call.
+- A fresh attained SLO with no burn breach is `healthy`; a burn breach or
+  internally inconsistent below-target result is `at_risk`; zero remaining
+  budget is `exhausted`; absent or stale evidence is `missing_telemetry`; and
+  ambiguous, invalid, failed, or incomplete evidence is `unverifiable`.
+- These five states are report data, so a successfully produced unhealthy
+  report exits zero. Invalid schema, missing reviewed provenance, invalid
+  options, multiple manifests, or a provider other than `prometheus_stack`
+  exits nonzero before a backend read.
+- Query failure findings retain the provider expression and error class, but
+  not the raw backend error message. The report never stores credentials.
+- Datadog live status remains postponed. Sloth status remains unavailable
+  until the engine can link its external generator handoff to the downstream
+  recording-rule identities. Bundle and portfolio aggregation are the next
+  Phase 13 increment.
+
+**Intent preserved:** objective, evaluation window, calculation basis, and
+response context come from reviewed neutral intent. PromQL record names and
+instant-query syntax stay in the Prometheus reader; the neutral status model
+contains only normalized values, identity, freshness, and findings.
+
 ## Maintenance Rule
 
 Update or rewrite usage when any of these changes:
@@ -813,5 +886,6 @@ Update or rewrite usage when any of these changes:
 - approved-plan schema, review, locking, exact execution, replay, or provider coverage changes
 - exact-plan resume eligibility, state-recheck, attempt, or re-verification behavior changes
 - cross-provider evidence portability or binding requirements change
+- live-status schema, classification, freshness, provider reads, or supported scope changes
 
 Keep this guide organized around engineering tasks. Every use case must state concrete stdout, written-file, provider-read, provider-write, and refusal behavior that applies.

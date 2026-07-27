@@ -25,6 +25,18 @@ class ValidationTest < Minitest::Test
     assert result.errors.any? { |error| error.path.end_with?('.objective') }
   end
 
+  def test_rejects_invalid_evaluation_window
+    definition = SloRulesEngine.definitions.fetch(0)
+    definition.slis.fetch(0).instances.fetch(0).slos.fetch(0).evaluation_window = 'monthly'
+
+    result = SloRulesEngine::CoreValidator.new.validate(definition)
+
+    refute result.valid?
+    assert result.errors.any? do |error|
+      error.path.end_with?('.evaluation_window') && error.message.include?('duration')
+    end
+  end
+
   def test_validation_errors_include_line_reference
     definition = SloRulesEngine.definitions.fetch(0)
     definition.slis.fetch(0).instances.fetch(0).slos.fetch(0).objective = 1.0

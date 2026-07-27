@@ -48,6 +48,7 @@ class ReliabilityModelTest < Minitest::Test
     assert_equal 1, report.fetch(:service_count)
     assert_equal 1, report.fetch(:slo_count)
     assert_empty report.fetch(:private_identifiers)
+    assert_equal({ '30d' => 1 }, report.fetch(:evaluation_window_distribution))
     assert_includes report.fetch(:observability_handoff_requests), 'bind provider queries'
   ensure
     SloRulesEngine.clear_definitions

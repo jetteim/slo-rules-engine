@@ -69,6 +69,7 @@ module SloRulesEngine
                 "Datadog metric SLO apply requires a success_selector for #{fetch_value(artifact, :name).inspect}"
         end
 
+        timeframe = slo_timeframe(artifact)
         {
           name: fetch_value(artifact, :name),
           type: 'metric',
@@ -80,11 +81,11 @@ module SloRulesEngine
           tags: datadog_tags(manifest, artifact, source),
           thresholds: [
             {
-              timeframe: DEFAULT_SLO_TIMEFRAME,
+              timeframe: timeframe,
               target: objective_percent(fetch_value(artifact, :objective_ratio))
             }
           ],
-          timeframe: DEFAULT_SLO_TIMEFRAME,
+          timeframe: timeframe,
           target_threshold: objective_percent(fetch_value(artifact, :objective_ratio))
         }
       end
@@ -103,6 +104,7 @@ module SloRulesEngine
                   "Datadog time-slice apply requires a success_selector or success_threshold for #{fetch_value(artifact, :name).inspect}"
           end
 
+        timeframe = slo_timeframe(artifact)
         {
           name: fetch_value(artifact, :name),
           type: 'time_slice',
@@ -111,11 +113,11 @@ module SloRulesEngine
           tags: datadog_tags(manifest, artifact, source),
           thresholds: [
             {
-              timeframe: DEFAULT_SLO_TIMEFRAME,
+              timeframe: timeframe,
               target: objective_percent(fetch_value(artifact, :objective_ratio))
             }
           ],
-          timeframe: DEFAULT_SLO_TIMEFRAME,
+          timeframe: timeframe,
           target_threshold: objective_percent(fetch_value(artifact, :objective_ratio))
         }
       end
@@ -190,11 +192,12 @@ module SloRulesEngine
         long_window = fetch_value(primary_window, :range)
         short_window = BURN_RATE_SHORT_WINDOWS.fetch(long_window, '5m')
         threshold = fetch_value(primary_window, :threshold)
+        timeframe = matching_slo_timeframe(manifest, artifact)
 
         {
           name: fetch_value(artifact, :name),
           type: 'slo alert',
-          query: %(burn_rate("__SLO_REF__[#{slo_reference_name_from_context(artifact)}]").over("#{DEFAULT_SLO_TIMEFRAME}").long_window("#{long_window}").short_window("#{short_window}") > #{threshold}),
+          query: %(burn_rate("__SLO_REF__[#{slo_reference_name_from_context(artifact)}]").over("#{timeframe}").long_window("#{long_window}").short_window("#{short_window}") > #{threshold}),
           message: burn_rate_message(artifact),
           tags: datadog_tags(manifest, artifact, source).push("route_key:#{fetch_value(artifact, :route_key)}"),
           options: {
@@ -224,6 +227,18 @@ module SloRulesEngine
             }
           }
         }
+      end
+
+      def slo_timeframe(artifact)
+        fetch_value(artifact, :evaluation_window, DEFAULT_SLO_TIMEFRAME).to_s
+      end
+
+      def matching_slo_timeframe(manifest, artifact)
+        reference_name = slo_reference_name_from_context(artifact)
+        slo = Array(fetch_value(fetch_value(manifest, :artifacts, {}), :slos, [])).find do |candidate|
+          fetch_value(candidate, :name).to_s == reference_name
+        end
+        slo_timeframe(slo || {})
       end
 
       def dashboard_payload(manifest, artifact, source)

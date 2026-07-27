@@ -10,6 +10,7 @@ require_relative '../lib/slo_rules_engine/cli/journal_commands'
 require_relative '../lib/slo_rules_engine/cli/onboarding_commands'
 require_relative '../lib/slo_rules_engine/cli/plan_commands'
 require_relative '../lib/slo_rules_engine/cli/report_commands'
+require_relative '../lib/slo_rules_engine/cli/status_commands'
 require_relative '../lib/slo_rules_engine/cli/telemetry_commands'
 
 module RulesCtl
@@ -19,6 +20,7 @@ module RulesCtl
   extend SloRulesEngine::CLI::OnboardingCommands
   extend SloRulesEngine::CLI::PlanCommands
   extend SloRulesEngine::CLI::ReportCommands
+  extend SloRulesEngine::CLI::StatusCommands
   extend SloRulesEngine::CLI::TelemetryCommands
 
   module_function
@@ -44,6 +46,8 @@ module RulesCtl
       import_existing(argv)
     when 'prune'
       prune(argv)
+    when 'status'
+      status(argv)
     when 'bundle'
       bundle(argv)
     when 'journal'
@@ -739,6 +743,7 @@ module RulesCtl
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--journal-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
+        bin/rules-ctl status --provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] [--max-age-seconds=<seconds>] [--output=<file>]
         bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
         bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
         bin/rules-ctl bundle apply <apply-ready-bundle.json> --confirm --approved-plan=<approved-plan.json> [--approved-plan=<approved-plan.json> ...] --journal-dir=<dir> --output=<applied-bundle.json>

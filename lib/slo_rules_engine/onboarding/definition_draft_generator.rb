@@ -105,6 +105,7 @@ module SloRulesEngine
           '      slo do',
           "        uid '#{quote(proposed_slo.fetch(:uid))}'",
           "        objective #{format_objective(proposed_slo.fetch(:objective))}",
+          "        evaluation_window '30d'",
           success_line(candidate.fetch(:signal)),
           "        calculation_basis '#{quote(proposed_slo.fetch(:calculation_basis))}'",
           "        documentation '#{quote(proposed_slo.fetch(:success_condition))}'",

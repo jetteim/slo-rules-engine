@@ -72,6 +72,7 @@ SRE.define do
       slo do
         uid 'successful-requests'
         objective 0.999
+        evaluation_window '30d'
         success_selector status: 'success'
         calculation_basis 'observations'
         alert_route_key 'checkout-api'

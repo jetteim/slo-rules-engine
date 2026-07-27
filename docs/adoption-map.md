@@ -72,13 +72,12 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. define provider-neutral live SLO and error-budget status from reviewed SLO
-   identity, objective attainment, error budget, burn rate, and freshness
-2. add read-only Prometheus-compatible status evidence without moving PromQL
-   into the neutral model
-3. keep Datadog live contract testing and exact apply/resume postponed until
+1. aggregate the completed one-manifest Prometheus live-status contract across
+   reviewed release bundles and portfolio scopes without weakening per-target
+   freshness or findings
+2. keep Datadog live status, contract testing, and exact apply/resume postponed until
    isolated credentials are available
-4. keep housekeeping paused unless feature work exposes a clean,
+3. keep housekeeping paused unless feature work exposes a clean,
    behavior-tested boundary
 
 ## Housekeeping Backlog

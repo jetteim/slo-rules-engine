@@ -22,6 +22,7 @@ class ProvidersTest < Minitest::Test
     assert_includes registry.fetch('datadog').capabilities, 'apply_plan'
     assert_includes registry.fetch('sloth').capabilities, 'slo_evaluation'
     assert_includes registry.fetch('sloth').capabilities, 'apply_plan'
+    assert_includes registry.fetch('prometheus_stack').capabilities, 'live_slo_status'
   end
 
   def test_provider_registry_lists_automation_modes_and_state_actions
@@ -80,6 +81,7 @@ class ProvidersTest < Minitest::Test
 
     assert_equal 'datadog', manifest[:provider]
     assert_equal 1, manifest[:artifacts][:slos].length
+    assert_equal '30d', manifest[:artifacts][:slos].fetch(0).fetch(:evaluation_window)
     assert_equal '5m', manifest[:artifacts][:slos].fetch(0).fetch(:query).fetch(:range)
     assert_equal 1, manifest[:artifacts][:monitors].length
     assert_equal [14.4, 6.0], manifest[:artifacts][:monitors].fetch(0)[:burn_rate_windows].map { |window| window[:threshold] }
@@ -88,13 +90,25 @@ class ProvidersTest < Minitest::Test
     assert_equal 1, manifest[:artifacts][:dashboards].length
   end
 
+  def test_datadog_provider_rejects_evaluation_windows_outside_the_verified_contract
+    slo = @definition.slis.fetch(0).instances.fetch(0).slos.fetch(0)
+    slo.evaluation_window = '7d'
+
+    result = SloRulesEngine.default_provider_registry.fetch('datadog').validate(@definition)
+
+    refute result.valid?
+    assert result.errors.any? do |error|
+      error.path.end_with?('.evaluation_window') && error.message.include?('30d')
+    end
+  end
+
   def test_prometheus_stack_provider_is_single_bundle
     manifest = SloRulesEngine.default_provider_registry.fetch('prometheus_stack').generate(@definition).to_h
 
     assert_equal 'prometheus_stack', manifest[:provider]
-    assert_equal 5, manifest[:artifacts][:recording_rules].length
+    assert_equal 6, manifest[:artifacts][:recording_rules].length
     assert_equal 1, manifest[:artifacts][:recording_rules].count { |rule| rule[:kind] == 'sli' }
-    assert_equal 4, manifest[:artifacts][:recording_rules].count { |rule| rule[:kind] == 'slo' }
+    assert_equal 5, manifest[:artifacts][:recording_rules].count { |rule| rule[:kind] == 'slo' }
     assert_equal 2, manifest[:artifacts][:burn_rate_rules].length
     assert_equal [14.4, 6.0], manifest[:artifacts][:burn_rate_rules].map { |rule| rule[:threshold] }
     assert_equal 1, manifest[:artifacts][:missing_telemetry_rules].length
