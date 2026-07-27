@@ -14,10 +14,12 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 4. Apply-exact-plan workflow
 5. Live SLO and error-budget status
 
-The release-bundle planning boundary and provider-neutral state/journal
-contracts are implemented. New slices should continue state-manager hardening
-in the accepted sequence above and should not resume housekeeping or
-opportunistic provider work.
+The release-bundle planning boundary, provider-neutral state/journal contracts,
+and file-backed apply-exact-plan workflow are implemented. Live Datadog sandbox
+testing is explicitly postponed by the user. The next local roadmap slice
+should complete multi-target file-backed `bundle apply`, then proceed to live
+SLO/error-budget status without resuming housekeeping or inventing Datadog
+backend semantics.
 
 Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages discovery evidence, reviewed handoffs and definitions, provider manifests, fresh manifest-review reports, and dry-run plans into a content-addressed JSON document. It records explicit reviewer attestation, lifecycle state, provider targets, artifact fingerprints, transition lineage, and provider-level change and risk summaries without credentials. `bundle create` is fail-closed for incomplete, stale, invalid, or credential-bearing input. `bundle plan` rechecks predecessor freshness, requires explicit runtime configuration for every target, leaves the predecessor immutable, performs no provider mutation, and writes a new content-addressed `apply_ready` bundle. `bundle status` detects schema errors, embedded tampering, identity mismatch, missing sources, and source drift.
 
@@ -30,12 +32,24 @@ expected/actual state fingerprints and stable findings. Sloth keeps downstream
 generation explicitly pending. Confirmed Datadog apply/prune now uses the same
 durable journal/result boundary, records sanitized request outcomes and returned
 backend identifiers, and refreshes backend state to verify canonical payload
-and identity convergence or delete absence. Exact-plan/resume behavior is still
-a later phase. Datadog dashboard reconciliation now reads the paginated custom
+and identity convergence or delete absence. Datadog dashboard reconciliation
+now reads the paginated custom
 dashboard catalog and full details instead of assuming manual dashboard-list
 membership. A public-safe sandbox smoke command can validate credentials,
 catalog/detail reads, and an explicitly confirmed temporary dashboard
 create/find/delete cycle without storing credentials or raw backend bodies.
+
+Current exact-plan status:
+`slo-rules-engine/approved-provider-plan/v1` locks one Prometheus Stack or
+Sloth target from a valid `apply_ready` bundle with reviewer attestation,
+bundle lineage, evidence fingerprints, exact provider plan, and managed
+runtime. `plan apply` serializes the managed scope, rejects changed observed
+state, executes only stored operations, journals the approved-plan reference,
+and verifies final files. Completed plans replay without mutation after a fresh
+convergence check. `plan resume` retries only journal-eligible writes after
+proving earlier successes still converge, preserves all attempts, and
+re-verifies the full file set. Datadog exact apply/resume remains postponed
+with live backend validation.
 
 ## Non-Negotiable Working Rules
 
@@ -218,13 +232,42 @@ Implemented by the latest feature slices:
 - `docs/datadog-sandbox-testing.md` documents public trial and partner-sandbox
   paths, least-privilege scopes, regional sites, exact provider reads/writes,
   expected output, telemetry-discovery behavior, and credential revocation
+- `plan approve` persists one immutable, content-addressed, credential-free
+  Prometheus Stack or Sloth target with explicit reviewer metadata and locked
+  bundle/manifest/review/handoff/provider-state fingerprints
+- `plan status` revalidates approved-plan identity, provider-state
+  fingerprints, evidence references, and managed path containment without
+  contacting a backend
+- `plan apply` acquires a nonblocking managed-scope lock, rejects stale
+  immediate state, and reconstructs execution only from approved `write`,
+  `noop`, and `handoff` changes
+- Exact execution journals validate both live execution-plan identity and the
+  approved dry-run plan ID/fingerprint; final managed files are re-read through
+  the existing `ProviderStateResult` verification contract
+- Completed exact plans replay idempotently only after a fresh convergence
+  check and return the original journal/result without rewriting files
+- Partial or failed exact plans return `approved_plan_requires_resume` without
+  adding attempts and include manual state-recheck/rollback guidance
+- `plan resume` proves all prior successes still converge, retries only
+  journal-eligible file writes, preserves attempt history, and re-verifies
+  every engine-owned file
+- Same-scope concurrent exact apply/resume returns
+  `approved_plan_scope_busy`; missing, stale, invalid, or non-resumable
+  evidence fails before a new provider operation
+- Datadog exact approval/apply/resume is intentionally rejected until safe live
+  backend recheck/idempotency evidence is available
 - The project backlog includes one atomic, revertible repository-wide
   simplification checkpoint gated by requirements/use-case traceability and full
   behavioral verification
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: public-safe Datadog sandbox setup and read/mutation
+- latest checkpoint: explicit state-checked resume for journal-eligible exact
+  file writes with full re-verification
+- previous checkpoint: converged completed-plan replay without file mutation
+- previous checkpoint: immutable approved plans and exact Prometheus
+  Stack/Sloth execution with stale-state and scope-concurrency rejection
+- previous checkpoint: public-safe Datadog sandbox setup and read/mutation
   contract smoke workflow
 - previous checkpoint: custom-dashboard catalog reconciliation independent of
   manual dashboard-list membership
@@ -289,12 +332,17 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Run the new read-only and temporary-dashboard smoke probes against an
-   isolated Datadog organization and record only sanitized contract evidence
-2. Validate remaining Datadog resource semantics against safe real-backend evidence
-3. Complete provider-schema create/update fixtures and managed-resource adoption evidence
-4. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
-5. Expose live SLO and error-budget status without weakening provider-neutral intent
+1. Complete multi-target file-backed `bundle apply` using approved plans,
+   fail-closed sequencing, and per-target results without weakening exact-plan
+   guarantees
+2. Define and expose live SLO/error-budget status without moving provider query
+   syntax into the neutral model
+3. Run the Datadog sandbox probes and resume live provider-contract work only
+   when the user makes credentials/evidence available
+4. Extend exact approval/apply/resume to Datadog only after verified backend
+   recheck and idempotency semantics exist
+5. Add automatic rollback execution only after a reviewed compensating-plan
+   contract exists; current exact failures provide manual guidance
 
 Secondary gaps:
 
@@ -308,40 +356,35 @@ Secondary gaps:
 
 Next recommended slice:
 
-- obtain credentials for an isolated Datadog trial, partner sandbox, or
-  administrator-approved test organization without storing them in the repo
-- run `scripts/datadog-sandbox-smoke` read-only first, then run the explicit
-  temporary-dashboard mutation probe only after confirming the target
-  organization is disposable or approved for testing
-- run Datadog telemetry discovery with `metrics_read`; accept an empty sandbox
-  as partial authentication/catalog evidence rather than inventing signals
-- convert only observed, sanitized contract facts into public-safe evidence;
-  never commit credentials, organization data, dashboard payloads, or raw error
-  bodies
-- if live evidence exposes a contract mismatch, add a failing characterization
-  test before changing the adapter
-- preserve current ownership, source-ref, payload validation, review, risk,
-  journal, sanitization, and post-mutation verification gates
-- keep unverified provider fields out of the supported contract rather than
-  generalizing from fake-client behavior
-- keep automatic resume, exact-plan execution, `bundle apply`, and live SLO
-  status outside this slice
+- add `bundle apply` for an `apply_ready` bundle plus one approved plan per
+  file-backed target
+- require exact target coverage, source bundle identity, target UID, provider,
+  service, evidence fingerprints, and approved provider-plan fingerprints to
+  match before any target begins
+- reject Datadog/mixed live-API bundles explicitly while live contract testing
+  remains postponed
+- execute targets deterministically through the existing exact-plan executor,
+  stop on the first failed/incomplete target, and preserve every per-target
+  journal/result
+- persist a new content-addressed `applied` bundle transition rather than
+  mutating the `apply_ready` predecessor
+- make completed target replay idempotent and ensure a partial target requires
+  explicit `plan resume` before bundle execution can advance
+- update README/use cases with exact stdout, written bundle, provider writes,
+  replay, partial failure, and refusal behavior
+- keep live SLO/error-budget status as the next feature after this bundle
+  execution boundary
 
 Rationale:
 
-- the provider-neutral plan, journal, attempt, result, and verification
-  contracts are now exercised by both deterministic files and the Datadog live
-  API adapter
-- fake-client evidence proves orchestration, failure, sanitization, and
-  convergence behavior but cannot prove the remaining external API field
-  contract
-- the sandbox probe now gives Phase 11 a repeatable least-privilege path from
-  credential validation through catalog/detail reads and optional managed
-  dashboard lifecycle verification
-- safe backend evidence is required before the remaining Datadog Phase 11
-  compatibility items can be marked complete
-- exact-plan execution remains a separate Phase 12 guarantee and must not be
-  implied by immediate live replanning or operation journals
+- release bundles already carry immutable target plans and lifecycle lineage
+- approved plans now provide the exact per-target review, stale-state,
+  concurrency, replay, resume, journal, and verification guarantees that
+  `bundle apply` was waiting for
+- file-backed providers can prove the bundle transition locally without
+  Datadog credentials or new provider semantics
+- Datadog live testing is explicitly postponed, so mixed/live-API bundle
+  mutation must fail closed rather than being generalized from fake clients
 
 ## Next Session Handoff
 
@@ -350,53 +393,52 @@ Prepared on 2026-07-27 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `4a421af feat: add datadog sandbox
-  contract smoke`
-- previous verified feature checkpoint: `7fb4976 fix: discover datadog
-  dashboards from catalog`
+- latest verified feature checkpoint: `2d94384 feat: resume eligible exact plan
+  writes`
+- previous verified feature checkpoint: `87964c9 feat: replay completed exact
+  plans safely`
+- previous verified feature checkpoint: `98086b5 feat: apply approved file
+  plans exactly`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: `4a421af` on local and remote `main`
+- target: `2d94384` on local and remote `main`
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-27T11:35:56Z`
+- recorded timestamp: `2026-07-27T13:55:39Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 377 tests, 2,279 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 395 tests, 2,448 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- live verification: not run because no Datadog sandbox API/application
-  credentials were available in the process; the missing-credential refusal
-  path was executed and returned the expected public-safe nonzero report
-- blast radius: Datadog dashboard state reads no longer depend on manual
-  dashboard-list membership; a separate script adds read-only sandbox checks
-  and an explicit one-dashboard mutation probe. Normal `apply`, `prune`,
-  ownership, review, journal, and verification gates are unchanged
-- rollback path: revert `4a421af` to remove the sandbox probe and guide; revert
-  `7fb4976` to restore the former manual-dashboard-list discovery behavior
+- live verification: intentionally not run; the user postponed Datadog live
+  testing and this checkpoint uses only deterministic managed files
+- blast radius: new `plan approve|status|apply|resume` commands and additive
+  approved-plan journal references for Prometheus Stack/Sloth exact execution;
+  standard apply/prune and Datadog mutation behavior are unchanged
+- rollback path: revert `2d94384` to remove resume, `87964c9` to remove
+  completed replay, `8efece8` for workflow docs, and `98086b5` for approved
+  plan/exact execution
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Check whether isolated Datadog credentials are available without printing
-   them. If they are not available, stop and request that the user provision a
-   trial/sandbox and export the environment-backed values.
-5. Run the read-only sandbox smoke first. Run
-   `--confirm-sandbox-mutation` only after the user confirms the organization is
-   isolated and approved for temporary dashboard mutation.
-6. Optionally run Datadog telemetry discovery with `metrics_read`; empty
-   evidence is a valid partial result.
-7. Convert confirmed backend shapes into public-safe fixtures without storing
-   credentials, raw private payloads, or backend error bodies.
-8. Preserve current ownership, payload, review, risk, journal, sanitization, and
-   post-mutation verification gates.
-9. If safe backend evidence is unavailable, stop at the verified boundary
-   rather than inventing provider semantics.
-10. Do not add automatic resume, exact-plan execution, `bundle apply`, or live
-   SLO/error-budget status in the same slice.
+4. Keep Datadog live testing postponed unless the user explicitly reopens it
+   with isolated credentials/evidence.
+5. Use TDD for multi-target file-backed `bundle apply`: fail first on target
+   coverage, approval/bundle mismatch, target failure, and immutable predecessor
+   behavior.
+6. Reuse `ProviderState::ApprovedPlan::Loader` and `ExactPlanExecutor`; do not
+   regenerate or execute a different operation list.
+7. Require one approved plan for every file-backed target and reject live-API
+   or mixed bundles before any target executes.
+8. Stop after the first incomplete target while preserving earlier target
+   journals/results; require explicit `plan resume` for partial targets.
+9. Persist a new content-addressed applied bundle with predecessor transition
+   and per-target execution references only after all targets succeed/replay.
+10. Keep live SLO/error-budget status after the bundle execution slice.
 
 ## Verification Commands
 
@@ -437,11 +479,13 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/provider_state/operation_journal.rb`,
+5. Inspect `lib/slo_rules_engine/provider_state/approved_plan.rb`,
+   `lib/slo_rules_engine/provider_state/exact_plan_executor.rb`,
    `lib/slo_rules_engine/provider_state/journal_execution.rb`, and their tests
-6. Inspect `lib/slo_rules_engine/datadog/state_verifier.rb`,
-   `lib/slo_rules_engine/datadog/state_reader.rb`,
-   `lib/slo_rules_engine/datadog/sandbox_smoke.rb`,
-   `scripts/datadog-sandbox-smoke`, and `docs/datadog-sandbox-testing.md`
-7. If the user says `proceed`, follow the Phase 11 handoff above
-8. Keep Phase 11 Datadog reconciliation, Phase 12 exact-plan execution, and Phase 13 live status in the accepted order
+6. Inspect `lib/slo_rules_engine/release_bundle/planner.rb`,
+   `lib/slo_rules_engine/release_bundle/status_evaluator.rb`, and
+   `lib/slo_rules_engine/cli/bundle_commands.rb`
+7. If the user says `proceed`, implement the file-backed `bundle apply` slice
+   described above
+8. Keep Datadog live testing postponed and preserve exact-plan, review,
+   journal, and verification gates
