@@ -43,23 +43,8 @@ module SloRulesEngine
       end
 
       def apply_exact(approved_plan)
-        unless approved_plan.is_a?(ProviderState::ApprovedPlan::Document)
-          raise ProviderState::ApprovedPlan::Error.new(
-            'invalid_approved_plan',
-            'exact apply requires an approved provider plan'
-          )
-        end
+        validate_approved_plan_runtime!(approved_plan)
         approved_provider_plan = approved_plan.provider_plan
-        approved_output_dir = File.expand_path(
-          ProviderState::Value.fetch(approved_plan.runtime, :output_dir)
-        )
-        unless File.expand_path(@output_dir) == approved_output_dir
-          raise ProviderState::ApprovedPlan::Error.new(
-            'invalid_approved_plan_runtime',
-            'approved output directory does not match the exact-plan executor',
-            path: 'runtime.output_dir'
-          )
-        end
 
         manifest = ProviderState::Value.copy(approved_provider_plan.desired_state.resources)
         exact_plan = exact_apply_plan(approved_provider_plan)
@@ -117,6 +102,22 @@ module SloRulesEngine
           write_operation(operation)
         end
         attach_rollback_guidance(executed, approved_plan)
+      end
+
+      def resume_exact(approved_plan)
+        validate_approved_plan_runtime!(approved_plan)
+        approved_provider_plan = approved_plan.provider_plan
+        manifest = ProviderState::Value.copy(approved_provider_plan.desired_state.resources)
+        exact_plan = exact_apply_plan(approved_provider_plan)
+        current_provider_plan = plan(manifest).provider_state_plan
+        resumed = @executor.resume(
+          exact_plan,
+          current_plan: current_provider_plan,
+          approved_plan_reference: approved_plan.reference
+        ) do |operation|
+          write_operation(operation)
+        end
+        attach_rollback_guidance(resumed, approved_plan)
       end
 
       def diff(manifest)
@@ -203,6 +204,25 @@ module SloRulesEngine
       end
 
       private
+
+      def validate_approved_plan_runtime!(approved_plan)
+        unless approved_plan.is_a?(ProviderState::ApprovedPlan::Document)
+          raise ProviderState::ApprovedPlan::Error.new(
+            'invalid_approved_plan',
+            'exact apply requires an approved provider plan'
+          )
+        end
+        approved_output_dir = File.expand_path(
+          ProviderState::Value.fetch(approved_plan.runtime, :output_dir)
+        )
+        return if File.expand_path(@output_dir) == approved_output_dir
+
+        raise ProviderState::ApprovedPlan::Error.new(
+          'invalid_approved_plan_runtime',
+          'approved output directory does not match the exact-plan executor',
+          path: 'runtime.output_dir'
+        )
+      end
 
       def existing_exact_execution(exact_plan, approved_plan_reference)
         return nil unless @journal_store

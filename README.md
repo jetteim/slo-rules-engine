@@ -146,6 +146,15 @@ bin/rules-ctl plan apply ./work/approved-prometheus-stack-plan.json \
   --journal-dir=./work/journals
 ```
 
+After a partial file-write failure has been inspected and its environmental
+cause corrected, resume only journal-declared eligible operations:
+
+```bash
+bin/rules-ctl plan resume ./work/approved-prometheus-stack-plan.json \
+  --confirm \
+  --journal-dir=./work/journals
+```
+
 Approval writes a content-addressed artifact containing the selected target,
 review attestation, bundle lineage, manifest/review/handoff fingerprints, exact
 dry-run provider plan, and managed output directory. Apply first rechecks the
@@ -157,7 +166,9 @@ path. The journal preserves both the live execution-plan identity and the
 approved dry-run plan identity. Reapplying a completed plan rechecks current
 state and returns the existing verified journal/result without rewriting files.
 Partial or failed journals return `approved_plan_requires_resume` with manual
-rollback guidance; they are never retried implicitly.
+rollback guidance; they are never retried implicitly. `plan resume` preserves
+attempt history, proves earlier successes still converge, retries only
+resumable file writes, and re-verifies the complete engine-owned file set.
 
 ### Persist an operation journal
 
@@ -205,9 +216,10 @@ reread each attempted engine-owned file and record expected and actual state
 fingerprints. Execution stops on the first operation failure and exits nonzero
 for partial execution or verification drift. No-op resources retain their
 immediately pre-execution convergence evidence. Sloth's downstream generator
-remains pending. Automatic partial-failure resume is not implemented; exact
-execution and completed-plan replay are available through the separate
-approved-plan workflow above.
+remains pending. Exact execution, completed-plan replay, and explicit
+file-backed partial-failure resume are available through the separate
+approved-plan workflow above. Datadog resume and non-resumable operation retry
+remain unsupported.
 
 ### Inspect or reconcile provider state
 

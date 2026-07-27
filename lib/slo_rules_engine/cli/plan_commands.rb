@@ -15,8 +15,10 @@ module SloRulesEngine
           plan_status(argv)
         when 'apply'
           plan_apply(argv)
+        when 'resume'
+          plan_resume(argv)
         else
-          abort_usage('usage: plan approve|status|apply')
+          abort_usage('usage: plan approve|status|apply|resume')
         end
       end
 
@@ -124,6 +126,38 @@ module SloRulesEngine
             error.message,
             path: error.path
           ),
+          approved_plan_id: ProviderState::Value.fetch(payload, :approved_plan_id)
+        )
+      rescue Errno::ENOENT, Errno::EACCES, JSON::ParserError => error
+        render_approved_plan_error(
+          ProviderState::ApprovedPlan::Error.new('invalid_approved_plan_input', error.message)
+        )
+      end
+
+      def plan_resume(argv)
+        path = argv.shift
+        confirm = false
+        journal_dir = nil
+        parser = OptionParser.new do |opts|
+          opts.on('--confirm', 'Resume only journal-declared eligible operations') { confirm = true }
+          opts.on('--journal-dir=DIR', 'Existing exact-plan operation journal directory') do |value|
+            journal_dir = value
+          end
+        end
+        parser.parse!(argv)
+        abort_usage('missing approved provider plan path') if path.to_s.empty?
+        abort_usage('exact plan resume requires --confirm') unless confirm
+        abort_usage('exact plan resume requires --journal-dir') if journal_dir.to_s.empty?
+        abort_usage('unexpected arguments') unless argv.empty?
+
+        payload = JSON.parse(File.read(path), symbolize_names: true)
+        approved_plan = ProviderState::ApprovedPlan::Loader.new.load(payload)
+        result = ProviderState::ExactPlanExecutor.new(journal_dir: journal_dir).resume(approved_plan)
+        puts JSON.pretty_generate(result.to_h)
+        exit 1 if failed_execution?(result)
+      rescue ProviderState::ApprovedPlan::Error => error
+        render_approved_plan_error(
+          error,
           approved_plan_id: ProviderState::Value.fetch(payload, :approved_plan_id)
         )
       rescue Errno::ENOENT, Errno::EACCES, JSON::ParserError => error

@@ -123,8 +123,11 @@ conflicting content without overwrite. Reapplying a completed plan rechecks
 managed state and returns the existing verified journal/result without
 rewriting files. A partial or failed journal returns
 `approved_plan_requires_resume`, preserves all attempts, and includes manual
-state-recheck and rollback guidance. Automatic partial-failure resume, rollback
-execution, and multi-target `bundle apply` remain future lifecycle transitions.
+state-recheck and rollback guidance. `plan resume` can then retry only
+journal-eligible file writes after proving prior successes still converge; it
+preserves attempt history and re-verifies every engine-owned file. Datadog
+resume, non-resumable retries, rollback execution, and multi-target
+`bundle apply` remain future lifecycle transitions.
 
 ## Status Safety
 
@@ -196,6 +199,10 @@ bin/rules-ctl plan approve ./apply-ready-bundle.json \
 bin/rules-ctl plan status ./approved-plan.json
 
 bin/rules-ctl plan apply ./approved-plan.json \
+  --confirm \
+  --journal-dir ./journals
+
+bin/rules-ctl plan resume ./approved-plan.json \
   --confirm \
   --journal-dir ./journals
 ```

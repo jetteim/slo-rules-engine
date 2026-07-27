@@ -178,7 +178,8 @@ This is the running plan for the long refactor.
 - [x] Serialize exact applies per managed service/provider scope and reject concurrent execution.
 - [ ] Extend approval and immediate state recheck to Datadog after safe live backend evidence is available.
 - [x] Add idempotent completed-plan replay against a terminal operation journal after a fresh convergence check.
-- [ ] Resume safely from operation journals after partial failure.
+- [x] Resume journal-eligible file writes after a full state recheck while preserving attempt history.
+- [ ] Extend exact-plan resume to Datadog only after live idempotency and backend recheck semantics are verified.
 - [x] Verify final file state against the approved plan and emit manual rollback guidance when convergence fails.
 - [ ] Extend final-state verification and rollback guidance to Datadog exact execution.
 

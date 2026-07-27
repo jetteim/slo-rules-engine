@@ -747,6 +747,7 @@ module RulesCtl
         bin/rules-ctl plan approve <apply-ready-bundle.json> --target=<service/provider> --reviewer=<identity> --reviewed-at=<timestamp> --output=<approved-plan.json> [--note=<text> ...]
         bin/rules-ctl plan status <approved-plan.json>
         bin/rules-ctl plan apply <approved-plan.json> --confirm --journal-dir=<dir>
+        bin/rules-ctl plan resume <approved-plan.json> --confirm --journal-dir=<dir>
         bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
         bin/rules-ctl providers list
         bin/rules-ctl integrations list

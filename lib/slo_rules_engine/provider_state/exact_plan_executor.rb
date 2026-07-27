@@ -12,24 +12,18 @@ module SloRulesEngine
       end
 
       def execute(approved_plan)
-        unless approved_plan.is_a?(ApprovedPlan::Document)
-          approved_plan = ApprovedPlan::Loader.new.load(approved_plan)
-        end
-        mode = Value.fetch(approved_plan.target, :automation_mode)
-        unless ApprovedPlan::SUPPORTED_AUTOMATION_MODES.include?(mode)
-          raise ApprovedPlan::Error.new(
-            'unsupported_exact_plan_provider',
-            "exact-plan execution does not support automation mode #{mode.inspect}",
-            path: 'target.automation_mode'
-          )
-        end
+        approved_plan = validated_document(approved_plan)
 
         with_scope_lock(approved_plan) do
-          Appliers::ManifestBundle.new(
-            output_dir: Value.fetch(approved_plan.runtime, :output_dir),
-            journal_dir: @journal_dir,
-            clock: @clock
-          ).apply_exact(approved_plan)
+          applier(approved_plan).apply_exact(approved_plan)
+        end
+      end
+
+      def resume(approved_plan)
+        approved_plan = validated_document(approved_plan)
+
+        with_scope_lock(approved_plan) do
+          applier(approved_plan).resume_exact(approved_plan)
         end
       end
 
@@ -46,6 +40,28 @@ module SloRulesEngine
       end
 
       private
+
+      def validated_document(approved_plan)
+        unless approved_plan.is_a?(ApprovedPlan::Document)
+          approved_plan = ApprovedPlan::Loader.new.load(approved_plan)
+        end
+        mode = Value.fetch(approved_plan.target, :automation_mode)
+        return approved_plan if ApprovedPlan::SUPPORTED_AUTOMATION_MODES.include?(mode)
+
+        raise ApprovedPlan::Error.new(
+          'unsupported_exact_plan_provider',
+          "exact-plan execution does not support automation mode #{mode.inspect}",
+          path: 'target.automation_mode'
+        )
+      end
+
+      def applier(approved_plan)
+        Appliers::ManifestBundle.new(
+          output_dir: Value.fetch(approved_plan.runtime, :output_dir),
+          journal_dir: @journal_dir,
+          clock: @clock
+        )
+      end
 
       def with_scope_lock(approved_plan)
         path = scope_lock_path(approved_plan)

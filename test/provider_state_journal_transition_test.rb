@@ -155,6 +155,66 @@ class ProviderStateJournalTransitionTest < Minitest::Test
     assert_equal 'prior_operation_failed', stopped.dig(:entries, 1, :skip, :reason)
   end
 
+  def test_transitioner_resumes_only_eligible_entries_after_matched_state_recheck
+    initial = operation_journal(change_count: 2)
+    first_id, second_id = initial.fetch(:entries).map { |entry| entry.fetch(:entry_id) }
+    transitioner = SloRulesEngine::ProviderState::JournalTransitioner.new
+    running = transitioner.transition(
+      initial,
+      entry_id: first_id,
+      to: 'running',
+      occurred_at: STARTED_AT
+    )
+    failed = transitioner.transition(
+      running,
+      entry_id: first_id,
+      to: 'failed',
+      occurred_at: FINISHED_AT,
+      evidence: {
+        error: {
+          code: 'file_write_failed',
+          class: 'Errno::EACCES',
+          message: 'permission denied'
+        }
+      }
+    )
+    stopped = transitioner.transition(
+      failed,
+      entry_id: second_id,
+      to: 'skipped',
+      occurred_at: FINISHED_AT,
+      evidence: { reason: 'prior_operation_failed' }
+    )
+    evidence = {
+      approved_plan_id: "approved-provider-plan-#{'a' * 64}",
+      state_recheck: {
+        status: 'matched',
+        current_plan_fingerprint: 'b' * 64
+      }
+    }
+
+    resumed_failure = transitioner.resume(
+      stopped,
+      entry_id: first_id,
+      occurred_at: '2026-07-26T12:01:00.000000Z',
+      evidence: evidence
+    )
+    assert_equal 'running', resumed_failure.dig(:entries, 0, :status)
+    assert_equal 2, resumed_failure.dig(:entries, 0, :attempts).length
+    assert_equal 'matched',
+                 resumed_failure.dig(:entries, 0, :attempts, 1, :evidence, :state_recheck, :status)
+
+    error = assert_raises(SloRulesEngine::ProviderState::ContractError) do
+      transitioner.resume(
+        stopped,
+        entry_id: second_id,
+        occurred_at: '2026-07-26T12:01:00.000000Z',
+        evidence: { state_recheck: { status: 'unverified' } }
+      )
+    end
+    assert_equal 'entries[1].resume.state_recheck', error.path
+  end
+
   def test_store_creates_and_transitions_a_journal_atomically
     Dir.mktmpdir do |dir|
       store = SloRulesEngine::ProviderState::JournalStore.new(
@@ -250,6 +310,46 @@ class ProviderStateJournalTransitionTest < Minitest::Test
         )
       end
       assert_equal 'entries[0].verification.status', error.path
+    end
+  end
+
+  def test_store_can_replace_terminal_verification_during_explicit_recheck
+    Dir.mktmpdir do |dir|
+      store = SloRulesEngine::ProviderState::JournalStore.new(
+        root_dir: dir,
+        clock: -> { Time.utc(2026, 7, 26, 12, 0, 0) }
+      )
+      initial = operation_journal
+      path = store.create(initial)
+      entry_id = initial.fetch(:entries).fetch(0).fetch(:entry_id)
+      store.record_verification(
+        path,
+        entry_id: entry_id,
+        evidence: {
+          status: 'failed',
+          path: '/managed/manifest.json',
+          expected: { present: true, fingerprint: 'a' * 64 },
+          actual: { present: false, fingerprint: 'b' * 64 },
+          findings: [{ code: 'managed_file_missing_after_write' }]
+        }
+      )
+
+      updated = store.record_verification(
+        path,
+        entry_id: entry_id,
+        recheck: true,
+        evidence: {
+          status: 'succeeded',
+          path: '/managed/manifest.json',
+          expected: { present: true, fingerprint: 'a' * 64 },
+          actual: { present: true, fingerprint: 'a' * 64 },
+          findings: []
+        }
+      )
+
+      assert_equal 'succeeded', updated.dig(:entries, 0, :verification, :status)
+      assert_equal 1, updated.dig(:summary, :verification_succeeded_entries)
+      assert_equal 0, updated.dig(:summary, :verification_failed_entries)
     end
   end
 

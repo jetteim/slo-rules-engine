@@ -406,6 +406,15 @@ bin/rules-ctl plan apply \
   --journal-dir=./work/journals
 ```
 
+After inspecting a partial journal and fixing the external file-write cause:
+
+```bash
+bin/rules-ctl plan resume \
+  ./work/approved-prometheus-stack-plan.json \
+  --confirm \
+  --journal-dir=./work/journals
+```
+
 For Sloth, approve `checkout-api/sloth` into a separate output file and run the
 same `plan apply` command.
 
@@ -440,6 +449,19 @@ same `plan apply` command.
 - A partial, failed, or otherwise non-successful journal returns
   `approved_plan_requires_resume` without adding attempts. The original failed
   result includes manual rollback guidance and requires a state refresh.
+- `plan resume` requires the same approved plan and journal directory. It
+  verifies every prior success is still `noop`, retries only `write` entries
+  whose journal resume policy is eligible, preserves earlier attempts, and
+  records matched state-recheck evidence on each new attempt.
+- Previously skipped writes caused by `prior_operation_failed` are executed in
+  order after the failed write succeeds. A currently converged resumable write
+  is recorded as reconciled by state recheck without rewriting it.
+- Resume rechecks verification evidence for every engine-owned entry. Success
+  returns `execution.resume.status: completed`, the original journal path, full
+  attempt history, and a converged `ProviderStateResult`.
+- Missing journals return `approved_plan_resume_not_found`. Drift in any prior
+  success returns `stale_approved_plan` before a new attempt. Non-resumable or
+  active entries return `approved_plan_resume_blocked`.
 - On success, Prometheus Stack writes the approved manifest and native
   PrometheusRule, Grafana ConfigMap, and Alertmanager route-intent files. Sloth
   writes the approved manifest and native `prometheus/v1` input.
@@ -457,9 +479,9 @@ same `plan apply` command.
 **Safety boundary:** source files changing after approval do not silently alter
 the locked operation payload; a new release bundle and approval are required to
 adopt those changes. Managed-state drift blocks execution. This checkpoint does
-not implement partial-failure resume, automatic rollback execution,
-multi-target `bundle apply`, Datadog exact apply, Sloth execution, Kubernetes
-apply, Grafana loading, or Alertmanager delivery.
+not implement automatic rollback execution, multi-target `bundle apply`,
+Datadog exact apply/resume, retry of non-resumable operations, Sloth execution,
+Kubernetes apply, Grafana loading, or Alertmanager delivery.
 
 ## Use Case 10: Apply Reviewed State
 
@@ -700,6 +722,7 @@ Update or rewrite usage when any of these changes:
 - bundle lifecycle, identity, runtime configuration, or output changes
 - operation-journal schema, execution, resume, or verification behavior changes
 - approved-plan schema, review, locking, exact execution, replay, or provider coverage changes
+- exact-plan resume eligibility, state-recheck, attempt, or re-verification behavior changes
 - cross-provider evidence portability or binding requirements change
 
 Keep this guide organized around engineering tasks. Every use case must state concrete stdout, written-file, provider-read, provider-write, and refusal behavior that applies.

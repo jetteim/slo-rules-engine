@@ -57,7 +57,49 @@ module SloRulesEngine
         current
       end
 
-      def record_verification(journal, entry_id:, occurred_at:, evidence:)
+      def resume(journal, entry_id:, occurred_at:, evidence:)
+        current = validated_copy(journal)
+        entries = Value.fetch(current, :entries)
+        index = entries.index { |entry| Value.fetch(entry, :entry_id) == entry_id }
+        raise ContractError.new('entry_id', 'does not identify a journal entry') unless index
+
+        entry = entries.fetch(index)
+        status = Value.fetch(entry, :status)
+        unless %w[failed skipped].include?(status)
+          raise ContractError.new(
+            "entries[#{index}].status",
+            'must be failed or skipped before resume'
+          )
+        end
+        resume_policy = Value.fetch(entry, :resume)
+        unless Value.fetch(resume_policy, :eligible)
+          raise ContractError.new(
+            "entries[#{index}].resume.eligible",
+            'must be true before resume'
+          )
+        end
+        if status == 'skipped' && Value.fetch(Value.fetch(entry, :skip), :reason) != 'prior_operation_failed'
+          raise ContractError.new(
+            "entries[#{index}].skip.reason",
+            'must be prior_operation_failed before resume'
+          )
+        end
+        state_recheck = Value.fetch(evidence, :state_recheck)
+        unless state_recheck.is_a?(Hash) && Value.fetch(state_recheck, :status) == 'matched'
+          raise ContractError.new(
+            "entries[#{index}].resume.state_recheck",
+            'must record matched state evidence before resume'
+          )
+        end
+
+        entry.delete(:skip)
+        entry[:status] = 'running'
+        start_attempt!(entry, occurred_at, evidence)
+        refresh_rollups!(current)
+        current
+      end
+
+      def record_verification(journal, entry_id:, occurred_at:, evidence:, recheck: false)
         current = validated_copy(journal)
         entries = Value.fetch(current, :entries)
         index = entries.index { |entry| Value.fetch(entry, :entry_id) == entry_id }
@@ -71,7 +113,7 @@ module SloRulesEngine
             'must be true before verification can be recorded'
           )
         end
-        unless Value.fetch(verification, :status) == 'pending'
+        unless Value.fetch(verification, :status) == 'pending' || recheck
           raise ContractError.new(
             "entries[#{index}].verification.status",
             'must be pending before terminal evidence is recorded'
@@ -190,7 +232,21 @@ module SloRulesEngine
         end
       end
 
-      def record_verification(path, entry_id:, evidence:)
+      def resume(path, entry_id:, evidence:)
+        with_lock(path) do
+          current = JSON.parse(File.read(path), symbolize_names: true)
+          updated = @transitioner.resume(
+            current,
+            entry_id: entry_id,
+            occurred_at: timestamp,
+            evidence: evidence
+          )
+          write_atomic(path, updated)
+          updated
+        end
+      end
+
+      def record_verification(path, entry_id:, evidence:, recheck: false)
         with_lock(path) do
           current = JSON.parse(File.read(path), symbolize_names: true)
           occurred_at = Value.fetch(evidence, :checked_at) || timestamp
@@ -198,7 +254,8 @@ module SloRulesEngine
             current,
             entry_id: entry_id,
             occurred_at: occurred_at,
-            evidence: evidence
+            evidence: evidence,
+            recheck: recheck
           )
           write_atomic(path, updated)
           updated
@@ -497,9 +554,241 @@ module SloRulesEngine
         apply_plan
       end
 
+      def resume(apply_plan, current_plan:, approved_plan_reference:)
+        plan = apply_plan.provider_state_plan
+        raise ContractError.new('plan', 'must include provider state') unless plan
+        raise ContractError.new('plan.mode', 'must be live for resume') unless plan.mode == 'live'
+        unless current_plan.is_a?(Plan) && current_plan.mode == 'dry_run'
+          raise ContractError.new('current_plan', 'must be a dry-run ProviderStatePlan')
+        end
+        unless @journal_store
+          raise ContractError.new('journal_store', 'is required for resume')
+        end
+
+        initial = JournalBuilder.new(accepted_modes: ['live']).build(
+          plan,
+          approved_plan_reference: approved_plan_reference
+        ).to_h
+        journal_path = @journal_store.path_for(initial)
+        unless File.exist?(journal_path)
+          raise ApprovedPlan::Error.new(
+            'approved_plan_resume_not_found',
+            'no operation journal exists for the approved plan',
+            path: journal_path
+          )
+        end
+        journal = @journal_store.read(journal_path)
+        status = JournalEvaluator.new.evaluate(journal)
+        unless status.fetch(:valid)
+          raise ApprovedPlan::Error.new(
+            'invalid_existing_operation_journal',
+            'existing exact-plan operation journal failed integrity validation',
+            path: journal_path,
+            findings: status.fetch(:findings)
+          )
+        end
+        validate_resume_contract!(
+          apply_plan,
+          current_plan,
+          journal,
+          approved_plan_reference,
+          journal_path
+        )
+
+        failed = false
+        apply_plan.operations.each_with_index do |operation, index|
+          entry = Value.fetch(journal, :entries).fetch(index)
+          next unless resume_candidate?(entry)
+          next if failed
+
+          current_change = current_plan.changes.fetch(index)
+          entry_id = Value.fetch(entry, :entry_id)
+          journal = @journal_store.resume(
+            journal_path,
+            entry_id: entry_id,
+            evidence: {
+              approved_plan_id: Value.fetch(approved_plan_reference, :approved_plan_id),
+              state_recheck: {
+                status: 'matched',
+                current_plan_fingerprint: current_plan.fingerprint,
+                current_action: current_change.action
+              }
+            }
+          )
+          begin
+            outcome = if current_change.action == 'noop'
+                        {
+                          provider_resource_id: Value.fetch(operation.payload, :path),
+                          reconciled_by_state_recheck: true
+                        }
+                      else
+                        yield(operation)
+                      end
+            journal = @journal_store.transition(
+              journal_path,
+              entry_id: entry_id,
+              to: 'succeeded',
+              evidence: outcome || {}
+            )
+          rescue StandardError => error
+            journal = @journal_store.transition(
+              journal_path,
+              entry_id: entry_id,
+              to: 'failed',
+              evidence: { error: @error_evidence.call(error, operation) }
+            )
+            failed = true
+          end
+        end
+
+        journal = verify_entries(plan, journal, journal_path, recheck: true)
+        result = ResultBuilder.new.build(plan: plan, journal: journal)
+        apply_plan.execution = {
+          approved_plan: Value.copy(approved_plan_reference),
+          operation_journal: {
+            schema_version: JOURNAL_SCHEMA_VERSION,
+            journal_id: Value.fetch(journal, :journal_id),
+            path: journal_path,
+            status: Value.fetch(journal, :status)
+          },
+          result: result.to_h,
+          resume: {
+            status: %w[succeeded noop].include?(result.status) ? 'completed' : 'incomplete',
+            state_rechecked: true
+          }
+        }
+        apply_plan
+      end
+
       private
 
-      def verify_entries(plan, journal, path)
+      def validate_resume_contract!(
+        apply_plan,
+        current_plan,
+        journal,
+        approved_plan_reference,
+        journal_path
+      )
+        journal_reference = Value.fetch(Value.fetch(journal, :plan), :approved_plan)
+        unless journal_reference == approved_plan_reference
+          raise ApprovedPlan::Error.new(
+            'invalid_existing_operation_journal',
+            'existing operation journal does not match the approved plan',
+            path: journal_path
+          )
+        end
+        unless apply_plan.operations.length == current_plan.changes.length &&
+               apply_plan.operations.length == Value.fetch(journal, :entries).length
+          raise ApprovedPlan::Error.new(
+            'stale_approved_plan',
+            'current managed-file plan no longer matches the approved operation count',
+            path: 'provider_plan.changes'
+          )
+        end
+
+        apply_plan.operations.each_with_index do |operation, index|
+          entry = Value.fetch(journal, :entries).fetch(index)
+          current_change = current_plan.changes.fetch(index)
+          unless [
+            operation.target,
+            operation.name,
+            operation.source
+          ] == [
+            current_change.target,
+            current_change.name,
+            current_change.source
+          ]
+            raise ApprovedPlan::Error.new(
+              'stale_approved_plan',
+              'current managed-file operation identity differs from the approved plan',
+              path: "provider_plan.changes[#{index}]"
+            )
+          end
+
+          case Value.fetch(entry, :status)
+          when 'succeeded'
+            require_current_noop!(current_change, index)
+          when 'failed'
+            require_resumable_change!(entry, operation, current_change, index)
+          when 'skipped'
+            validate_skipped_resume_entry!(entry, operation, current_change, index)
+          else
+            raise ApprovedPlan::Error.new(
+              'approved_plan_resume_blocked',
+              'operation journal contains active or unstarted work that cannot be resumed automatically',
+              path: "entries[#{index}].status",
+              findings: [
+                {
+                  code: 'approved_plan_resume_blocked',
+                  journal_path: journal_path,
+                  entry_id: Value.fetch(entry, :entry_id),
+                  status: Value.fetch(entry, :status)
+                }
+              ]
+            )
+          end
+        end
+      end
+
+      def validate_skipped_resume_entry!(entry, operation, current_change, index)
+        reason = Value.fetch(Value.fetch(entry, :skip), :reason)
+        if reason == 'prior_operation_failed'
+          require_resumable_change!(entry, operation, current_change, index)
+          return
+        end
+        return if operation.action == 'handoff' && reason == 'external_handoff_required'
+        return if operation.action == 'noop' && current_change.action == 'noop'
+
+        raise ApprovedPlan::Error.new(
+          'approved_plan_resume_blocked',
+          'skipped operation does not have resumable prior-failure evidence',
+          path: "entries[#{index}].skip"
+        )
+      end
+
+      def require_resumable_change!(entry, operation, current_change, index)
+        unless Value.fetch(Value.fetch(entry, :resume), :eligible) &&
+               operation.action == 'write'
+          raise ApprovedPlan::Error.new(
+            'approved_plan_resume_blocked',
+            'operation is not eligible for automatic resume',
+            path: "entries[#{index}].resume"
+          )
+        end
+        return if %w[write noop].include?(current_change.action)
+
+        raise ApprovedPlan::Error.new(
+          'stale_approved_plan',
+          'current managed-file state cannot be reconciled by the approved write',
+          path: "provider_plan.changes[#{index}].action"
+        )
+      end
+
+      def require_current_noop!(current_change, index)
+        return if current_change.action == 'noop'
+
+        raise ApprovedPlan::Error.new(
+          'stale_approved_plan',
+          'a previously successful operation no longer matches approved desired state',
+          path: "provider_plan.changes[#{index}].action",
+          findings: [
+            {
+              code: 'resumed_operation_state_drift',
+              position: index,
+              current_action: current_change.action
+            }
+          ]
+        )
+      end
+
+      def resume_candidate?(entry)
+        status = Value.fetch(entry, :status)
+        return true if status == 'failed'
+
+        status == 'skipped' && Value.fetch(Value.fetch(entry, :skip), :reason) == 'prior_operation_failed'
+      end
+
+      def verify_entries(plan, journal, path, recheck: false)
         entries = Value.fetch(journal, :entries).select do |entry|
           verification = Value.fetch(entry, :verification)
           next false unless Value.fetch(verification, :required)
@@ -518,7 +807,8 @@ module SloRulesEngine
             journal,
             path,
             entry_id: Value.fetch(entry, :entry_id),
-            evidence: evidence
+            evidence: evidence,
+            recheck: recheck
           )
         end
         journal
@@ -542,12 +832,13 @@ module SloRulesEngine
         }
       end
 
-      def record_verification(journal, path, entry_id:, evidence:)
+      def record_verification(journal, path, entry_id:, evidence:, recheck: false)
         if @journal_store
           return @journal_store.record_verification(
             path,
             entry_id: entry_id,
-            evidence: evidence
+            evidence: evidence,
+            recheck: recheck
           )
         end
 
@@ -555,7 +846,8 @@ module SloRulesEngine
           journal,
           entry_id: entry_id,
           occurred_at: Value.fetch(evidence, :checked_at),
-          evidence: evidence
+          evidence: evidence,
+          recheck: recheck
         )
       end
 

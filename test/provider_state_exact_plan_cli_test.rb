@@ -324,6 +324,97 @@ class ProviderStateExactPlanCliTest < Minitest::Test
       assert_equal 'approved_plan_requires_resume', second.dig('error', 'code')
       assert_equal journal_path, second.dig('findings', 0, 'journal_path')
       assert_equal journal_bytes, File.binread(journal_path)
+
+      File.delete(generated_path)
+      resumed, resume_stderr, resume_status = command_json(
+        'plan',
+        'resume',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+
+      assert resume_status.success?, resume_stderr
+      assert_equal 'completed', resumed.dig('execution', 'resume', 'status')
+      assert_equal true, resumed.dig('execution', 'resume', 'state_rechecked')
+      assert_equal 'succeeded', resumed.dig('execution', 'result', 'status')
+      assert_equal 'succeeded', resumed.dig('execution', 'result', 'verification', 'status')
+      assert_equal journal_path, resumed.dig('execution', 'operation_journal', 'path')
+      journal = JSON.parse(File.read(journal_path))
+      assert_equal %w[succeeded succeeded succeeded succeeded],
+                   journal.fetch('entries').map { |entry| entry.fetch('status') }
+      assert_equal [1, 2, 1, 1],
+                   journal.fetch('entries').map { |entry| entry.fetch('attempts').length }
+      assert_equal 'matched',
+                   journal.dig('entries', 1, 'attempts', 1, 'evidence', 'state_recheck', 'status')
+    end
+  end
+
+  def test_resume_requires_an_existing_exact_plan_journal
+    Dir.mktmpdir do |dir|
+      fixture, bundle_path, = write_planned_bundle(dir)
+      approved_path = File.join(dir, 'approved-plan.json')
+      journal_dir = File.join(dir, 'journals')
+      _approved, stderr, status = approve(fixture, bundle_path, approved_path)
+      assert status.success?, stderr
+
+      result, resume_stderr, resume_status = command_json(
+        'plan',
+        'resume',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+
+      refute resume_status.success?, resume_stderr
+      assert_equal 'approved_plan_resume_not_found', result.dig('error', 'code')
+      assert_empty Dir.glob(File.join(journal_dir, '**', '*.json'))
+    end
+  end
+
+  def test_resume_rejects_drift_in_a_previously_successful_operation
+    Dir.mktmpdir do |dir|
+      fixture, bundle_path, managed_dir = write_planned_bundle(dir)
+      approved_path = File.join(dir, 'approved-plan.json')
+      journal_dir = File.join(dir, 'journals')
+      _approved, stderr, status = approve(fixture, bundle_path, approved_path)
+      assert status.success?, stderr
+      generated_path = File.join(
+        managed_dir,
+        'checkout-api',
+        'prometheus_stack',
+        'generated'
+      )
+      FileUtils.mkdir_p(File.dirname(generated_path))
+      File.write(generated_path, 'blocks generated directory creation')
+      first, _first_stderr, first_status = command_json(
+        'plan',
+        'apply',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+      refute first_status.success?
+      journal_path = first.dig('execution', 'operation_journal', 'path')
+      journal_bytes = File.binread(journal_path)
+      File.delete(generated_path)
+      File.write(
+        File.join(managed_dir, 'checkout-api', 'prometheus_stack', 'manifest.json'),
+        JSON.pretty_generate('drift' => 'after partial execution')
+      )
+
+      result, resume_stderr, resume_status = command_json(
+        'plan',
+        'resume',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+
+      refute resume_status.success?, resume_stderr
+      assert_equal 'stale_approved_plan', result.dig('error', 'code')
+      assert_equal 'resumed_operation_state_drift', result.dig('findings', 0, 'code')
+      assert_equal journal_bytes, File.binread(journal_path)
     end
   end
 

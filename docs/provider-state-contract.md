@@ -248,6 +248,15 @@ return `approved_plan_requires_resume` and keep their attempt history
 unchanged; the failed result includes state-recheck and manual rollback
 guidance.
 
+`plan resume` is an explicit mutation boundary. It requires the same approved
+plan, journal directory, confirmation, and managed-scope lock. Before any new
+attempt it validates operation identity and proves every previously successful
+write still converges. Only `write` entries with journal resume eligibility may
+start another attempt; skipped writes with `prior_operation_failed` may start
+their first attempt. Current `noop` state is recorded as reconciled by the
+state recheck without rewriting. Terminal verification evidence is then
+replaced with a fresh full managed-file recheck.
+
 ## Provider Evidence
 
 ### Datadog
@@ -341,7 +350,7 @@ skipped handoff rather than claiming downstream execution.
 
 ## Not Yet Implemented
 
-- actual resume execution after partial failure
+- Datadog or non-resumable operation retry after partial failure
 - downstream Sloth generation and Prometheus-state verification
 - automatic compensating rollback plans
 - Datadog approved-plan execution and live backend recheck
