@@ -154,7 +154,10 @@ journal or provider mutation; a concurrent apply for the same scope returns
 `approved_plan_scope_busy`. Successful stdout contains the live
 `ProviderStateResult`, the approved-plan reference, and the durable journal
 path. The journal preserves both the live execution-plan identity and the
-approved dry-run plan identity.
+approved dry-run plan identity. Reapplying a completed plan rechecks current
+state and returns the existing verified journal/result without rewriting files.
+Partial or failed journals return `approved_plan_requires_resume` with manual
+rollback guidance; they are never retried implicitly.
 
 ### Persist an operation journal
 
@@ -202,8 +205,9 @@ reread each attempted engine-owned file and record expected and actual state
 fingerprints. Execution stops on the first operation failure and exits nonzero
 for partial execution or verification drift. No-op resources retain their
 immediately pre-execution convergence evidence. Sloth's downstream generator
-remains pending. Automatic resume and exact-plan replay are not implemented;
-exact execution is available through the separate approved-plan workflow above.
+remains pending. Automatic partial-failure resume is not implemented; exact
+execution and completed-plan replay are available through the separate
+approved-plan workflow above.
 
 ### Inspect or reconcile provider state
 

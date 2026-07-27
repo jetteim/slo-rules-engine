@@ -122,9 +122,13 @@ Explicit features:
   lock, rechecks managed-file state, rejects stale observation fingerprints,
   executes only stored `write`, `noop`, and `handoff` changes, and links the
   approved plan through the durable journal and `ProviderStateResult`.
-- **Exact-plan provider boundary:** Datadog approval/execution, completed-plan
-  replay, partial-failure resume, rollback execution, and multi-target bundle
-  apply remain explicit future work.
+- **Completed exact-plan replay:** a terminal successful journal is returned
+  idempotently only after current managed state is rechecked as converged;
+  partial or failed journals are blocked without adding attempts and include
+  state-recheck and manual rollback guidance.
+- **Exact-plan provider boundary:** Datadog approval/execution,
+  partial-failure resume, automatic rollback execution, and multi-target
+  bundle apply remain explicit future work.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

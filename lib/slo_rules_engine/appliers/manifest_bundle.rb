@@ -17,6 +17,7 @@ module SloRulesEngine
         journal_store = if journal_dir
                           ProviderState::JournalStore.new(root_dir: journal_dir, clock: clock)
                         end
+        @journal_store = journal_store
         @executor = ProviderState::JournaledExecutor.new(
           journal_store: journal_store,
           clock: clock,
@@ -61,7 +62,35 @@ module SloRulesEngine
         end
 
         manifest = ProviderState::Value.copy(approved_provider_plan.desired_state.resources)
+        exact_plan = exact_apply_plan(approved_provider_plan)
+        existing_execution = existing_exact_execution(
+          exact_plan,
+          approved_plan.reference
+        )
         current_provider_plan = plan(manifest).provider_state_plan
+        if existing_execution
+          unless %w[succeeded noop].include?(existing_execution.dig(:result, :status))
+            raise ProviderState::ApprovedPlan::Error.new(
+              'approved_plan_requires_resume',
+              'the approved plan has non-terminal or failed execution evidence; explicit resume review is required',
+              path: existing_execution.fetch(:journal_path),
+              findings: [
+                {
+                  code: 'approved_plan_requires_resume',
+                  journal_path: existing_execution.fetch(:journal_path),
+                  journal_status: existing_execution.fetch(:journal_status),
+                  result_status: existing_execution.dig(:result, :status),
+                  resume: existing_execution.fetch(:journal_status_report).fetch(:resume)
+                }
+              ]
+            )
+          end
+          return replay_completed_exact_plan(
+            exact_plan,
+            approved_plan,
+            existing_execution
+          ) if converged_plan?(current_provider_plan)
+        end
         unless current_provider_plan.fingerprint == approved_provider_plan.fingerprint
           raise ProviderState::ApprovedPlan::Error.new(
             'stale_approved_plan',
@@ -81,13 +110,13 @@ module SloRulesEngine
           )
         end
 
-        exact_plan = exact_apply_plan(approved_provider_plan)
-        @executor.execute(
+        executed = @executor.execute(
           exact_plan,
           approved_plan_reference: approved_plan.reference
         ) do |operation|
           write_operation(operation)
         end
+        attach_rollback_guidance(executed, approved_plan)
       end
 
       def diff(manifest)
@@ -174,6 +203,92 @@ module SloRulesEngine
       end
 
       private
+
+      def existing_exact_execution(exact_plan, approved_plan_reference)
+        return nil unless @journal_store
+
+        provider_plan = exact_plan.provider_state_plan
+        initial_journal = ProviderState::JournalBuilder.new(
+          accepted_modes: ['live']
+        ).build(
+          provider_plan,
+          approved_plan_reference: approved_plan_reference
+        ).to_h
+        path = @journal_store.path_for(initial_journal)
+        return nil unless File.exist?(path)
+
+        journal = @journal_store.read(path)
+        status = ProviderState::JournalEvaluator.new.evaluate(journal)
+        unless status.fetch(:valid)
+          raise ProviderState::ApprovedPlan::Error.new(
+            'invalid_existing_operation_journal',
+            'existing exact-plan operation journal failed integrity validation',
+            path: path,
+            findings: status.fetch(:findings)
+          )
+        end
+        unless ProviderState::Value.fetch(
+          ProviderState::Value.fetch(journal, :plan),
+          :approved_plan
+        ) == approved_plan_reference
+          raise ProviderState::ApprovedPlan::Error.new(
+            'invalid_existing_operation_journal',
+            'existing operation journal does not match the approved plan',
+            path: path
+          )
+        end
+        result = ProviderState::ResultBuilder.new.build(
+          plan: provider_plan,
+          journal: journal
+        ).to_h
+        {
+          journal_path: path,
+          journal_status: ProviderState::Value.fetch(journal, :status),
+          journal_status_report: status,
+          result: result
+        }
+      end
+
+      def converged_plan?(provider_plan)
+        provider_plan.changes.all? { |change| %w[noop handoff].include?(change.action) }
+      end
+
+      def replay_completed_exact_plan(exact_plan, approved_plan, existing_execution)
+        exact_plan.execution = {
+          approved_plan: approved_plan.reference,
+          operation_journal: {
+            schema_version: ProviderState::JOURNAL_SCHEMA_VERSION,
+            journal_id: existing_execution.dig(:journal_status_report, :journal_id),
+            path: existing_execution.fetch(:journal_path),
+            status: existing_execution.fetch(:journal_status)
+          },
+          result: ProviderState::Value.copy(existing_execution.fetch(:result)),
+          replay: {
+            status: 'completed',
+            mutated: false,
+            state_rechecked: true
+          }
+        }
+        exact_plan
+      end
+
+      def attach_rollback_guidance(executed_plan, approved_plan)
+        status = executed_plan.execution&.dig(:result, :status)
+        return executed_plan unless %w[partial failed blocked].include?(status)
+
+        executed_plan.execution[:rollback] = {
+          supported: false,
+          requires_state_recheck: true,
+          approved_plan_id: approved_plan.approved_plan_id,
+          operation_journal: executed_plan.execution.dig(:operation_journal, :path),
+          guidance: [
+            'stop automatic execution and inspect the durable operation journal',
+            'refresh managed-file state before deciding whether any operation can be retried',
+            'restore prior reviewed content through a new release bundle and approved plan'
+          ]
+        }
+        executed_plan
+      end
 
       def exact_apply_plan(provider_plan)
         operations = provider_plan.changes.map.with_index do |change, index|

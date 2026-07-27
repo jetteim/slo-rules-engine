@@ -240,6 +240,14 @@ fingerprint. Journal identity covers that reference. Prometheus Stack and
 Sloth retain the existing post-operation verification rules; Sloth's stored
 handoff remains skipped and pending.
 
+A completed exact plan can be replayed idempotently only when an immediate
+managed-state read proves all engine-owned changes are `noop`. The existing
+journal and `ProviderStateResult` are returned without new attempts or file
+writes. Drift still returns `stale_approved_plan`. Partial and failed journals
+return `approved_plan_requires_resume` and keep their attempt history
+unchanged; the failed result includes state-recheck and manual rollback
+guidance.
+
 ## Provider Evidence
 
 ### Datadog
@@ -335,8 +343,7 @@ skipped handoff rather than claiming downstream execution.
 
 - actual resume execution after partial failure
 - downstream Sloth generation and Prometheus-state verification
-- compensating rollback plans
-- completed approved-plan replay
+- automatic compensating rollback plans
 - Datadog approved-plan execution and live backend recheck
 - multi-target bundle apply
 

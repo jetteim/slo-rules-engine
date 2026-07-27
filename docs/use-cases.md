@@ -434,6 +434,12 @@ same `plan apply` command.
   fingerprints. No operation journal JSON or managed-file mutation occurs.
 - If another exact apply holds the same scope lock, stdout contains
   `approved_plan_scope_busy`; execution does not start.
+- Reapplying a completed plan first proves current files still converge, then
+  returns `execution.replay.status: completed`, the existing journal/result,
+  and `mutated: false` without rewriting managed files.
+- A partial, failed, or otherwise non-successful journal returns
+  `approved_plan_requires_resume` without adding attempts. The original failed
+  result includes manual rollback guidance and requires a state refresh.
 - On success, Prometheus Stack writes the approved manifest and native
   PrometheusRule, Grafana ConfigMap, and Alertmanager route-intent files. Sloth
   writes the approved manifest and native `prometheus/v1` input.
@@ -451,7 +457,7 @@ same `plan apply` command.
 **Safety boundary:** source files changing after approval do not silently alter
 the locked operation payload; a new release bundle and approval are required to
 adopt those changes. Managed-state drift blocks execution. This checkpoint does
-not implement exact-plan replay, partial-failure resume, rollback execution,
+not implement partial-failure resume, automatic rollback execution,
 multi-target `bundle apply`, Datadog exact apply, Sloth execution, Kubernetes
 apply, Grafana loading, or Alertmanager delivery.
 

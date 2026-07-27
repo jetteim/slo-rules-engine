@@ -177,9 +177,10 @@ This is the running plan for the long refactor.
 - [x] Link approved plan identity and evidence fingerprints through the durable operation journal and provider result.
 - [x] Serialize exact applies per managed service/provider scope and reject concurrent execution.
 - [ ] Extend approval and immediate state recheck to Datadog after safe live backend evidence is available.
-- [ ] Add idempotent completed-plan replay against a terminal operation journal.
+- [x] Add idempotent completed-plan replay against a terminal operation journal after a fresh convergence check.
 - [ ] Resume safely from operation journals after partial failure.
-- [ ] Verify final provider state against the approved plan and emit rollback guidance when convergence fails.
+- [x] Verify final file state against the approved plan and emit manual rollback guidance when convergence fails.
+- [ ] Extend final-state verification and rollback guidance to Datadog exact execution.
 
 ## Phase 13: Live SLO And Error-Budget Status
 

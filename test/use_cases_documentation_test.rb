@@ -49,6 +49,8 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'slo-rules-engine/approved-provider-plan/v1'
     assert_includes document, 'stale_approved_plan'
     assert_includes document, 'approved_plan_scope_busy'
+    assert_includes document, 'approved_plan_requires_resume'
+    assert_includes document, 'execution.replay.status: completed'
     assert_includes readme, 'plan approve'
     assert_includes readme, 'plan apply'
   end

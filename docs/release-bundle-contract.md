@@ -119,9 +119,12 @@ still rereads every attempted engine-owned file. Sloth downstream generation
 remains explicitly pending.
 
 Approved output persistence is idempotent for identical content and rejects
-conflicting content without overwrite. Completed-plan replay,
-partial-failure resume, rollback execution, and multi-target `bundle apply`
-remain future lifecycle transitions.
+conflicting content without overwrite. Reapplying a completed plan rechecks
+managed state and returns the existing verified journal/result without
+rewriting files. A partial or failed journal returns
+`approved_plan_requires_resume`, preserves all attempts, and includes manual
+state-recheck and rollback guidance. Automatic partial-failure resume, rollback
+execution, and multi-target `bundle apply` remain future lifecycle transitions.
 
 ## Status Safety
 

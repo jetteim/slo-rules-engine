@@ -72,7 +72,7 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 ## Current Best Next Value
 
 1. keep Datadog live contract testing postponed until isolated credentials are available
-2. harden exact-plan replay and partial-failure resume using the approved-plan and journal identities now implemented
+2. add explicit partial-failure resume using the approved-plan and journal identities now implemented
 3. add multi-target `bundle apply` only after exact replay/resume behavior has a fail-closed contract
 4. proceed to provider-neutral live SLO and error-budget status after the exact-plan checkpoint is stable
 5. keep housekeeping paused unless feature work exposes a clean, behavior-tested boundary

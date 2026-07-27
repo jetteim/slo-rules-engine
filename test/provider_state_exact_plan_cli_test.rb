@@ -226,6 +226,107 @@ class ProviderStateExactPlanCliTest < Minitest::Test
     end
   end
 
+  def test_completed_exact_plan_replay_rechecks_state_without_rewriting_files
+    Dir.mktmpdir do |dir|
+      fixture, bundle_path, managed_dir = write_planned_bundle(dir)
+      approved_path = File.join(dir, 'approved-plan.json')
+      journal_dir = File.join(dir, 'journals')
+      _approved, stderr, status = approve(fixture, bundle_path, approved_path)
+      assert status.success?, stderr
+      first, first_stderr, first_status = command_json(
+        'plan',
+        'apply',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+      assert first_status.success?, first_stderr
+      manifest_path = File.join(
+        managed_dir,
+        'checkout-api',
+        'prometheus_stack',
+        'manifest.json'
+      )
+      first_mtime = File.stat(manifest_path).mtime
+      journal_path = first.dig('execution', 'operation_journal', 'path')
+      journal_bytes = File.binread(journal_path)
+
+      second, second_stderr, second_status = command_json(
+        'plan',
+        'apply',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+
+      assert second_status.success?, second_stderr
+      assert_equal 'completed', second.dig('execution', 'replay', 'status')
+      assert_equal false, second.dig('execution', 'replay', 'mutated')
+      assert_equal true, second.dig('execution', 'replay', 'state_rechecked')
+      assert_equal journal_path, second.dig('execution', 'operation_journal', 'path')
+      assert_equal first_mtime, File.stat(manifest_path).mtime
+      assert_equal journal_bytes, File.binread(journal_path)
+      assert_equal 1, Dir.glob(File.join(journal_dir, '**', '*.json')).length
+
+      File.write(manifest_path, JSON.pretty_generate('drift' => 'after completion'))
+      stale, stale_stderr, stale_status = command_json(
+        'plan',
+        'apply',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+      refute stale_status.success?, stale_stderr
+      assert_equal 'stale_approved_plan', stale.dig('error', 'code')
+      assert_equal journal_bytes, File.binread(journal_path)
+    end
+  end
+
+  def test_partial_exact_plan_requires_explicit_resume_and_emits_rollback_guidance
+    Dir.mktmpdir do |dir|
+      fixture, bundle_path, managed_dir = write_planned_bundle(dir)
+      approved_path = File.join(dir, 'approved-plan.json')
+      journal_dir = File.join(dir, 'journals')
+      _approved, stderr, status = approve(fixture, bundle_path, approved_path)
+      assert status.success?, stderr
+      generated_path = File.join(
+        managed_dir,
+        'checkout-api',
+        'prometheus_stack',
+        'generated'
+      )
+      FileUtils.mkdir_p(File.dirname(generated_path))
+      File.write(generated_path, 'blocks generated directory creation')
+
+      first, _first_stderr, first_status = command_json(
+        'plan',
+        'apply',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+      refute first_status.success?
+      assert_equal 'partial', first.dig('execution', 'result', 'status')
+      assert_equal false, first.dig('execution', 'rollback', 'supported')
+      assert_equal true, first.dig('execution', 'rollback', 'requires_state_recheck')
+      journal_path = first.dig('execution', 'operation_journal', 'path')
+      journal_bytes = File.binread(journal_path)
+
+      second, second_stderr, second_status = command_json(
+        'plan',
+        'apply',
+        approved_path,
+        '--confirm',
+        "--journal-dir=#{journal_dir}"
+      )
+
+      refute second_status.success?, second_stderr
+      assert_equal 'approved_plan_requires_resume', second.dig('error', 'code')
+      assert_equal journal_path, second.dig('findings', 0, 'journal_path')
+      assert_equal journal_bytes, File.binread(journal_path)
+    end
+  end
+
   private
 
   def write_planned_bundle(dir, provider: 'prometheus_stack')
