@@ -114,6 +114,17 @@ Explicit features:
   fingerprints. Sloth apply verifies both the reviewed engine manifest and
   native Sloth `prometheus/v1` generator input files while leaving downstream
   generation explicitly pending.
+- **Approved provider plans:** one Prometheus Stack or Sloth target from a valid
+  `apply_ready` release bundle can be locked into a content-addressed,
+  credential-free approval artifact with explicit reviewer metadata, bundle
+  lineage, evidence fingerprints, exact provider plan, and managed runtime.
+- **Exact file-backed execution:** approved-plan apply acquires a same-scope
+  lock, rechecks managed-file state, rejects stale observation fingerprints,
+  executes only stored `write`, `noop`, and `handoff` changes, and links the
+  approved plan through the durable journal and `ProviderStateResult`.
+- **Exact-plan provider boundary:** Datadog approval/execution, completed-plan
+  replay, partial-failure resume, rollback execution, and multi-target bundle
+  apply remain explicit future work.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

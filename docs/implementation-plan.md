@@ -170,11 +170,14 @@ This is the running plan for the long refactor.
 
 ## Phase 12: Apply-Exact-Plan Workflow
 
-- [ ] Persist immutable provider change plans with desired-state, observed-state, manifest, review, and handoff fingerprints.
-- [ ] Add explicit plan review and confirmation metadata without storing credentials.
-- [ ] Recheck backend or managed-file state immediately before execution and reject stale plans.
-- [ ] Execute only the operations recorded in the approved plan.
-- [ ] Add idempotency and concurrency protection for conflicting applies against the same managed scope.
+- [x] Persist immutable file-backed provider change plans with desired-state, observed-state, manifest, review, and handoff fingerprints.
+- [x] Add explicit plan review and confirmation metadata without storing credentials.
+- [x] Recheck managed-file state immediately before execution and reject stale plans.
+- [x] Execute only the file-backed operations recorded in the approved plan.
+- [x] Link approved plan identity and evidence fingerprints through the durable operation journal and provider result.
+- [x] Serialize exact applies per managed service/provider scope and reject concurrent execution.
+- [ ] Extend approval and immediate state recheck to Datadog after safe live backend evidence is available.
+- [ ] Add idempotent completed-plan replay against a terminal operation journal.
 - [ ] Resume safely from operation journals after partial failure.
 - [ ] Verify final provider state against the approved plan and emit rollback guidance when convergence fails.
 

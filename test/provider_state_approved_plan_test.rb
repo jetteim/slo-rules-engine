@@ -128,6 +128,27 @@ class ProviderStateApprovedPlanTest < Minitest::Test
     end
   end
 
+  def test_store_revalidates_hashes_before_writing
+    Dir.mktmpdir do |dir|
+      fixture, bundle, = planned_bundle(dir)
+      approved = SloRulesEngine::ProviderState::ApprovedPlan::Builder.new.build(
+        bundle,
+        target_uid: fixture.fetch(:target),
+        reviewer: REVIEWER,
+        reviewed_at: REVIEWED_AT
+      )
+      approved[:provider_plan][:fingerprint] = '0' * 64
+      output_path = File.join(dir, 'approved-plan.json')
+
+      error = assert_raises(SloRulesEngine::ProviderState::ApprovedPlan::Error) do
+        SloRulesEngine::ProviderState::ApprovedPlan::Store.new.write(output_path, approved)
+      end
+
+      assert_equal 'invalid_provider_plan', error.code
+      refute File.exist?(output_path)
+    end
+  end
+
   private
 
   def planned_bundle(dir)

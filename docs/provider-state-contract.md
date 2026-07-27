@@ -205,6 +205,41 @@ The manifest and native inputs can reach `engine_owned_status: succeeded`, but
 overall and external verification stay `pending` until downstream generation
 and Prometheus state are verified outside the engine.
 
+### Approved Provider Plan
+
+Exact file-backed execution uses a separate approval schema:
+
+```text
+slo-rules-engine/approved-provider-plan/v1
+```
+
+The document locks one `apply_ready` release-bundle target together with:
+
+- reviewer identity, explicit approval timestamp, and notes
+- source release-bundle identity
+- bundle review content and fingerprint
+- provider manifest, manifest-review report, reviewed handoff, and generated
+  change-plan artifact fingerprints
+- the validated `dry_run` provider-state plan
+- its desired-state and observed-state fingerprints
+- a managed output directory derived from contained operation paths
+
+Approval is content-addressed and credential-free. `plan status` revalidates
+the document and every nested provider-state fingerprint without reading
+managed state.
+
+Exact apply acquires one nonblocking lock for the managed service/provider
+scope, replans only to compare immediate state with the approved plan, and
+discards the regenerated operations. It reconstructs the live `ApplyPlan` from
+the approved changes. Managed-state drift returns `stale_approved_plan`;
+same-scope concurrency returns `approved_plan_scope_busy`.
+
+The live journal's plan reference includes the approved-plan ID, approved
+dry-run plan fingerprint, source bundle ID, and aggregate approval-evidence
+fingerprint. Journal identity covers that reference. Prometheus Stack and
+Sloth retain the existing post-operation verification rules; Sloth's stored
+handoff remains skipped and pending.
+
 ## Provider Evidence
 
 ### Datadog
@@ -280,6 +315,10 @@ skipped handoff rather than claiming downstream execution.
 - Existing review and ownership gates remain in force; every confirmed
   apply/prune additionally requires `--journal-dir`.
 - Release-bundle plans now package the state contract inside each generated change-plan artifact.
+- Approved-plan output is idempotent for identical content and refuses
+  conflicting output without overwrite.
+- Exact file-backed execution rejects immediate state drift and serializes
+  concurrent execution for the same managed scope.
 - Journal creation accepts exactly one `dry_run` plan and revalidates all
   content fingerprints before persistence.
 - Journal identity excludes mutable entry status and attempts while covering
@@ -297,7 +336,8 @@ skipped handoff rather than claiming downstream execution.
 - actual resume execution after partial failure
 - downstream Sloth generation and Prometheus-state verification
 - compensating rollback plans
-- exact execution of a separately reviewed plan
-- concurrent-apply protection
+- completed approved-plan replay
+- Datadog approved-plan execution and live backend recheck
+- multi-target bundle apply
 
 Those features must build on this contract rather than overloading the current dry-run plan.

@@ -86,6 +86,43 @@ File-backed providers require a per-target managed output directory. Planning re
 
 Provider summaries include target and plan counts, total and actionable operations, destructive operations, risky operations, highest risk, and counts by action, resource target, and risk level. Risk classification remains provider-owned.
 
+## Target Approval And Exact File Execution
+
+`plan approve` derives one immutable target approval from a valid
+`apply_ready` bundle. The
+`slo-rules-engine/approved-provider-plan/v1` document records:
+
+- a content-addressed approved-plan ID
+- explicit reviewer identity, timestamp, and notes
+- source bundle ID and target identity
+- bundle review content and fingerprint
+- provider change-plan, manifest, manifest-review report, and reviewed-handoff
+  artifact fingerprints
+- the fully validated dry-run `ProviderStatePlan`
+- the managed output directory derived from the plan's contained file paths
+
+Approval currently accepts only `manifest_bundle` and `external_generator`
+targets. Datadog `live_api` targets are rejected until a safe live backend
+recheck contract is verified.
+
+`plan apply` requires `--confirm` and `--journal-dir`. It locks the selected
+managed scope, rebuilds the current dry-run plan only for an immediate
+fingerprint comparison, and discards those regenerated operations. Matching
+state executes operations reconstructed from the approved plan. Changed state
+returns `stale_approved_plan`; same-scope concurrency returns
+`approved_plan_scope_busy`. Both stop before provider operations.
+
+The operation journal records the live execution-plan identity and a validated
+approved-plan reference containing approved plan ID, dry-run provider-plan
+fingerprint, source bundle ID, and evidence fingerprint. Post-write verification
+still rereads every attempted engine-owned file. Sloth downstream generation
+remains explicitly pending.
+
+Approved output persistence is idempotent for identical content and rejects
+conflicting content without overwrite. Completed-plan replay,
+partial-failure resume, rollback execution, and multi-target `bundle apply`
+remain future lifecycle transitions.
+
 ## Status Safety
 
 Status evaluation checks:
@@ -142,6 +179,22 @@ Inspect schema, identity, embedded fingerprints, and current source freshness:
 
 ```bash
 bin/rules-ctl bundle status ./release-bundle.json
+```
+
+Approve and execute one file-backed target:
+
+```bash
+bin/rules-ctl plan approve ./apply-ready-bundle.json \
+  --target checkout-api/prometheus_stack \
+  --reviewer team/payments-sre \
+  --reviewed-at 2026-07-27T14:00:00Z \
+  --output ./approved-plan.json
+
+bin/rules-ctl plan status ./approved-plan.json
+
+bin/rules-ctl plan apply ./approved-plan.json \
+  --confirm \
+  --journal-dir ./journals
 ```
 
 Creation and planning are fail-closed. Stale, invalid, incomplete, or wrong-lifecycle predecessors; missing or unknown target runtime configuration; invalid dry-run plans; credential-like structured keys; and invalid bundle schemas produce nonzero status and do not write the requested output file. Planning also rejects in-place output so the predecessor remains immutable.

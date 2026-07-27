@@ -13,6 +13,7 @@ Use the toolkit to:
 - reuse discovery evidence from one backend while targeting another backend
 - generate SLO evaluation, alerting, dashboard, and routing artifacts
 - package review evidence and provider plans into a content-addressed release bundle
+- approve one file-backed provider target and execute only its reviewed operations
 - compare reviewed desired state with existing backend or managed-file state
 - persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
@@ -37,6 +38,14 @@ All provider dry-run plans can be converted into
 preserve resource IDs, ownership identity, and risk; Prometheus Stack journals
 preserve managed-file verification requirements; Sloth journals also identify
 the external-generator handoff as requiring manual verification.
+
+Prometheus Stack and Sloth targets in an `apply_ready` release bundle can also
+be converted into an immutable
+`slo-rules-engine/approved-provider-plan/v1` artifact. Exact apply rechecks
+managed-file state under a per-scope lock, rejects drift, executes only the
+stored operations, and links the approved plan to the durable operation
+journal. Datadog exact apply remains deferred until its live backend recheck
+contract is verified.
 
 ## Usage By Use Case
 
@@ -114,6 +123,39 @@ bin/rules-ctl bundle plan ./work/review-ready.json \
 
 The planned bundle contains generated dry-run plans and provider-level total, actionable, destructive, and risk summaries. Planning does not change the predecessor bundle or provider state.
 
+### Approve and execute one exact file-backed plan
+
+Approve one reviewed target from the `apply_ready` bundle:
+
+```bash
+bin/rules-ctl plan approve ./work/apply-ready.json \
+  --target=checkout-api/prometheus_stack \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-07-27T14:00:00Z \
+  --note='Managed-file changes reviewed.' \
+  --output=./work/approved-prometheus-stack-plan.json
+
+bin/rules-ctl plan status ./work/approved-prometheus-stack-plan.json
+```
+
+Execute only the approved operations:
+
+```bash
+bin/rules-ctl plan apply ./work/approved-prometheus-stack-plan.json \
+  --confirm \
+  --journal-dir=./work/journals
+```
+
+Approval writes a content-addressed artifact containing the selected target,
+review attestation, bundle lineage, manifest/review/handoff fingerprints, exact
+dry-run provider plan, and managed output directory. Apply first rechecks the
+managed-file plan fingerprint. Drift returns `stale_approved_plan` before a
+journal or provider mutation; a concurrent apply for the same scope returns
+`approved_plan_scope_busy`. Successful stdout contains the live
+`ProviderStateResult`, the approved-plan reference, and the durable journal
+path. The journal preserves both the live execution-plan identity and the
+approved dry-run plan identity.
+
 ### Persist an operation journal
 
 Create one journal from a saved single-manifest dry-run plan:
@@ -160,7 +202,8 @@ reread each attempted engine-owned file and record expected and actual state
 fingerprints. Execution stops on the first operation failure and exits nonzero
 for partial execution or verification drift. No-op resources retain their
 immediately pre-execution convergence evidence. Sloth's downstream generator
-remains pending. Automatic resume and exact-plan execution are not implemented.
+remains pending. Automatic resume and exact-plan replay are not implemented;
+exact execution is available through the separate approved-plan workflow above.
 
 ### Inspect or reconcile provider state
 
@@ -256,6 +299,8 @@ The initial delivery integration is `notification_router`, which generates conte
 - Bundle planning is read-only and rejects stale or invalid predecessors.
 - Journal creation accepts exactly one verified dry-run provider plan and never executes it.
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
+- Approved plans are credential-free, content-addressed, and limited to one
+  Prometheus Stack or Sloth target.
 - Confirmed apply and prune require reviewed manifest input.
 - Confirmed mutations require durable journal persistence, stop after the first
   failed operation, and verify resulting provider or managed-file state.
@@ -265,6 +310,8 @@ The initial delivery integration is `notification_router`, which generates conte
   and full dashboard details; manual dashboard-list membership is not required
   for discovery, import, apply verification, or prune ownership.
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
+- Exact file-backed apply rejects changed observed state and same-scope
+  concurrency before executing the stored operation list.
 
 ## Documentation
 

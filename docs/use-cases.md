@@ -13,6 +13,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Cross-provider delivery | One reviewed SLO with explicit binding per target | Target-provider manifest linked to source-provider evidence | No metric or query translation is inferred |
 | Generate provider bundle | SLI, objective, response context, dashboard, route, and miss policy | Reviewed provider manifest and manifest-review report | Generation is local and read-only |
 | Package release | Reviewed evidence and target identity | Immutable review and apply-ready bundle JSON | Planning reads state but does not mutate it |
+| Approve and execute exact plan | One reviewed target, locked evidence, and exact operation list | Content-addressed approved plan, durable journal, and provider result | Explicit approval, `--confirm`, immediate state recheck, and same-scope lock |
 | Inspect drift | Reviewed desired state compared with observed state | Provider plan with deterministic state fingerprints | Read-only provider or managed-file access |
 | Inventory state | Ownership and adoption evidence | Observed state and findings | Read-only provider or managed-file access |
 | Create operation journal | Exact provider plan identity and operation safety evidence | Immutable initial journal plus status assessment | Standalone journal creation does not execute |
@@ -37,6 +38,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Artifact indexing | Per-scope links across discovery, handoff, reviewed definition, provider manifests, and review reports |
 | Release bundling | Content-addressed `review_ready` JSON containing reviewed evidence and target artifacts |
 | Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
+| Exact-plan approval | `slo-rules-engine/approved-provider-plan/v1` JSON containing one target, reviewer attestation, release-bundle lineage, evidence fingerprints, managed runtime, and exact dry-run provider plan |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
 | Datadog sandbox smoke | `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with public-safe read checks and optional temporary-dashboard lifecycle evidence |
@@ -49,6 +51,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Reviewed manifest | SLOs, burn-rate monitors, missing-telemetry monitors, decision dashboards, and route context | SLI/SLO/burn-rate recording rules, telemetry-gap and burn-rate alerts, Grafana dashboards, Alertmanager routes, and rendered native resource content | Sloth `prometheus/v1` SLO specs with event queries, page/ticket alert labels, and response annotations |
 | Saved review report | `manifest-review/datadog.json` | `manifest-review/prometheus_stack.json` | `manifest-review/sloth.json` |
 | Dry-run plan | API-oriented `create`, `update`, `recreate`, or `noop` changes with IDs, ownership identity, and risk | `write` or `noop` changes for `manifest.json` and every native YAML file | `write` or `noop` changes for the manifest and native Sloth input plus a `handoff` change |
+| Approved exact plan | Deferred until the live backend recheck contract is verified | Immutable reviewed plan with manifest, review, handoff, desired-state, observed-state, and operation fingerprints | The same immutable contract, including the stored external-generator handoff |
 | Operation journal | Confirmed apply/prune persists request method/path, returned resource ID, response fingerprint, sanitized failures, and terminal backend verification | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
 | Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
@@ -372,9 +375,87 @@ bin/rules-ctl journal status \
 - `journal status` prints effective state, entry counts, resume eligibility, and findings such as `partial_failure`, `resume_blocked`, or `resume_state_recheck_required`.
 - Confirmed apply/prune for every provider creates a separate live-mode journal automatically through `--journal-dir`; operators do not manually transition that journal.
 
-**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing, but there is no manual transition command, automatic resume, downstream Sloth verification, or separately approved exact-plan guarantee.
+**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing. The approved-plan workflow below adds an exact file-backed execution guarantee, but there is no manual transition command, automatic resume, exact-plan replay, Datadog exact execution, or downstream Sloth verification.
 
-## Use Case 9: Apply Reviewed State
+## Use Case 9: Approve And Execute An Exact File-Backed Plan
+
+**Task:** separate plan review from mutation and prove that execution uses the
+reviewed operations rather than a newly generated operation list.
+
+Start from the `apply_ready` bundle produced in Use Case 5. Approve one
+Prometheus Stack target:
+
+```bash
+bin/rules-ctl plan approve ./work/apply-ready.json \
+  --target=checkout-api/prometheus_stack \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-07-27T14:00:00Z \
+  --note='Managed-file changes reviewed.' \
+  --output=./work/approved-prometheus-stack-plan.json
+
+bin/rules-ctl plan status \
+  ./work/approved-prometheus-stack-plan.json
+```
+
+Execute the approved operations:
+
+```bash
+bin/rules-ctl plan apply \
+  ./work/approved-prometheus-stack-plan.json \
+  --confirm \
+  --journal-dir=./work/journals
+```
+
+For Sloth, approve `checkout-api/sloth` into a separate output file and run the
+same `plan apply` command.
+
+**What to expect:**
+
+- `plan approve` accepts one valid `apply_ready` bundle and one
+  `manifest_bundle` or `external_generator` target. It rechecks bundle schema,
+  identity, embedded fingerprints, and current source freshness before writing
+  anything.
+- The output file is immutable, idempotent for identical approval content, and
+  uses schema `slo-rules-engine/approved-provider-plan/v1`. Conflicting content
+  at the same output path returns `approved_plan_output_conflict`.
+- The approved artifact contains reviewer identity, explicit ISO 8601 approval
+  time, notes, source bundle ID, target identity, bundle review content and
+  fingerprint, provider manifest/review-report/handoff fingerprints, exact
+  provider plan, and managed output directory. Credential-like keys are
+  rejected.
+- `plan status` verifies the approved-plan ID, every nested provider-state
+  fingerprint, evidence references, runtime path containment, and provider
+  coverage without reading provider state.
+- `plan apply` acquires a nonblocking lock for the selected managed
+  service/provider scope and regenerates a dry-run plan only to compare its
+  fingerprint with the approved plan. The regenerated operations are discarded.
+- If managed-file state changed after approval, stdout contains
+  `stale_approved_plan` with expected and actual plan/observed-state
+  fingerprints. No operation journal JSON or managed-file mutation occurs.
+- If another exact apply holds the same scope lock, stdout contains
+  `approved_plan_scope_busy`; execution does not start.
+- On success, Prometheus Stack writes the approved manifest and native
+  PrometheusRule, Grafana ConfigMap, and Alertmanager route-intent files. Sloth
+  writes the approved manifest and native `prometheus/v1` input.
+- Successful stdout is one live provider plan containing
+  `execution.approved_plan`, `execution.operation_journal`, and
+  `execution.result`. The journal validates both the live execution-plan
+  fingerprint and the approved dry-run plan ID/fingerprint.
+- Sloth still marks the stored external-generator handoff `skipped` with
+  `external_handoff_required`; engine-owned verification can succeed while
+  downstream status remains `pending`.
+- Datadog targets return `unsupported_exact_plan_provider` at approval. Normal
+  Datadog `apply`/`prune` remains available, but exact execution waits for
+  verified live backend recheck semantics.
+
+**Safety boundary:** source files changing after approval do not silently alter
+the locked operation payload; a new release bundle and approval are required to
+adopt those changes. Managed-state drift blocks execution. This checkpoint does
+not implement exact-plan replay, partial-failure resume, rollback execution,
+multi-target `bundle apply`, Datadog exact apply, Sloth execution, Kubernetes
+apply, Grafana loading, or Alertmanager delivery.
+
+## Use Case 10: Apply Reviewed State
 
 **Task:** converge current provider state after reviewing the current manifest and evidence gates.
 
@@ -436,7 +517,7 @@ bin/rules-ctl apply \
 
 **Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. Datadog verification covers the supported managed API payload and identity contract, while file verification covers engine-owned paths. It does not prove notification delivery, Kubernetes application, Grafana loading, Alertmanager receiver delivery, Sloth execution, automatic resume, or execution of a separately approved exact plan.
 
-## Use Case 10: Remove Managed State
+## Use Case 11: Remove Managed State
 
 **Task:** inspect and explicitly remove provider state managed for the reviewed service scope.
 
@@ -487,7 +568,7 @@ bin/rules-ctl prune \
 
 **Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. Verification proves Datadog managed-ID absence or engine-owned path absence only; journaling does not provide rollback, automatic resume, or downstream-system cleanup.
 
-## Use Case 11: Verify Telemetry Before Production Adoption
+## Use Case 12: Verify Telemetry Before Production Adoption
 
 **Task:** prove that each reviewed provider binding resolves to usable current evidence.
 
@@ -519,7 +600,7 @@ bin/rules-ctl reality-check \
 
 **Intent preserved:** the check tests whether reviewed intent is measurable. It reports gaps rather than changing the binding, objective, calculation basis, or SLO policy.
 
-## Use Case 12: Generate Contextual Alert Routes
+## Use Case 13: Generate Contextual Alert Routes
 
 **Task:** hand alert context to a delivery system without giving the rules engine delivery credentials.
 
@@ -539,7 +620,7 @@ bin/rules-ctl generate-routes \
 
 **Intent preserved:** generated routes carry service, owner, severity, response, dashboard, and playbook context. The notification router remains responsible for Teams, Slack, Telegram, webhook, console, or other channel configuration and delivery.
 
-## Use Case 13: Validate Datadog Lookup In An Isolated Sandbox
+## Use Case 14: Validate Datadog Lookup In An Isolated Sandbox
 
 **Task:** prove the Datadog credential, dashboard catalog, detail-read, and
 managed-identity contracts without using production resources.
@@ -612,6 +693,7 @@ Update or rewrite usage when any of these changes:
 - a workflow begins contacting a backend or mutating state
 - bundle lifecycle, identity, runtime configuration, or output changes
 - operation-journal schema, execution, resume, or verification behavior changes
+- approved-plan schema, review, locking, exact execution, replay, or provider coverage changes
 - cross-provider evidence portability or binding requirements change
 
 Keep this guide organized around engineering tasks. Every use case must state concrete stdout, written-file, provider-read, provider-write, and refusal behavior that applies.

@@ -46,6 +46,11 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'Validate Datadog Lookup In An Isolated Sandbox'
     assert_includes document, 'slo-rules-engine/datadog-sandbox-smoke/v1'
     assert_includes readme, 'Datadog Sandbox Testing'
+    assert_includes document, 'slo-rules-engine/approved-provider-plan/v1'
+    assert_includes document, 'stale_approved_plan'
+    assert_includes document, 'approved_plan_scope_busy'
+    assert_includes readme, 'plan approve'
+    assert_includes readme, 'plan apply'
   end
 
   private

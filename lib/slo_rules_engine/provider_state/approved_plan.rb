@@ -534,7 +534,11 @@ module SloRulesEngine
 
       class Store
         def write(path, value)
-          payload = value.respond_to?(:to_h) ? value.to_h : Loader.new.load(value).to_h
+          payload = if value.is_a?(Document)
+                      value.to_h
+                    else
+                      Loader.new.load(value).to_h
+                    end
           path = File.expand_path(path)
           if File.exist?(path)
             existing = JSON.parse(File.read(path), symbolize_names: true)
