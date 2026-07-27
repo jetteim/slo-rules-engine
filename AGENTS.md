@@ -8,18 +8,21 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. First-class onboarding and release bundle
-2. Provider-neutral state-manager hardening
-3. Production-grade Datadog reconciliation
-4. Apply-exact-plan workflow
-5. Live SLO and error-budget status
+1. Live SLO and error-budget status across reviewed release bundles and
+   portfolio scopes
+2. Production-grade Datadog reconciliation only when isolated backend evidence
+   is available
+3. Datadog exact-plan parity only after live recheck/idempotency semantics are
+   verified
+4. Atomic coherence-preserving simplification after the feature sequence
+   reaches a stable boundary
 
 The release-bundle create/plan/apply boundary, provider-neutral state/journal
-contracts, and file-backed apply-exact-plan workflow are implemented. Live
-Datadog sandbox testing is explicitly postponed by the user. The next roadmap
-slice is provider-neutral live SLO/error-budget status, beginning with
-read-only Prometheus-compatible evidence and without resuming housekeeping or
-inventing Datadog backend semantics.
+contracts, file-backed apply-exact-plan workflow, and one-manifest
+Prometheus-compatible live-status boundary are implemented. Live Datadog
+sandbox testing is explicitly postponed by the user. The next roadmap slice is
+bundle/portfolio aggregation over the existing neutral status contract,
+without resuming housekeeping or inventing Datadog backend semantics.
 
 Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages
 discovery evidence, reviewed handoffs and definitions, provider manifests,
@@ -72,6 +75,19 @@ targets, and incompatible output destinations fail before the first target.
 Execution stops on the first incomplete target, preserves earlier target
 results, and requires explicit `plan resume` before a rerun can finish the
 applied transition. Completed targets replay without rewriting files.
+
+Current live-status status: neutral SLO intent now includes an explicit
+evaluation window with a `30d` compatibility default. Prometheus Stack
+generation emits evaluation-window success/error ratios, allowed and remaining
+error-budget records, and burn-rate records calculated over their own policy
+windows. `status --provider=prometheus_stack --manifest=...` requires one
+reviewed manifest and performs GET-only instant queries against generated
+record names. The versioned report distinguishes `healthy`, `at_risk`,
+`exhausted`, `missing_telemetry`, and `unverifiable`, preserves reviewed
+identity/context and provider evidence, detects reviewed/provider objective
+drift, sanitizes backend failures, and can save the same timestamped/freshness
+report printed to stdout. Datadog and Sloth readers plus release-bundle and
+portfolio aggregation remain open.
 
 ## Non-Negotiable Working Rules
 
@@ -126,7 +142,28 @@ Implemented and already pushed:
 Implemented by the latest feature slices:
 
 - Prometheus Stack generation now emits one non-duplicated base observation recording rule per SLI instance
-- Each reviewed Prometheus SLO now has derived success-ratio, error-ratio, objective-ratio, error-budget-ratio, and burn-rate recording rules
+- Neutral SLO intent now carries a validated evaluation window with a `30d`
+  compatibility default, and generated onboarding drafts expose it explicitly
+- Each reviewed Prometheus SLO now has evaluation-window success-ratio,
+  error-ratio, objective-ratio, allowed/remaining error-budget, and
+  policy-window burn-rate recording rules
+- Prometheus SLO recording-rule labels retain the reviewed evaluation window,
+  and Grafana dashboards include remaining error budget
+- The Prometheus Stack provider declares `live_slo_status`; Datadog keeps its
+  currently verified `30d` timeframe boundary and rejects other neutral windows
+  during provider validation
+- `slo-rules-engine/live-slo-status/v1` normalizes objective attainment,
+  remaining/consumed budget, burn rates, observations, timestamps, freshness,
+  reviewed context, provider resources, evidence, and findings
+- The live-status classifier distinguishes `healthy`, `at_risk`, `exhausted`,
+  `missing_telemetry`, and `unverifiable` with deterministic precedence
+- Provider-observed objective and budget values are checked against reviewed
+  manifest intent; mismatch is `unverifiable`
+- `status --provider=prometheus_stack --manifest=...` requires reviewed
+  provenance, accepts a freshness limit, optionally saves the stdout report,
+  and contacts only `/api/v1/query`
+- Datadog live status is explicitly refused, and raw provider error messages
+  are not copied into status evidence
 - Generated recording names satisfy the Prometheus metric-name contract
 - Threshold-based Prometheus SLOs require numeric `time_slice` semantics and fail validation otherwise
 - Prometheus Stack manifests now include a native Prometheus Operator `PrometheusRule`
@@ -296,7 +333,9 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: fail-closed multi-target file-backed bundle apply with
+- latest checkpoint: provider-neutral one-manifest live SLO/error-budget status
+  with window-correct Prometheus recording rules
+- previous checkpoint: fail-closed multi-target file-backed bundle apply with
   immutable applied-bundle evidence
 - previous checkpoint: explicit state-checked resume for journal-eligible exact
   file writes with full re-verification
@@ -368,13 +407,16 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Define and expose live SLO/error-budget status without moving provider query
-   syntax into the neutral model
-2. Run the Datadog sandbox probes and resume live provider-contract work only
+1. Aggregate live SLO/error-budget status across reviewed release bundles and
+   portfolio scopes while preserving per-target runtime, freshness, and
+   findings
+2. Add Sloth live status only after downstream generated recording-rule
+   identity is captured
+3. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
-3. Extend exact approval/apply/resume to Datadog only after verified backend
+4. Extend exact approval/apply/resume to Datadog only after verified backend
    recheck and idempotency semantics exist
-4. Add automatic rollback execution only after a reviewed compensating-plan
+5. Add automatic rollback execution only after a reviewed compensating-plan
    contract exists; current exact failures provide manual guidance
 
 Secondary gaps:
@@ -389,35 +431,33 @@ Secondary gaps:
 
 Next recommended slice:
 
-- define a versioned provider-neutral live SLO status contract for reviewed SLO
-  identity, objective attainment, error-budget remaining, burn rate, telemetry
-  freshness, provider evidence, and machine-readable findings
-- distinguish `healthy`, `at_risk`, `exhausted`, `missing_telemetry`, and
-  `unverifiable` without placing PromQL or Datadog query syntax in the neutral
-  status model
-- implement the first read-only Prometheus-compatible status reader against a
-  reviewed provider manifest and deterministic fake/query fixtures
-- preserve provider query expressions in provider-owned manifest bindings and
-  normalize only evaluated values, timestamps, freshness, and identity into the
-  shared result
-- define exact stdout and optional saved-report behavior for one manifest before
-  expanding to bundle or portfolio aggregation
+- extend the existing `status` command from exactly one reviewed manifest to
+  reviewed release-bundle and explicit portfolio inputs
+- define a versioned aggregate report that retains every per-target
+  `LiveSLOStatusReport` unchanged and adds deterministic target/state rollups
+- require explicit Prometheus-compatible runtime endpoint selection per target;
+  keep credentials and runtime URLs outside release bundles
+- validate bundle schema, identity, artifact fingerprints, and current manifest
+  sources before the first backend read
+- represent one target's query failure as normalized `unverifiable` evidence
+  without dropping successful target reports or weakening input validation
+- support optional saved aggregate reports with source bundle/manifest
+  fingerprints, checked timestamps, and per-target freshness
 - update README/use cases in the same slice with provider-specific reads,
-  normalized output, missing-telemetry behavior, and explicit non-mutation
-  boundaries
+  exact aggregate output, partial evidence, and explicit non-mutation boundaries
 - keep Datadog status reads deferred until isolated live evidence is available;
   do not infer its contract from Prometheus behavior
 
 Rationale:
 
-- release-bundle and exact-plan delivery now reach an immutable applied boundary
-- operational users still need current objective, budget, burn, and freshness
-  evidence after delivery
-- Prometheus Stack already generates complete SLI/SLO recording rules, so a
-  read-only status slice can use provider-owned metric names without new policy
-- beginning with normalized contracts and deterministic Prometheus-compatible
-  evidence keeps Datadog work evidence-driven while its live testing is
-  postponed
+- the one-manifest reader and five-state neutral contract are now verified
+- release bundles already carry reviewed target identity and artifact
+  fingerprints, so aggregation can reuse their safety boundary without adding
+  provider policy
+- operators need one report across a reviewed release or portfolio while still
+  seeing each target's exact freshness and failure evidence
+- explicit per-target runtime selection avoids persisting endpoints or assuming
+  that all services share one Prometheus backend
 
 ## Next Session Handoff
 
@@ -426,32 +466,34 @@ Prepared on 2026-07-27 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `f87cde0 feat: apply approved file bundles
-  exactly`
+- latest verified feature checkpoint: `e156a9d feat: report live prometheus slo
+  status`
+- previous verified feature checkpoint: `f87cde0 feat: apply approved file
+  bundles exactly`
 - previous verified feature checkpoint: `2d94384 feat: resume eligible exact
   plan writes`
-- previous verified feature checkpoint: `87964c9 feat: replay completed exact
-  plans safely`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: `f87cde0` on local and remote `main`
+- target: `e156a9d` on local and remote `main`
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-27T16:01:57Z`
+- recorded timestamp: `2026-07-27T16:24:41Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 404 tests, 2,531 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 415 tests, 2,635 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- live verification: intentionally not run; the user postponed Datadog live
-  testing and this checkpoint uses only deterministic managed files
-- blast radius: new `bundle apply` command, `applied` bundle transition,
-  execution-result artifact schema, multi-target Prometheus Stack/Sloth
-  orchestration, and one Sloth handoff-resume correction; standard apply/prune
-  and Datadog mutation behavior are unchanged
-- rollback path: revert `f87cde0` to remove multi-target bundle apply and its
-  applied-bundle contract
+- live verification: intentionally not run; no Prometheus endpoint was
+  available and the user postponed Datadog live testing. HTTP behavior is
+  covered with an injected deterministic Prometheus response fixture.
+- blast radius: neutral SLO evaluation-window field/default/validation,
+  Prometheus SLO and remaining-budget recording expressions, Grafana panels,
+  Datadog `30d` provider validation, the new GET-only one-manifest `status`
+  command, versioned status values, and documentation. Existing state mutation
+  gates are unchanged.
+- rollback path: revert `e156a9d` to remove the one-manifest live-status
+  contract and restore the prior Prometheus recording-rule expressions
 
 When the user types `proceed` in a fresh session:
 
@@ -460,14 +502,14 @@ When the user types `proceed` in a fresh session:
 3. Do not resume housekeeping by default.
 4. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-5. Use TDD to define the provider-neutral live status value contract before
-   adding provider queries or CLI orchestration.
-6. Start with one reviewed Prometheus Stack manifest and deterministic
-   Prometheus-compatible query fixtures.
-7. Keep provider query syntax in provider-owned bindings; expose normalized
-   attainment, budget, burn, freshness, identity, and findings.
-8. Define exact one-manifest stdout and saved-report behavior before adding
-   bundle or portfolio aggregation.
+5. Use TDD to define aggregate bundle/portfolio status without changing the
+   verified per-manifest `LiveSLOStatusReport`.
+6. Inspect release-bundle target/artifact identity and source freshness before
+   choosing the aggregate input contract.
+7. Require explicit runtime endpoint mapping for every readable Prometheus
+   target and keep those values outside persisted release bundles.
+8. Preserve each target report and add deterministic aggregate rollups; do not
+   collapse missing or unverifiable evidence into a generic failure.
 9. Keep Datadog live testing postponed and do not generalize a Datadog status
    contract without backend evidence.
 
@@ -478,6 +520,8 @@ Use these before claiming a checkpoint:
 ```bash
 ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
+ruby -Ilib test/live_status_test.rb
+ruby -Ilib test/live_status_cli_test.rb
 ruby -Ilib test/release_bundle_test.rb
 ruby -Ilib test/release_bundle_cli_test.rb
 ruby -Ilib test/release_bundle_apply_test.rb
@@ -512,12 +556,12 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect the neutral model, manifest schema, Prometheus Stack generated
-   recording-rule names, telemetry lookup adapter, and reality-check result
-   patterns before naming the live-status contract
-6. Inspect `docs/implementation-plan.md` Phase 13 and the live-status use-case
-   expectations above
-7. If the user says `proceed`, implement the first provider-neutral plus
-   Prometheus-compatible live SLO/error-budget status slice described above
+5. Inspect `lib/slo_rules_engine/live_status.rb`,
+   `lib/slo_rules_engine/cli/status_commands.rb`, release-bundle schema/builder,
+   and the current per-target runtime mapping patterns
+6. Inspect `docs/live-status-contract.md`, `docs/implementation-plan.md` Phase
+   13, and Use Case 16
+7. If the user says `proceed`, implement the release-bundle plus portfolio
+   aggregation slice described above
 8. Keep Datadog live testing postponed and preserve release-bundle, exact-plan,
    review, journal, and verification gates
