@@ -62,6 +62,7 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 - immutable bundle-native plan generation with provider-level change and risk summaries
 - target-level approved plan artifacts with explicit reviewer attestation
 - immediate managed-state recheck and execution of only stored operations
+- deterministic multi-target file-backed execution with immutable applied-bundle evidence
 
 ## What We Are Not Optimizing For
 
@@ -71,11 +72,14 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. keep Datadog live contract testing postponed until isolated credentials are available
-2. add multi-target `bundle apply` on the fail-closed exact execution and resume contract now implemented
-3. keep Datadog exact apply/resume deferred with the postponed live contract evidence
-4. proceed to provider-neutral live SLO and error-budget status after the exact-plan checkpoint is stable
-5. keep housekeeping paused unless feature work exposes a clean, behavior-tested boundary
+1. define provider-neutral live SLO and error-budget status from reviewed SLO
+   identity, objective attainment, error budget, burn rate, and freshness
+2. add read-only Prometheus-compatible status evidence without moving PromQL
+   into the neutral model
+3. keep Datadog live contract testing and exact apply/resume postponed until
+   isolated credentials are available
+4. keep housekeeping paused unless feature work exposes a clean,
+   behavior-tested boundary
 
 ## Housekeeping Backlog
 

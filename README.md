@@ -14,6 +14,7 @@ Use the toolkit to:
 - generate SLO evaluation, alerting, dashboard, and routing artifacts
 - package review evidence and provider plans into a content-addressed release bundle
 - approve one file-backed provider target and execute only its reviewed operations
+- execute every approved file-backed target and persist one immutable applied release
 - compare reviewed desired state with existing backend or managed-file state
 - persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
@@ -46,6 +47,12 @@ managed-file state under a per-scope lock, rejects drift, executes only the
 stored operations, and links the approved plan to the durable operation
 journal. Datadog exact apply remains deferred until its live backend recheck
 contract is verified.
+
+When every target is file-backed, `bundle apply` requires one approved plan per
+target, validates the complete approval set before any write, executes targets
+in stable UID order through the same exact-plan boundary, and writes a new
+content-addressed `applied` bundle containing one execution-result artifact per
+target. Mixed or Datadog live-API bundles are rejected before execution.
 
 ## Usage By Use Case
 
@@ -169,6 +176,47 @@ Partial or failed journals return `approved_plan_requires_resume` with manual
 rollback guidance; they are never retried implicitly. `plan resume` preserves
 attempt history, proves earlier successes still converge, retries only
 resumable file writes, and re-verifies the complete engine-owned file set.
+
+### Apply an approved multi-target file release
+
+Approve each target from the same file-only `apply_ready` bundle, then execute
+the bundle:
+
+```bash
+bin/rules-ctl plan approve ./work/apply-ready.json \
+  --target=checkout-api/prometheus_stack \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-07-27T14:00:00Z \
+  --output=./work/approved-prometheus-stack-plan.json
+
+bin/rules-ctl plan approve ./work/apply-ready.json \
+  --target=checkout-api/sloth \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-07-27T14:00:00Z \
+  --output=./work/approved-sloth-plan.json
+
+bin/rules-ctl bundle apply ./work/apply-ready.json \
+  --confirm \
+  --approved-plan=./work/approved-prometheus-stack-plan.json \
+  --approved-plan=./work/approved-sloth-plan.json \
+  --journal-dir=./work/journals \
+  --output=./work/applied.json
+```
+
+Success writes and prints the immutable `applied` successor. Its target entries
+reference generated `execution_result` artifacts containing the approved-plan
+reference, durable journal reference, and terminal `ProviderStateResult`;
+summary fields include execution counts by status. Prometheus Stack and Sloth
+engine-owned files are written, while Sloth downstream generation remains an
+external handoff.
+
+Missing, duplicate, unknown, or bundle-mismatched approvals; stale bundle
+sources; live-API targets; and incompatible existing output files fail before
+the first target executes. Execution stops at the first incomplete target and
+prints that target plus earlier completed target results without writing
+`applied.json`. Inspect and resume the failed approved plan with `plan resume`,
+then rerun `bundle apply`. Completed targets replay from their verified journals
+without file rewrites.
 
 ### Persist an operation journal
 

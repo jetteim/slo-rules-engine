@@ -14,6 +14,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Generate provider bundle | SLI, objective, response context, dashboard, route, and miss policy | Reviewed provider manifest and manifest-review report | Generation is local and read-only |
 | Package release | Reviewed evidence and target identity | Immutable review and apply-ready bundle JSON | Planning reads state but does not mutate it |
 | Approve and execute exact plan | One reviewed target, locked evidence, and exact operation list | Content-addressed approved plan, durable journal, and provider result | Explicit approval, `--confirm`, immediate state recheck, and same-scope lock |
+| Apply file-backed release | Complete approved-plan coverage for one apply-ready bundle | Immutable applied bundle with one execution result per target | All approvals preflight before deterministic exact execution |
 | Inspect drift | Reviewed desired state compared with observed state | Provider plan with deterministic state fingerprints | Read-only provider or managed-file access |
 | Inventory state | Ownership and adoption evidence | Observed state and findings | Read-only provider or managed-file access |
 | Create operation journal | Exact provider plan identity and operation safety evidence | Immutable initial journal plus status assessment | Standalone journal creation does not execute |
@@ -39,6 +40,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Release bundling | Content-addressed `review_ready` JSON containing reviewed evidence and target artifacts |
 | Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
 | Exact-plan approval | `slo-rules-engine/approved-provider-plan/v1` JSON containing one target, reviewer attestation, release-bundle lineage, evidence fingerprints, managed runtime, and exact dry-run provider plan |
+| Bundle execution | New content-addressed `applied` bundle with predecessor lineage and one `execution_result` artifact per target |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
 | Datadog sandbox smoke | `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with public-safe read checks and optional temporary-dashboard lifecycle evidence |
@@ -375,7 +377,7 @@ bin/rules-ctl journal status \
 - `journal status` prints effective state, entry counts, resume eligibility, and findings such as `partial_failure`, `resume_blocked`, or `resume_state_recheck_required`.
 - Confirmed apply/prune for every provider creates a separate live-mode journal automatically through `--journal-dir`; operators do not manually transition that journal.
 
-**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing. The approved-plan workflow below adds an exact file-backed execution guarantee, but there is no manual transition command, automatic resume, exact-plan replay, Datadog exact execution, or downstream Sloth verification.
+**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing. The approved-plan workflow below adds exact file-backed execution, completed replay, and explicit resume. There is no manual journal transition command, automatic retry, Datadog exact execution, automatic rollback, or downstream Sloth verification.
 
 ## Use Case 9: Approve And Execute An Exact File-Backed Plan
 
@@ -456,6 +458,9 @@ same `plan apply` command.
 - Previously skipped writes caused by `prior_operation_failed` are executed in
   order after the failed write succeeds. A currently converged resumable write
   is recorded as reconciled by state recheck without rewriting it.
+- A Sloth external-generator handoff skipped after an earlier write failure is
+  not misclassified as a retryable write; resume repairs eligible engine-owned
+  files and leaves the handoff explicitly external.
 - Resume rechecks verification evidence for every engine-owned entry. Success
   returns `execution.resume.status: completed`, the original journal path, full
   attempt history, and a converged `ProviderStateResult`.
@@ -478,12 +483,92 @@ same `plan apply` command.
 
 **Safety boundary:** source files changing after approval do not silently alter
 the locked operation payload; a new release bundle and approval are required to
-adopt those changes. Managed-state drift blocks execution. This checkpoint does
-not implement automatic rollback execution, multi-target `bundle apply`,
-Datadog exact apply/resume, retry of non-resumable operations, Sloth execution,
-Kubernetes apply, Grafana loading, or Alertmanager delivery.
+adopt those changes. Managed-state drift blocks execution. This workflow does
+not implement automatic rollback execution, Datadog exact apply/resume, retry
+of non-resumable operations, Sloth execution, Kubernetes apply, Grafana
+loading, or Alertmanager delivery.
 
-## Use Case 10: Apply Reviewed State
+## Use Case 10: Apply An Approved Multi-Target File Release
+
+**Task:** execute every reviewed file-backed target from one `apply_ready`
+bundle and persist the release-level result only after every target succeeds.
+
+Create one approved plan per target from the same bundle:
+
+```bash
+bin/rules-ctl plan approve ./work/apply-ready.json \
+  --target=checkout-api/prometheus_stack \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-07-27T14:00:00Z \
+  --output=./work/approved-prometheus-stack-plan.json
+
+bin/rules-ctl plan approve ./work/apply-ready.json \
+  --target=checkout-api/sloth \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-07-27T14:00:00Z \
+  --output=./work/approved-sloth-plan.json
+```
+
+Apply the file-only bundle:
+
+```bash
+bin/rules-ctl bundle apply ./work/apply-ready.json \
+  --confirm \
+  --approved-plan=./work/approved-prometheus-stack-plan.json \
+  --approved-plan=./work/approved-sloth-plan.json \
+  --journal-dir=./work/journals \
+  --output=./work/applied.json
+
+bin/rules-ctl bundle status ./work/applied.json
+```
+
+**What to expect:**
+
+- Before execution, the command revalidates the `apply_ready` bundle, source
+  freshness, exact target coverage, source bundle ID, target identity, bundle
+  review, manifest/review/handoff fingerprints, and provider-plan fingerprint.
+- Missing, duplicate, or unknown approvals return
+  `incomplete_approved_plan_coverage`. Mismatched approval evidence returns
+  `approved_plan_bundle_mismatch`. No target journal, managed file, or applied
+  bundle is written.
+- A Datadog or mixed live/file bundle returns
+  `unsupported_bundle_apply_target` before any target execution.
+- Targets execute in stable target-UID order through `ExactPlanExecutor`.
+  Prometheus Stack writes its reviewed manifest and native rules/dashboard/route
+  files. Sloth writes its reviewed manifest and native `prometheus/v1` input;
+  downstream Sloth/Prometheus execution remains external.
+- Success writes and prints a new content-addressed `applied` bundle. The
+  predecessor stays byte-for-byte unchanged. Each target references a generated
+  `execution_result` artifact containing
+  `slo-rules-engine/bundle-target-execution/v1`, its approved-plan reference,
+  durable operation-journal reference, and terminal `ProviderStateResult`.
+- The applied summary includes `execution_count`, `executions_by_status`, and
+  provider execution rollups. `bundle status` reports `valid: true` and
+  `effective_lifecycle: applied`.
+- Repeating the command with the same bundle, approvals, journal directory, and
+  output rechecks convergence, reuses terminal journals/results, leaves managed
+  file modification times unchanged, and returns the same applied bundle ID and
+  bytes.
+- An incompatible existing `--output` returns
+  `release_bundle_output_conflict` before target execution and is never
+  overwritten.
+- If a target returns `partial`, `failed`, or another non-success status, stdout
+  contains `bundle_target_execution_incomplete`, the failed `target_uid`, its
+  journal reference, and `completed_targets` for earlier successes. Execution
+  stops, later targets do not start, and `applied.json` is not written.
+- After reviewing and correcting the external cause, run `plan resume` for the
+  failed approved plan. Rerun `bundle apply`; earlier completed targets replay
+  without writes and the applied successor is persisted once all targets are
+  terminally successful.
+
+**Safety boundary:** bundle apply never replans an alternative operation list.
+It accepts only file-backed exact plans from the same source bundle, performs
+all approval/output compatibility checks before the first target, stops at the
+first incomplete target, and never retries a partial plan implicitly. It does
+not support live API targets, automatic rollback, Sloth execution, Kubernetes
+apply, Grafana loading, or Alertmanager delivery.
+
+## Use Case 11: Apply Reviewed State
 
 **Task:** converge current provider state after reviewing the current manifest and evidence gates.
 
@@ -545,7 +630,7 @@ bin/rules-ctl apply \
 
 **Safety boundary:** current apply replans immediately before mutation and requires reviewed manifest input. Datadog verification covers the supported managed API payload and identity contract, while file verification covers engine-owned paths. It does not prove notification delivery, Kubernetes application, Grafana loading, Alertmanager receiver delivery, Sloth execution, automatic resume, or execution of a separately approved exact plan.
 
-## Use Case 11: Remove Managed State
+## Use Case 12: Remove Managed State
 
 **Task:** inspect and explicitly remove provider state managed for the reviewed service scope.
 
@@ -596,7 +681,7 @@ bin/rules-ctl prune \
 
 **Safety boundary:** deletion is limited by the reviewed service/provider scope and provider ownership gates. Verification proves Datadog managed-ID absence or engine-owned path absence only; journaling does not provide rollback, automatic resume, or downstream-system cleanup.
 
-## Use Case 12: Verify Telemetry Before Production Adoption
+## Use Case 13: Verify Telemetry Before Production Adoption
 
 **Task:** prove that each reviewed provider binding resolves to usable current evidence.
 
@@ -628,7 +713,7 @@ bin/rules-ctl reality-check \
 
 **Intent preserved:** the check tests whether reviewed intent is measurable. It reports gaps rather than changing the binding, objective, calculation basis, or SLO policy.
 
-## Use Case 13: Generate Contextual Alert Routes
+## Use Case 14: Generate Contextual Alert Routes
 
 **Task:** hand alert context to a delivery system without giving the rules engine delivery credentials.
 
@@ -648,7 +733,7 @@ bin/rules-ctl generate-routes \
 
 **Intent preserved:** generated routes carry service, owner, severity, response, dashboard, and playbook context. The notification router remains responsible for Teams, Slack, Telegram, webhook, console, or other channel configuration and delivery.
 
-## Use Case 14: Validate Datadog Lookup In An Isolated Sandbox
+## Use Case 15: Validate Datadog Lookup In An Isolated Sandbox
 
 **Task:** prove the Datadog credential, dashboard catalog, detail-read, and
 managed-identity contracts without using production resources.

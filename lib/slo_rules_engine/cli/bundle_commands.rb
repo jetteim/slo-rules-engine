@@ -13,10 +13,12 @@ module SloRulesEngine
           bundle_create(argv)
         when 'plan'
           bundle_plan(argv)
+        when 'apply'
+          bundle_apply(argv)
         when 'status'
           bundle_status(argv)
         else
-          abort_usage('usage: bundle create|plan|status')
+          abort_usage('usage: bundle create|plan|apply|status')
         end
       end
 
@@ -147,6 +149,86 @@ module SloRulesEngine
         render_bundle_error(code: 'invalid_bundle_input', message: error.message)
       end
 
+      def bundle_apply(argv)
+        input_path = argv.shift
+        confirm = false
+        journal_dir = nil
+        output_path = nil
+        approved_plan_paths = []
+        parser = OptionParser.new do |opts|
+          opts.on('--confirm', 'Execute every covered file-backed target exactly') { confirm = true }
+          opts.on('--approved-plan=FILE', 'Approved provider plan; repeat once per bundle target') do |value|
+            approved_plan_paths << value
+          end
+          opts.on('--journal-dir=DIR', 'Durable exact-plan operation journal directory') do |value|
+            journal_dir = value
+          end
+          opts.on('--output=FILE', 'Write the immutable applied release bundle') { |value| output_path = value }
+        end
+        parser.parse!(argv)
+        abort_usage('missing apply-ready release bundle path') if input_path.to_s.empty?
+        abort_usage('bundle apply requires --confirm') unless confirm
+        abort_usage('bundle apply requires at least one --approved-plan') if approved_plan_paths.empty?
+        abort_usage('bundle apply requires --journal-dir') if journal_dir.to_s.empty?
+        abort_usage('bundle apply requires --output') if output_path.to_s.empty?
+        abort_usage('unexpected arguments') unless argv.empty?
+        if File.expand_path(input_path) == File.expand_path(output_path)
+          render_bundle_error(
+            code: 'immutable_bundle_input',
+            message: 'bundle apply output must differ from the predecessor bundle path'
+          )
+        end
+
+        release_bundle = JSON.parse(File.read(input_path), symbolize_names: true)
+        approved_plans = approved_plan_paths.map do |path|
+          payload = JSON.parse(File.read(path), symbolize_names: true)
+          ProviderState::ApprovedPlan::Loader.new.load(payload)
+        end
+        store = SloRulesEngine::ReleaseBundle::Store.new
+        store.preflight(
+          output_path,
+          predecessor_bundle_id: release_bundle.fetch(:bundle_id),
+          approved_plan_ids: approved_plans.map(&:approved_plan_id)
+        )
+        executor = ProviderState::ExactPlanExecutor.new(journal_dir: journal_dir)
+        applied = SloRulesEngine::ReleaseBundle::Applier.new(executor: executor).apply(
+          release_bundle,
+          approved_plans: approved_plans
+        )
+        store.write(output_path, applied)
+        puts JSON.pretty_generate(applied)
+      rescue SloRulesEngine::ReleaseBundle::ApplyError => error
+        render_bundle_error(
+          code: error.code,
+          message: error.message,
+          findings: error.findings,
+          target_uid: error.target_uid,
+          completed_targets: error.completed_targets,
+          path: error.path
+        )
+      rescue SloRulesEngine::ProviderState::ApprovedPlan::Error => error
+        render_bundle_error(
+          code: error.code,
+          message: error.message,
+          findings: error.findings,
+          path: error.path
+        )
+      rescue SloRulesEngine::ReleaseBundle::CredentialError => error
+        render_bundle_error(
+          code: 'credential_material_forbidden',
+          message: error.message,
+          errors: error.paths.map { |path| { path: path, message: 'credential-like keys are forbidden' } }
+        )
+      rescue SloRulesEngine::ReleaseBundle::SchemaError => error
+        render_bundle_error(
+          code: 'invalid_release_bundle',
+          message: error.message,
+          errors: error.result.errors.map(&:to_h)
+        )
+      rescue ArgumentError, Errno::ENOENT, Errno::EACCES, JSON::ParserError => error
+        render_bundle_error(code: 'invalid_bundle_input', message: error.message)
+      end
+
       def bundle_status(argv)
         path = argv.shift
         abort_usage('missing release bundle path') if path.to_s.empty?
@@ -160,7 +242,16 @@ module SloRulesEngine
         render_bundle_error(code: 'invalid_bundle_input', message: error.message)
       end
 
-      def render_bundle_error(code:, message:, status: nil, findings: nil, errors: nil)
+      def render_bundle_error(
+        code:,
+        message:,
+        status: nil,
+        findings: nil,
+        errors: nil,
+        target_uid: nil,
+        completed_targets: nil,
+        path: nil
+      )
         payload = {
           valid: false,
           error: {
@@ -171,7 +262,10 @@ module SloRulesEngine
           lifecycle: status&.fetch(:effective_lifecycle, nil),
           summary: status&.fetch(:summary, nil),
           findings: findings || status&.fetch(:findings, nil),
-          errors: errors
+          errors: errors,
+          target_uid: target_uid,
+          completed_targets: completed_targets,
+          path: path
         }.compact
         puts JSON.pretty_generate(payload)
         exit 1

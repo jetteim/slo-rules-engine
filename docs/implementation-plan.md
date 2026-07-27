@@ -141,7 +141,8 @@ This is the running plan for the long refactor.
 - [x] Add read-only `bundle plan` with explicit runtime configuration for every packaged provider target.
 - [x] Make the `review_ready` to `apply_ready` transition deterministic and reject stale, invalid, incomplete, or already-planned predecessors.
 - [x] Support multi-scope and multi-provider bundles with provider-level change and risk summaries.
-- [ ] Add `bundle apply` only after Phase 10 defines shared execution and result contracts and Phase 12 defines exact-plan guarantees.
+- [x] Add fail-closed multi-target file-backed `bundle apply` after Phase 10
+  shared result contracts and Phase 12 exact-plan guarantees.
 - [ ] Add `bundle verify` after provider-specific verification evidence has a shared Phase 10 contract.
 
 ## Phase 10: Provider-Neutral State-Manager Hardening

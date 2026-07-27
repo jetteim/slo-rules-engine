@@ -8,7 +8,9 @@ require_relative 'onboarding_fixtures'
 module ReleaseBundleFixtures
   include OnboardingFixtures
 
-  def write_release_bundle_fixture(dir, include_plan: false, provider: 'prometheus_stack')
+  def write_release_bundle_fixture(dir, include_plan: false, provider: 'prometheus_stack', providers: nil)
+    providers = Array(providers || [provider]).map(&:to_s)
+    provider = providers.fetch(0)
     discovery_dir = File.join(dir, 'discovery')
     handoff_dir = File.join(dir, 'handoff')
     draft_dir = File.join(dir, 'drafts')
@@ -30,35 +32,45 @@ module ReleaseBundleFixtures
     draft_path = File.join(draft_dir, 'checkout-prod.rb')
     File.write(draft_path, "# reviewed public-safe definition\n")
 
-    manifest = reviewed_provider_manifest(provider)
-    manifest_path = File.join(manifest_dir, 'checkout-api', provider, 'manifest.json')
-    FileUtils.mkdir_p(File.dirname(manifest_path))
-    File.write(manifest_path, JSON.pretty_generate(manifest))
+    manifests = {}
+    reports = {}
+    providers.each do |provider_key|
+      manifest = reviewed_provider_manifest(provider_key)
+      manifest_path = File.join(manifest_dir, 'checkout-api', provider_key, 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(manifest_path))
+      File.write(manifest_path, JSON.pretty_generate(manifest))
+      manifests[provider_key] = manifest_path
 
-    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
-      [manifest],
-      provider: provider,
-      handoff_dir: handoff_dir
-    )
-    report_path = File.join(manifest_dir, 'manifest-review', "#{provider}.json")
-    FileUtils.mkdir_p(File.dirname(report_path))
-    File.write(report_path, JSON.pretty_generate(report))
+      report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+        [manifest],
+        provider: provider_key,
+        handoff_dir: handoff_dir
+      )
+      report_path = File.join(manifest_dir, 'manifest-review', "#{provider_key}.json")
+      FileUtils.mkdir_p(File.dirname(report_path))
+      File.write(report_path, JSON.pretty_generate(report))
+      reports[provider_key] = report_path
+    end
 
     artifact_index = SloRulesEngine::Onboarding::ArtifactIndexBuilder.new.build(
       discovery_index_path,
       handoff_dir: handoff_dir,
       draft_dir: draft_dir,
       manifest_dir: manifest_dir,
-      providers: [provider]
+      providers: providers
     )
     artifact_index_path = File.join(dir, 'artifact-index.json')
     File.write(artifact_index_path, JSON.pretty_generate(artifact_index))
 
-    plan_path = nil
+    plans = {}
     if include_plan
-      plan = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: File.join(dir, 'managed')).plan(manifest)
-      plan_path = File.join(dir, "#{provider}-plan.json")
-      File.write(plan_path, JSON.pretty_generate(plan.to_h))
+      providers.each do |provider_key|
+        manifest = JSON.parse(File.read(manifests.fetch(provider_key)), symbolize_names: true)
+        plan = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: File.join(dir, 'managed')).plan(manifest)
+        plan_path = File.join(dir, "#{provider_key}-plan.json")
+        File.write(plan_path, JSON.pretty_generate(plan.to_h))
+        plans["checkout-api/#{provider_key}"] = plan_path
+      end
     end
 
     {
@@ -66,10 +78,14 @@ module ReleaseBundleFixtures
       discovery: File.join(discovery_dir, 'checkout-prod.json'),
       handoff: handoff_path,
       draft: draft_path,
-      manifest: manifest_path,
-      report: report_path,
-      plan: plan_path,
-      target: "checkout-api/#{provider}"
+      manifest: manifests.fetch(provider),
+      manifests: manifests,
+      report: reports.fetch(provider),
+      reports: reports,
+      plan: plans["checkout-api/#{provider}"],
+      plans: plans,
+      target: "checkout-api/#{provider}",
+      targets: providers.map { |provider_key| "checkout-api/#{provider_key}" }
     }.compact
   end
 

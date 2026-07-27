@@ -6,6 +6,7 @@ module SloRulesEngine
   module ReleaseBundle
     SCHEMA_VERSION = 'slo-rules-engine/release-bundle/v1'
     KIND = 'SLOReleaseBundle'
+    EXECUTION_SCHEMA_VERSION = 'slo-rules-engine/bundle-target-execution/v1' unless const_defined?(:EXECUTION_SCHEMA_VERSION)
     LIFECYCLE_STATES = %w[incomplete review_ready apply_ready stale applied verified].freeze
     ARTIFACT_KINDS = %w[
       onboarding_artifact_index
@@ -16,6 +17,7 @@ module SloRulesEngine
       provider_manifest
       manifest_review_report
       change_plan
+      execution_result
     ].freeze
 
     class SchemaError < StandardError
@@ -74,7 +76,11 @@ module SloRulesEngine
         result.error('lifecycle', "must be one of #{LIFECYCLE_STATES.inspect}") unless LIFECYCLE_STATES.include?(lifecycle)
 
         validate_review(result, fetch_value(bundle, :review))
-        validate_transition(result, fetch_value(bundle, :transition)) if fetch_value(bundle, :transition)
+        validate_transition(
+          result,
+          fetch_value(bundle, :transition),
+          lifecycle: lifecycle
+        ) if fetch_value(bundle, :transition)
         artifacts = validate_array(result, 'artifacts', fetch_value(bundle, :artifacts))
         targets = validate_array(result, 'targets', fetch_value(bundle, :targets))
         validate_artifacts(result, artifacts)
@@ -83,7 +89,8 @@ module SloRulesEngine
           targets,
           artifacts,
           require_references: lifecycle != 'incomplete',
-          require_plans: %w[apply_ready applied verified].include?(lifecycle)
+          require_plans: %w[apply_ready applied verified].include?(lifecycle),
+          require_executions: %w[applied verified].include?(lifecycle)
         )
         validate_array(result, 'findings', fetch_value(bundle, :findings))
         validate_hash(result, 'summary', fetch_value(bundle, :summary))
@@ -94,21 +101,23 @@ module SloRulesEngine
         result
       end
 
-      def validate_transition(result, transition)
+      def validate_transition(result, transition, lifecycle:)
         validate_hash(result, 'transition', transition)
         return unless transition.is_a?(Hash)
 
-        validate_exact(result, 'transition.action', fetch_value(transition, :action), 'plan')
+        action = fetch_value(transition, :action)
+        unless %w[plan apply].include?(action)
+          result.error('transition.action', 'must be plan or apply')
+          return
+        end
         predecessor_id = fetch_value(transition, :predecessor_bundle_id)
         unless predecessor_id.to_s.match?(/\Aslo-bundle-[0-9a-f]{64}\z/)
           result.error('transition.predecessor_bundle_id', 'must be a content-addressed slo-bundle identifier')
         end
-        validate_exact(
-          result,
-          'transition.predecessor_lifecycle',
-          fetch_value(transition, :predecessor_lifecycle),
-          'review_ready'
-        )
+        predecessor_lifecycle = action == 'plan' ? 'review_ready' : 'apply_ready'
+        validate_exact(result, 'transition.predecessor_lifecycle', fetch_value(transition, :predecessor_lifecycle), predecessor_lifecycle)
+        expected_lifecycle = action == 'plan' ? 'apply_ready' : 'applied'
+        validate_exact(result, 'lifecycle', lifecycle, expected_lifecycle)
       end
 
       def validate!(bundle)
@@ -185,7 +194,7 @@ module SloRulesEngine
         end
       end
 
-      def validate_targets(result, targets, artifacts, require_references:, require_plans:)
+      def validate_targets(result, targets, artifacts, require_references:, require_plans:, require_executions:)
         result.error('targets', 'must contain at least one provider target') if targets.empty?
         artifact_uids = artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         seen = {}
@@ -226,6 +235,18 @@ module SloRulesEngine
               expected_provider: provider
             )
           end
+          execution_uid = fetch_value(target, :execution_artifact_uid)
+          next unless require_executions || execution_uid
+
+          execution = validate_artifact_reference(
+            result,
+            "#{path}.execution_artifact_uid",
+            execution_uid,
+            artifact_uids,
+            expected_kind: 'execution_result',
+            expected_provider: provider
+          )
+          validate_execution_reference(result, path, target, execution) if execution
         end
       end
 
@@ -243,6 +264,79 @@ module SloRulesEngine
         end
         unless fetch_value(artifact, :provider) == expected_provider
           result.error(path, 'must reference an artifact for the target provider')
+        end
+        artifact
+      end
+
+      def validate_execution_reference(result, path, target, artifact)
+        content = fetch_value(artifact, :content)
+        unless content.is_a?(Hash)
+          result.error("#{path}.execution_artifact_uid", 'must reference an execution result object')
+          return
+        end
+        validate_exact(
+          result,
+          "#{path}.execution.target_uid",
+          fetch_value(content, :target_uid),
+          fetch_value(target, :uid)
+        )
+        validate_exact(
+          result,
+          "#{path}.execution.schema_version",
+          fetch_value(content, :schema_version),
+          EXECUTION_SCHEMA_VERSION
+        )
+        validate_exact(
+          result,
+          "#{path}.execution.kind",
+          fetch_value(content, :kind),
+          'BundleTargetExecution'
+        )
+        {
+          target_uid: :uid,
+          service: :service,
+          provider: :provider
+        }.each do |content_key, target_key|
+          validate_exact(
+            result,
+            "#{path}.execution.#{content_key}",
+            fetch_value(content, content_key),
+            fetch_value(target, target_key)
+          )
+        end
+        approved_plan = fetch_value(content, :approved_plan)
+        validate_hash(result, "#{path}.execution.approved_plan", approved_plan)
+        validate_presence(
+          result,
+          "#{path}.execution.approved_plan.approved_plan_id",
+          fetch_value(approved_plan, :approved_plan_id)
+        )
+        operation_journal = fetch_value(content, :operation_journal)
+        validate_hash(result, "#{path}.execution.operation_journal", operation_journal)
+        %i[journal_id path status].each do |key|
+          validate_presence(
+            result,
+            "#{path}.execution.operation_journal.#{key}",
+            fetch_value(operation_journal, key)
+          )
+        end
+        execution_result = fetch_value(content, :result)
+        validate_hash(result, "#{path}.execution.result", execution_result)
+        validate_exact(
+          result,
+          "#{path}.execution.result.provider",
+          fetch_value(execution_result, :provider),
+          fetch_value(target, :provider)
+        )
+        validate_exact(
+          result,
+          "#{path}.execution.result.service",
+          fetch_value(execution_result, :service),
+          fetch_value(target, :service)
+        )
+        status = fetch_value(execution_result, :status)
+        unless %w[succeeded noop].include?(status)
+          result.error("#{path}.execution.result.status", 'must be succeeded or noop')
         end
       end
 

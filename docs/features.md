@@ -130,9 +130,14 @@ Explicit features:
   `plan resume` proves previous successes still converge, retries only
   journal-eligible file writes, preserves all attempt history, and re-verifies
   every engine-owned file.
+- **Multi-target file-backed bundle apply:** one approved plan per target is
+  preflighted against the same apply-ready bundle, then Prometheus Stack and
+  Sloth targets execute in stable UID order through the exact-plan executor.
+  Success creates a new content-addressed applied bundle with per-target
+  journal/result artifacts; partial targets require explicit resume.
 - **Exact-plan provider boundary:** Datadog approval/execution,
   Datadog resume, non-resumable operation retry, automatic rollback execution,
-  and multi-target bundle apply remain explicit future work.
+  and live/file mixed-bundle apply remain explicit future work.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

@@ -733,6 +733,8 @@ module SloRulesEngine
       def validate_skipped_resume_entry!(entry, operation, current_change, index)
         reason = Value.fetch(Value.fetch(entry, :skip), :reason)
         if reason == 'prior_operation_failed'
+          return if operation.action == 'handoff' && current_change.action == 'handoff'
+
           require_resumable_change!(entry, operation, current_change, index)
           return
         end
@@ -785,7 +787,9 @@ module SloRulesEngine
         status = Value.fetch(entry, :status)
         return true if status == 'failed'
 
-        status == 'skipped' && Value.fetch(Value.fetch(entry, :skip), :reason) == 'prior_operation_failed'
+        status == 'skipped' &&
+          Value.fetch(Value.fetch(entry, :skip), :reason) == 'prior_operation_failed' &&
+          Value.fetch(Value.fetch(entry, :resume), :eligible)
       end
 
       def verify_entries(plan, journal, path, recheck: false)

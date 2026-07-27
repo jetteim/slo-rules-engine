@@ -35,7 +35,7 @@ Supported persisted lifecycle states:
 - `review_ready`: discovery, handoff, reviewed definition, provider manifest, and fresh manifest-review evidence are packaged
 - `apply_ready`: every provider target also has a valid dry-run change plan
 - `stale`: current review evidence no longer matches its predecessor artifacts
-- `applied`: reserved for the future bundle apply transition
+- `applied`: every file-backed target has terminal exact-execution evidence
 - `verified`: reserved for the future post-apply verification transition
 
 `bundle status` will report `invalid` as an effective status when the schema, an embedded artifact fingerprint, or the content-addressed bundle identity has been tampered with. `invalid` is not a persisted lifecycle state.
@@ -52,8 +52,14 @@ The v1 artifact inventory supports:
 - provider manifest
 - provider-level manifest-review report
 - optional dry-run provider change plan
+- generated target execution result
 
-Each artifact includes a stable UID, kind, content type, SHA-256 fingerprint, source metadata, and embedded content. File-backed predecessors record an absolute source path. Bundle-native plans record generated lineage to the predecessor bundle and provider target instead of inventing a mutable source file. Provider targets reference the packaged manifest, review report, and optional plan by UID.
+Each artifact includes a stable UID, kind, content type, SHA-256 fingerprint,
+source metadata, and embedded content. File-backed predecessors record an
+absolute source path. Bundle-native plans and execution results record generated
+lineage to the predecessor bundle and provider target instead of inventing a
+mutable source file. Provider targets reference the packaged manifest, review
+report, optional plan, and applied execution result by UID.
 
 The bundle excludes credential ownership. Structured content containing credential-like keys such as `api_key`, `app_key`, `secret`, `password`, `token`, `authorization`, or `credentials` is rejected before it can be packaged.
 
@@ -126,8 +132,40 @@ rewriting files. A partial or failed journal returns
 state-recheck and rollback guidance. `plan resume` can then retry only
 journal-eligible file writes after proving prior successes still converge; it
 preserves attempt history and re-verifies every engine-owned file. Datadog
-resume, non-resumable retries, rollback execution, and multi-target
-`bundle apply` remain future lifecycle transitions.
+resume, non-resumable retries, and rollback execution remain future work.
+
+## Multi-Target File-Backed Apply
+
+`bundle apply` accepts one valid `apply_ready` bundle and exactly one approved
+plan per target. Before any target begins, it verifies:
+
+- every target uses `manifest_bundle` or `external_generator` automation
+- the approval set covers every target exactly once with no unknown target
+- every approval names the source bundle ID and exact target identity
+- bundle-review, provider-plan, manifest, manifest-review, and handoff
+  fingerprints still match the packaged artifacts
+- the requested applied-bundle destination is absent or is the compatible
+  immutable result of the same predecessor and approved-plan set
+
+Datadog or mixed live/file bundles return
+`unsupported_bundle_apply_target`. Coverage, evidence, source freshness, and
+output conflicts also fail before a target journal or managed-file write.
+
+Targets execute in deterministic UID order through `ExactPlanExecutor`. The
+command stops after the first non-success target and reports its UID, journal,
+and all earlier completed target results. It does not write an applied bundle
+until every target returns `succeeded` or `noop`. A partial target must be
+reviewed and explicitly resumed with `plan resume`; rerunning `bundle apply`
+then replays already-converged targets without rewriting their files.
+
+Successful execution creates a new content-addressed `applied` bundle with an
+`apply` transition to the `apply_ready` predecessor. Each target references a
+generated `execution_result` artifact whose
+`slo-rules-engine/bundle-target-execution/v1` content includes the
+approved-plan reference, operation-journal reference, and terminal
+`ProviderStateResult`. Execution counts and statuses are included in aggregate
+and provider summaries. Identical replay persists identical bundle bytes;
+conflicting output is never overwritten.
 
 ## Status Safety
 
@@ -207,4 +245,20 @@ bin/rules-ctl plan resume ./approved-plan.json \
   --journal-dir ./journals
 ```
 
-Creation and planning are fail-closed. Stale, invalid, incomplete, or wrong-lifecycle predecessors; missing or unknown target runtime configuration; invalid dry-run plans; credential-like structured keys; and invalid bundle schemas produce nonzero status and do not write the requested output file. Planning also rejects in-place output so the predecessor remains immutable.
+Apply every approved target in one file-only bundle:
+
+```bash
+bin/rules-ctl bundle apply ./apply-ready-bundle.json \
+  --confirm \
+  --approved-plan ./approved-prometheus-stack-plan.json \
+  --approved-plan ./approved-sloth-plan.json \
+  --journal-dir ./journals \
+  --output ./applied-bundle.json
+```
+
+Creation, planning, and bundle execution are fail-closed. Stale, invalid,
+incomplete, or wrong-lifecycle predecessors; missing or unknown target runtime
+configuration; invalid dry-run plans; credential-like structured keys; invalid
+bundle schemas; incomplete/mismatched approvals; unsupported live targets; and
+incompatible applied-bundle outputs produce nonzero status. Planning and apply
+also reject in-place output so the predecessor remains immutable.

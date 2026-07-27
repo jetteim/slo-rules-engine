@@ -8,20 +8,30 @@ module SloRulesEngine
 
       def build(review:, targets:, artifacts:, findings:)
         plan_artifacts = artifacts.select { |artifact| fetch_value(artifact, :kind) == 'change_plan' }
+        execution_artifacts = artifacts.select { |artifact| fetch_value(artifact, :kind) == 'execution_result' }
         plans_by_uid = plan_artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
+        executions_by_uid = execution_artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         provider_summaries = targets.group_by { |target| fetch_value(target, :provider).to_s }.map do |provider, provider_targets|
           plans = provider_targets.filter_map do |target|
             plans_by_uid[fetch_value(target, :change_plan_artifact_uid)]
           end
-          operation_summary(plans).merge(
+          executions = provider_targets.filter_map do |target|
+            executions_by_uid[fetch_value(target, :execution_artifact_uid)]
+          end
+          provider_summary = operation_summary(plans).merge(
             provider: provider,
             target_count: provider_targets.length,
             change_plan_count: plans.length
           )
+          unless executions.empty?
+            provider_summary[:execution_count] = executions.length
+            provider_summary[:executions_by_status] = execution_status_counts(executions)
+          end
+          provider_summary
         end.sort_by { |summary| summary.fetch(:provider) }
 
         aggregate = aggregate_summaries(provider_summaries)
-        {
+        summary = {
           scope_count: Array(fetch_value(review, :scopes)).length,
           provider_target_count: targets.length,
           artifact_count: artifacts.length,
@@ -34,6 +44,11 @@ module SloRulesEngine
           provider_summaries: provider_summaries,
           finding_count: findings.length
         }
+        unless execution_artifacts.empty?
+          summary[:execution_count] = execution_artifacts.length
+          summary[:executions_by_status] = execution_status_counts(execution_artifacts)
+        end
+        summary
       end
 
       private
@@ -72,6 +87,12 @@ module SloRulesEngine
       def counts(values)
         values.compact.each_with_object(Hash.new(0)) { |value, result| result[value.to_s] += 1 }
           .sort.to_h
+      end
+
+      def execution_status_counts(artifacts)
+        counts(artifacts.map do |artifact|
+          fetch_value(fetch_value(fetch_value(artifact, :content), :result), :status)
+        end)
       end
 
       def merge_counts(collection)

@@ -55,6 +55,11 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes readme, 'plan approve'
     assert_includes readme, 'plan apply'
     assert_includes readme, 'plan resume'
+    assert_includes document, 'bundle apply'
+    assert_includes document, 'slo-rules-engine/bundle-target-execution/v1'
+    assert_includes document, 'bundle_target_execution_incomplete'
+    assert_includes document, 'unsupported_bundle_apply_target'
+    assert_includes readme, '--output=./work/applied.json'
   end
 
   private
