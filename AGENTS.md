@@ -31,7 +31,11 @@ generation explicitly pending. Confirmed Datadog apply/prune now uses the same
 durable journal/result boundary, records sanitized request outcomes and returned
 backend identifiers, and refreshes backend state to verify canonical payload
 and identity convergence or delete absence. Exact-plan/resume behavior is still
-a later phase.
+a later phase. Datadog dashboard reconciliation now reads the paginated custom
+dashboard catalog and full details instead of assuming manual dashboard-list
+membership. A public-safe sandbox smoke command can validate credentials,
+catalog/detail reads, and an explicitly confirmed temporary dashboard
+create/find/delete cycle without storing credentials or raw backend bodies.
 
 ## Non-Negotiable Working Rules
 
@@ -205,13 +209,26 @@ Implemented by the latest feature slices:
   linked `ProviderStateResult`
 - Confirmed Datadog CLI apply/prune now requires `--journal-dir` after review
   evidence passes and before credentials or provider mutation
+- Datadog dashboard discovery, import, convergence verification, and prune
+  ownership now use the paginated custom-dashboard catalog plus full detail
+  reads and do not depend on manual dashboard-list membership
+- `scripts/datadog-sandbox-smoke` now provides a read-only credential/catalog
+  probe and an explicitly confirmed temporary-dashboard create/find/delete
+  probe with public-safe versioned output and cleanup attempts
+- `docs/datadog-sandbox-testing.md` documents public trial and partner-sandbox
+  paths, least-privilege scopes, regional sites, exact provider reads/writes,
+  expected output, telemetry-discovery behavior, and credential revocation
 - The project backlog includes one atomic, revertible repository-wide
   simplification checkpoint gated by requirements/use-case traceability and full
   behavioral verification
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: journal-backed Datadog execution outcomes and
+- latest checkpoint: public-safe Datadog sandbox setup and read/mutation
+  contract smoke workflow
+- previous checkpoint: custom-dashboard catalog reconciliation independent of
+  manual dashboard-list membership
+- previous checkpoint: journal-backed Datadog execution outcomes and
   post-mutation backend convergence evidence
 - previous checkpoint: post-operation Prometheus Stack and Sloth managed-file
   convergence evidence
@@ -272,10 +289,12 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Validate remaining Datadog resource semantics against safe real-backend evidence
-2. Complete provider-schema create/update fixtures and managed-resource adoption evidence
-3. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
-4. Expose live SLO and error-budget status without weakening provider-neutral intent
+1. Run the new read-only and temporary-dashboard smoke probes against an
+   isolated Datadog organization and record only sanitized contract evidence
+2. Validate remaining Datadog resource semantics against safe real-backend evidence
+3. Complete provider-schema create/update fixtures and managed-resource adoption evidence
+4. Persist and execute an exact reviewed plan with stale-state rejection and safe resume
+5. Expose live SLO and error-budget status without weakening provider-neutral intent
 
 Secondary gaps:
 
@@ -289,9 +308,18 @@ Secondary gaps:
 
 Next recommended slice:
 
-- validate the remaining supported Datadog create/update/readback semantics
-  against safe, explicit backend evidence and convert only confirmed shapes into
-  public-safe request/response contract fixtures
+- obtain credentials for an isolated Datadog trial, partner sandbox, or
+  administrator-approved test organization without storing them in the repo
+- run `scripts/datadog-sandbox-smoke` read-only first, then run the explicit
+  temporary-dashboard mutation probe only after confirming the target
+  organization is disposable or approved for testing
+- run Datadog telemetry discovery with `metrics_read`; accept an empty sandbox
+  as partial authentication/catalog evidence rather than inventing signals
+- convert only observed, sanitized contract facts into public-safe evidence;
+  never commit credentials, organization data, dashboard payloads, or raw error
+  bodies
+- if live evidence exposes a contract mismatch, add a failing characterization
+  test before changing the adapter
 - preserve current ownership, source-ref, payload validation, review, risk,
   journal, sanitization, and post-mutation verification gates
 - keep unverified provider fields out of the supported contract rather than
@@ -307,6 +335,9 @@ Rationale:
 - fake-client evidence proves orchestration, failure, sanitization, and
   convergence behavior but cannot prove the remaining external API field
   contract
+- the sandbox probe now gives Phase 11 a repeatable least-privilege path from
+  credential validation through catalog/detail reads and optional managed
+  dashboard lifecycle verification
 - safe backend evidence is required before the remaining Datadog Phase 11
   compatibility items can be marked complete
 - exact-plan execution remains a separate Phase 12 guarantee and must not be
@@ -314,48 +345,57 @@ Rationale:
 
 ## Next Session Handoff
 
-Prepared on 2026-07-26 for a restart-and-`proceed` workflow.
+Prepared on 2026-07-27 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `49d27c2 feat: journal datadog
-  reconciliation`
+- latest verified feature checkpoint: `4a421af feat: add datadog sandbox
+  contract smoke`
+- previous verified feature checkpoint: `7fb4976 fix: discover datadog
+  dashboards from catalog`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: `49d27c2` on local and remote `main`
+- target: `4a421af` on local and remote `main`
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-26T21:01:50Z`
+- recorded timestamp: `2026-07-27T11:35:56Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 368 tests, 2,225 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 377 tests, 2,279 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- blast radius: confirmed Datadog apply/prune now requires `--journal-dir`,
-  persists sanitized operation outcomes and backend identifiers, refreshes
-  provider state after mutation, and exits nonzero on execution or convergence
-  failure; dry-run, diff, import, review gates, ownership gates, and file-backed
-  execution retain their prior behavior
-- rollback path: revert `49d27c2`; existing Datadog resources remain
-  reconcilable from reviewed manifests, but live journal/result evidence and the
-  Datadog CLI journal gate are removed
+- live verification: not run because no Datadog sandbox API/application
+  credentials were available in the process; the missing-credential refusal
+  path was executed and returned the expected public-safe nonzero report
+- blast radius: Datadog dashboard state reads no longer depend on manual
+  dashboard-list membership; a separate script adds read-only sandbox checks
+  and an explicit one-dashboard mutation probe. Normal `apply`, `prune`,
+  ownership, review, journal, and verification gates are unchanged
+- rollback path: revert `4a421af` to remove the sandbox probe and guide; revert
+  `7fb4976` to restore the former manual-dashboard-list discovery behavior
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping by default.
-4. Continue Phase 11 only with safe explicit Datadog backend evidence for a
-   remaining create/update/readback contract gap.
-5. Convert confirmed backend shapes into public-safe fixtures without storing
+4. Check whether isolated Datadog credentials are available without printing
+   them. If they are not available, stop and request that the user provision a
+   trial/sandbox and export the environment-backed values.
+5. Run the read-only sandbox smoke first. Run
+   `--confirm-sandbox-mutation` only after the user confirms the organization is
+   isolated and approved for temporary dashboard mutation.
+6. Optionally run Datadog telemetry discovery with `metrics_read`; empty
+   evidence is a valid partial result.
+7. Convert confirmed backend shapes into public-safe fixtures without storing
    credentials, raw private payloads, or backend error bodies.
-6. Preserve current ownership, payload, review, risk, journal, sanitization, and
+8. Preserve current ownership, payload, review, risk, journal, sanitization, and
    post-mutation verification gates.
-7. If safe backend evidence is unavailable, stop at the verified boundary
+9. If safe backend evidence is unavailable, stop at the verified boundary
    rather than inventing provider semantics.
-8. Do not add automatic resume, exact-plan execution, `bundle apply`, or live
+10. Do not add automatic resume, exact-plan execution, `bundle apply`, or live
    SLO/error-budget status in the same slice.
 
 ## Verification Commands
@@ -400,7 +440,8 @@ If a new session needs to resume quickly:
 5. Inspect `lib/slo_rules_engine/provider_state/operation_journal.rb`,
    `lib/slo_rules_engine/provider_state/journal_execution.rb`, and their tests
 6. Inspect `lib/slo_rules_engine/datadog/state_verifier.rb`,
-   `lib/slo_rules_engine/apply.rb`, both provider appliers, and
-   `docs/provider-state-contract.md`
+   `lib/slo_rules_engine/datadog/state_reader.rb`,
+   `lib/slo_rules_engine/datadog/sandbox_smoke.rb`,
+   `scripts/datadog-sandbox-smoke`, and `docs/datadog-sandbox-testing.md`
 7. If the user says `proceed`, follow the Phase 11 handoff above
 8. Keep Phase 11 Datadog reconciliation, Phase 12 exact-plan execution, and Phase 13 live status in the accepted order
