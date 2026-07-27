@@ -14,14 +14,26 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 4. Apply-exact-plan workflow
 5. Live SLO and error-budget status
 
-The release-bundle planning boundary, provider-neutral state/journal contracts,
-and file-backed apply-exact-plan workflow are implemented. Live Datadog sandbox
-testing is explicitly postponed by the user. The next local roadmap slice
-should complete multi-target file-backed `bundle apply`, then proceed to live
-SLO/error-budget status without resuming housekeeping or inventing Datadog
-backend semantics.
+The release-bundle create/plan/apply boundary, provider-neutral state/journal
+contracts, and file-backed apply-exact-plan workflow are implemented. Live
+Datadog sandbox testing is explicitly postponed by the user. The next roadmap
+slice is provider-neutral live SLO/error-budget status, beginning with
+read-only Prometheus-compatible evidence and without resuming housekeeping or
+inventing Datadog backend semantics.
 
-Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages discovery evidence, reviewed handoffs and definitions, provider manifests, fresh manifest-review reports, and dry-run plans into a content-addressed JSON document. It records explicit reviewer attestation, lifecycle state, provider targets, artifact fingerprints, transition lineage, and provider-level change and risk summaries without credentials. `bundle create` is fail-closed for incomplete, stale, invalid, or credential-bearing input. `bundle plan` rechecks predecessor freshness, requires explicit runtime configuration for every target, leaves the predecessor immutable, performs no provider mutation, and writes a new content-addressed `apply_ready` bundle. `bundle status` detects schema errors, embedded tampering, identity mismatch, missing sources, and source drift.
+Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages
+discovery evidence, reviewed handoffs and definitions, provider manifests,
+fresh manifest-review reports, dry-run plans, and terminal file-target execution
+evidence into a content-addressed JSON document. `bundle create` is fail-closed
+for incomplete, stale, invalid, or credential-bearing input. `bundle plan`
+rechecks predecessor freshness, requires explicit runtime configuration for
+every target, leaves the predecessor immutable, performs no provider mutation,
+and writes a new content-addressed `apply_ready` bundle. `bundle apply`
+preflights one approved plan per file-backed target, rejects live/mixed bundles,
+executes exact plans in deterministic UID order, and writes an immutable
+`applied` successor only after every target succeeds or safely replays.
+`bundle status` detects schema errors, embedded tampering, identity mismatch,
+missing sources, and source drift.
 
 Current state-manager status: confirmed Prometheus Stack and Sloth apply/prune
 requires `--journal-dir`, persists atomic per-operation transitions and attempt
@@ -50,6 +62,16 @@ convergence check. `plan resume` retries only journal-eligible writes after
 proving earlier successes still converge, preserves all attempts, and
 re-verifies the full file set. Datadog exact apply/resume remains postponed
 with live backend validation.
+
+Current multi-target apply status: successful Prometheus Stack and Sloth bundle
+execution records one generated
+`slo-rules-engine/bundle-target-execution/v1` artifact per target with approved
+plan, journal, and `ProviderStateResult` references. Missing/duplicate/unknown
+approval coverage, bundle/evidence mismatch, stale sources, unsupported live
+targets, and incompatible output destinations fail before the first target.
+Execution stops on the first incomplete target, preserves earlier target
+results, and requires explicit `plan resume` before a rerun can finish the
+applied transition. Completed targets replay without rewriting files.
 
 ## Non-Negotiable Working Rules
 
@@ -256,13 +278,27 @@ Implemented by the latest feature slices:
   evidence fails before a new provider operation
 - Datadog exact approval/apply/resume is intentionally rejected until safe live
   backend recheck/idempotency evidence is available
+- `bundle apply` requires exact approved-plan coverage for every file-backed
+  target and validates bundle, target, review, manifest, review-report, handoff,
+  provider-plan, and output-destination identity before execution
+- File-backed bundle targets execute in deterministic UID order through
+  `ExactPlanExecutor`; live API or mixed bundles fail before any target starts
+- Successful bundle execution writes a new content-addressed `applied` successor
+  with one terminal `execution_result` artifact and provider rollup per target
+- Incomplete target execution stops the sequence, reports earlier completions,
+  writes no applied bundle, and advances only after explicit target
+  `plan resume`; completed target replay is file-write-free
+- Sloth resume now leaves a downstream handoff skipped after a repaired prior
+  write failure instead of misclassifying the handoff as a retryable write
 - The project backlog includes one atomic, revertible repository-wide
   simplification checkpoint gated by requirements/use-case traceability and full
   behavioral verification
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: explicit state-checked resume for journal-eligible exact
+- latest checkpoint: fail-closed multi-target file-backed bundle apply with
+  immutable applied-bundle evidence
+- previous checkpoint: explicit state-checked resume for journal-eligible exact
   file writes with full re-verification
 - previous checkpoint: converged completed-plan replay without file mutation
 - previous checkpoint: immutable approved plans and exact Prometheus
@@ -332,16 +368,13 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Complete multi-target file-backed `bundle apply` using approved plans,
-   fail-closed sequencing, and per-target results without weakening exact-plan
-   guarantees
-2. Define and expose live SLO/error-budget status without moving provider query
+1. Define and expose live SLO/error-budget status without moving provider query
    syntax into the neutral model
-3. Run the Datadog sandbox probes and resume live provider-contract work only
+2. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
-4. Extend exact approval/apply/resume to Datadog only after verified backend
+3. Extend exact approval/apply/resume to Datadog only after verified backend
    recheck and idempotency semantics exist
-5. Add automatic rollback execution only after a reviewed compensating-plan
+4. Add automatic rollback execution only after a reviewed compensating-plan
    contract exists; current exact failures provide manual guidance
 
 Secondary gaps:
@@ -356,35 +389,35 @@ Secondary gaps:
 
 Next recommended slice:
 
-- add `bundle apply` for an `apply_ready` bundle plus one approved plan per
-  file-backed target
-- require exact target coverage, source bundle identity, target UID, provider,
-  service, evidence fingerprints, and approved provider-plan fingerprints to
-  match before any target begins
-- reject Datadog/mixed live-API bundles explicitly while live contract testing
-  remains postponed
-- execute targets deterministically through the existing exact-plan executor,
-  stop on the first failed/incomplete target, and preserve every per-target
-  journal/result
-- persist a new content-addressed `applied` bundle transition rather than
-  mutating the `apply_ready` predecessor
-- make completed target replay idempotent and ensure a partial target requires
-  explicit `plan resume` before bundle execution can advance
-- update README/use cases with exact stdout, written bundle, provider writes,
-  replay, partial failure, and refusal behavior
-- keep live SLO/error-budget status as the next feature after this bundle
-  execution boundary
+- define a versioned provider-neutral live SLO status contract for reviewed SLO
+  identity, objective attainment, error-budget remaining, burn rate, telemetry
+  freshness, provider evidence, and machine-readable findings
+- distinguish `healthy`, `at_risk`, `exhausted`, `missing_telemetry`, and
+  `unverifiable` without placing PromQL or Datadog query syntax in the neutral
+  status model
+- implement the first read-only Prometheus-compatible status reader against a
+  reviewed provider manifest and deterministic fake/query fixtures
+- preserve provider query expressions in provider-owned manifest bindings and
+  normalize only evaluated values, timestamps, freshness, and identity into the
+  shared result
+- define exact stdout and optional saved-report behavior for one manifest before
+  expanding to bundle or portfolio aggregation
+- update README/use cases in the same slice with provider-specific reads,
+  normalized output, missing-telemetry behavior, and explicit non-mutation
+  boundaries
+- keep Datadog status reads deferred until isolated live evidence is available;
+  do not infer its contract from Prometheus behavior
 
 Rationale:
 
-- release bundles already carry immutable target plans and lifecycle lineage
-- approved plans now provide the exact per-target review, stale-state,
-  concurrency, replay, resume, journal, and verification guarantees that
-  `bundle apply` was waiting for
-- file-backed providers can prove the bundle transition locally without
-  Datadog credentials or new provider semantics
-- Datadog live testing is explicitly postponed, so mixed/live-API bundle
-  mutation must fail closed rather than being generalized from fake clients
+- release-bundle and exact-plan delivery now reach an immutable applied boundary
+- operational users still need current objective, budget, burn, and freshness
+  evidence after delivery
+- Prometheus Stack already generates complete SLI/SLO recording rules, so a
+  read-only status slice can use provider-owned metric names without new policy
+- beginning with normalized contracts and deterministic Prometheus-compatible
+  evidence keeps Datadog work evidence-driven while its live testing is
+  postponed
 
 ## Next Session Handoff
 
@@ -393,32 +426,32 @@ Prepared on 2026-07-27 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `2d94384 feat: resume eligible exact plan
-  writes`
+- latest verified feature checkpoint: `f87cde0 feat: apply approved file bundles
+  exactly`
+- previous verified feature checkpoint: `2d94384 feat: resume eligible exact
+  plan writes`
 - previous verified feature checkpoint: `87964c9 feat: replay completed exact
   plans safely`
-- previous verified feature checkpoint: `98086b5 feat: apply approved file
-  plans exactly`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: `2d94384` on local and remote `main`
+- target: `f87cde0` on local and remote `main`
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-27T13:55:39Z`
+- recorded timestamp: `2026-07-27T16:01:57Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 395 tests, 2,448 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 404 tests, 2,531 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
 - live verification: intentionally not run; the user postponed Datadog live
   testing and this checkpoint uses only deterministic managed files
-- blast radius: new `plan approve|status|apply|resume` commands and additive
-  approved-plan journal references for Prometheus Stack/Sloth exact execution;
-  standard apply/prune and Datadog mutation behavior are unchanged
-- rollback path: revert `2d94384` to remove resume, `87964c9` to remove
-  completed replay, `8efece8` for workflow docs, and `98086b5` for approved
-  plan/exact execution
+- blast radius: new `bundle apply` command, `applied` bundle transition,
+  execution-result artifact schema, multi-target Prometheus Stack/Sloth
+  orchestration, and one Sloth handoff-resume correction; standard apply/prune
+  and Datadog mutation behavior are unchanged
+- rollback path: revert `f87cde0` to remove multi-target bundle apply and its
+  applied-bundle contract
 
 When the user types `proceed` in a fresh session:
 
@@ -427,18 +460,16 @@ When the user types `proceed` in a fresh session:
 3. Do not resume housekeeping by default.
 4. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-5. Use TDD for multi-target file-backed `bundle apply`: fail first on target
-   coverage, approval/bundle mismatch, target failure, and immutable predecessor
-   behavior.
-6. Reuse `ProviderState::ApprovedPlan::Loader` and `ExactPlanExecutor`; do not
-   regenerate or execute a different operation list.
-7. Require one approved plan for every file-backed target and reject live-API
-   or mixed bundles before any target executes.
-8. Stop after the first incomplete target while preserving earlier target
-   journals/results; require explicit `plan resume` for partial targets.
-9. Persist a new content-addressed applied bundle with predecessor transition
-   and per-target execution references only after all targets succeed/replay.
-10. Keep live SLO/error-budget status after the bundle execution slice.
+5. Use TDD to define the provider-neutral live status value contract before
+   adding provider queries or CLI orchestration.
+6. Start with one reviewed Prometheus Stack manifest and deterministic
+   Prometheus-compatible query fixtures.
+7. Keep provider query syntax in provider-owned bindings; expose normalized
+   attainment, budget, burn, freshness, identity, and findings.
+8. Define exact one-manifest stdout and saved-report behavior before adding
+   bundle or portfolio aggregation.
+9. Keep Datadog live testing postponed and do not generalize a Datadog status
+   contract without backend evidence.
 
 ## Verification Commands
 
@@ -449,6 +480,8 @@ ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
 ruby -Ilib test/release_bundle_test.rb
 ruby -Ilib test/release_bundle_cli_test.rb
+ruby -Ilib test/release_bundle_apply_test.rb
+ruby -Ilib test/release_bundle_apply_cli_test.rb
 ruby -Ilib test/provider_state_contract_test.rb
 ruby -Ilib test/provider_state_journal_test.rb
 ruby -Ilib test/provider_state_journal_cli_test.rb
@@ -479,13 +512,12 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/provider_state/approved_plan.rb`,
-   `lib/slo_rules_engine/provider_state/exact_plan_executor.rb`,
-   `lib/slo_rules_engine/provider_state/journal_execution.rb`, and their tests
-6. Inspect `lib/slo_rules_engine/release_bundle/planner.rb`,
-   `lib/slo_rules_engine/release_bundle/status_evaluator.rb`, and
-   `lib/slo_rules_engine/cli/bundle_commands.rb`
-7. If the user says `proceed`, implement the file-backed `bundle apply` slice
-   described above
-8. Keep Datadog live testing postponed and preserve exact-plan, review,
-   journal, and verification gates
+5. Inspect the neutral model, manifest schema, Prometheus Stack generated
+   recording-rule names, telemetry lookup adapter, and reality-check result
+   patterns before naming the live-status contract
+6. Inspect `docs/implementation-plan.md` Phase 13 and the live-status use-case
+   expectations above
+7. If the user says `proceed`, implement the first provider-neutral plus
+   Prometheus-compatible live SLO/error-budget status slice described above
+8. Keep Datadog live testing postponed and preserve release-bundle, exact-plan,
+   review, journal, and verification gates

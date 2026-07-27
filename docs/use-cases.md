@@ -493,6 +493,10 @@ loading, or Alertmanager delivery.
 **Task:** execute every reviewed file-backed target from one `apply_ready`
 bundle and persist the release-level result only after every target succeeds.
 
+Use a file-only `apply_ready` bundle containing Prometheus Stack and Sloth
+targets. The Datadog-inclusive bundle in Use Case 5 demonstrates packaging and
+planning; it is deliberately ineligible for file-backed bundle apply.
+
 Create one approved plan per target from the same bundle:
 
 ```bash

@@ -114,6 +114,7 @@ bin/rules-ctl onboarding-artifact-index \
   --draft-dir=./work/drafts \
   --manifest-dir=./work/generated \
   --provider=prometheus_stack \
+  --provider=sloth \
   --output=./work/artifact-index.json \
   ./work/discovery/index.json
 
@@ -125,6 +126,7 @@ bin/rules-ctl bundle create \
 
 bin/rules-ctl bundle plan ./work/review-ready.json \
   --target-output=checkout-api/prometheus_stack=./managed \
+  --target-output=checkout-api/sloth=./managed \
   --output=./work/apply-ready.json
 ```
 
