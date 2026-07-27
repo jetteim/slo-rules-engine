@@ -43,6 +43,9 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes readme, 'canonical payload or confirmed delete absence'
     assert_includes document, 'paginated custom-dashboard catalog'
     assert_includes readme, 'manual dashboard-list membership is not required'
+    assert_includes document, 'Validate Datadog Lookup In An Isolated Sandbox'
+    assert_includes document, 'slo-rules-engine/datadog-sandbox-smoke/v1'
+    assert_includes readme, 'Datadog Sandbox Testing'
   end
 
   private

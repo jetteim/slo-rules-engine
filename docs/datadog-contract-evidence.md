@@ -36,6 +36,11 @@ Public-safe fixtures:
 - `test/fixtures/datadog/dashboard_detail.json`
 - `test/datadog_client_state_test.rb`
 
+An operator-run live probe is available through
+`scripts/datadog-sandbox-smoke`; setup and expected output are documented in
+[Datadog Sandbox Testing](datadog-sandbox-testing.md). Its result is local
+evidence and is not committed automatically.
+
 Expected provider reads:
 
 ```text

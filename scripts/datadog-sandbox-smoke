@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'json'
+require 'optparse'
+require_relative '../lib/slo_rules_engine'
+
+options = {
+  allow_mutation: false,
+  service: SloRulesEngine::Datadog::SandboxSmoke::DEFAULT_SERVICE,
+  site: ENV.fetch('DD_SITE', 'datadoghq.com')
+}
+
+parser = OptionParser.new do |opts|
+  opts.banner = 'Usage: scripts/datadog-sandbox-smoke [options]'
+  opts.on(
+    '--confirm-sandbox-mutation',
+    'Create, reconcile, and delete one temporary managed dashboard'
+  ) { options[:allow_mutation] = true }
+  opts.on('--service=NAME', 'Tag the temporary dashboard with this sandbox service') do |value|
+    options[:service] = value
+  end
+  opts.on('--site=SITE', 'Datadog site, for example datadoghq.eu') do |value|
+    options[:site] = value
+  end
+end
+
+begin
+  parser.parse!
+  raise OptionParser::InvalidArgument, "unexpected arguments: #{ARGV.join(' ')}" unless ARGV.empty?
+
+  client = SloRulesEngine::Datadog::Client.new(site: options.fetch(:site))
+  smoke = SloRulesEngine::Datadog::SandboxSmoke.new(
+    client: client,
+    site: options.fetch(:site),
+    service: options.fetch(:service)
+  )
+  puts JSON.pretty_generate(smoke.run(allow_mutation: options.fetch(:allow_mutation)))
+rescue OptionParser::ParseError => error
+  warn error.message
+  warn parser
+  exit 2
+rescue SloRulesEngine::Datadog::MissingCredentials
+  puts JSON.pretty_generate(
+    schema_version: SloRulesEngine::Datadog::SandboxSmoke::SCHEMA_VERSION,
+    status: 'failed',
+    finding: {
+      code: 'missing_credentials',
+      message: 'Datadog sandbox smoke requires environment-backed API and application credentials.'
+    }
+  )
+  exit 2
+rescue SloRulesEngine::Datadog::SandboxSmoke::ContractError => error
+  puts JSON.pretty_generate(
+    schema_version: SloRulesEngine::Datadog::SandboxSmoke::SCHEMA_VERSION,
+    status: 'failed',
+    finding: {
+      code: error.code,
+      error_class: error.class.name
+    }
+  )
+  exit 1
+rescue SloRulesEngine::Datadog::ApiError => error
+  puts JSON.pretty_generate(
+    schema_version: SloRulesEngine::Datadog::SandboxSmoke::SCHEMA_VERSION,
+    status: 'failed',
+    finding: {
+      code: 'datadog_api_error',
+      error_class: error.class.name,
+      http_status: error.response&.code
+    }.compact
+  )
+  exit 1
+rescue StandardError => error
+  puts JSON.pretty_generate(
+    schema_version: SloRulesEngine::Datadog::SandboxSmoke::SCHEMA_VERSION,
+    status: 'failed',
+    finding: {
+      code: 'sandbox_smoke_failed',
+      error_class: error.class.name
+    }
+  )
+  exit 1
+end

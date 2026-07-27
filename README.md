@@ -17,6 +17,8 @@ Use the toolkit to:
 - persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
 - run telemetry reality checks before treating an SLO as operationally ready
+- validate Datadog credentials and dashboard reconciliation in an isolated
+  sandbox before relying on live provider behavior
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
@@ -202,6 +204,32 @@ bin/rules-ctl reality-check \
 
 The report identifies missing metrics, absent series, incomplete histogram evidence, and other provider-binding gaps. It does not silently adjust the reviewed objective or calculation basis.
 
+### Validate Datadog against an isolated sandbox
+
+Run the credential and dashboard read contract without mutation:
+
+```bash
+scripts/datadog-sandbox-smoke
+```
+
+In a disposable trial or approved sandbox organization, opt in to one temporary
+empty dashboard create/find/delete cycle:
+
+```bash
+scripts/datadog-sandbox-smoke --confirm-sandbox-mutation
+```
+
+Both modes print public-safe
+`slo-rules-engine/datadog-sandbox-smoke/v1` JSON. Read-only mode validates the
+key pair, custom-dashboard catalog, and one detail response when available.
+Mutation mode additionally verifies the paginated catalog read path,
+high-confidence `source_ref` reconciliation, cleanup, and confirmed absence. It
+does not create SLOs or monitors and is not a substitute for reviewed
+`apply`/`prune`. Setup,
+least-privilege scopes, regional `DD_SITE` values, exact reads/writes, and
+expected output are in
+[Datadog Sandbox Testing](docs/datadog-sandbox-testing.md).
+
 ## Provider Model
 
 A provider is a complete operational observability bundle, not an individual artifact writer. It must declare:
@@ -246,6 +274,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Release Bundle Contract](docs/release-bundle-contract.md)
 - [Provider State Contract](docs/provider-state-contract.md)
 - [Datadog Public Contract Evidence](docs/datadog-contract-evidence.md)
+- [Datadog Sandbox Testing](docs/datadog-sandbox-testing.md)
 - [Provider Contract](docs/provider-contract.md)
 - [Provider Contribution Guide](docs/provider-contribution-guide.md)
 - [Implementation Plan](docs/implementation-plan.md)

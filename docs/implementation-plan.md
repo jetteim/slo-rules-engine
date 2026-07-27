@@ -165,6 +165,7 @@ This is the running plan for the long refactor.
 - [ ] Reconcile update, recreate, and prune behavior against current backend state without accepting weak ownership evidence.
 - [x] Capture resulting backend identifiers and provider verification evidence after every confirmed mutation.
 - [x] Discover and verify managed dashboards through the paginated custom-dashboard catalog instead of assuming manual dashboard-list membership.
+- [x] Add an isolated Datadog sandbox setup guide plus read-only and explicitly confirmed temporary-dashboard contract smoke tests.
 - [ ] Add public-safe contract fixtures for every verified Datadog request and response shape.
 
 ## Phase 12: Apply-Exact-Plan Workflow

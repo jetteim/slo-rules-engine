@@ -20,6 +20,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Remove managed state | Reviewed scope and ownership evidence | Durable journal plus confirmed delete result and absence verification | Explicit `--confirm` and `--journal-dir` |
 | Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
 | Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
+| Validate Datadog contract | Explicit sandbox credential and dashboard API evidence | Public-safe sandbox smoke JSON | Read-only by default; one temporary dashboard only with explicit confirmation |
 
 ## Output Map
 
@@ -38,6 +39,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
+| Datadog sandbox smoke | `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with public-safe read checks and optional temporary-dashboard lifecycle evidence |
 
 ### Provider Outputs
 
@@ -536,6 +538,69 @@ bin/rules-ctl generate-routes \
 - Route availability-check intent is included. Endpoint URLs, tokens, receiver credentials, and message delivery outcomes are not.
 
 **Intent preserved:** generated routes carry service, owner, severity, response, dashboard, and playbook context. The notification router remains responsible for Teams, Slack, Telegram, webhook, console, or other channel configuration and delivery.
+
+## Use Case 13: Validate Datadog Lookup In An Isolated Sandbox
+
+**Task:** prove the Datadog credential, dashboard catalog, detail-read, and
+managed-identity contracts without using production resources.
+
+Create a 14-day trial or approved isolated Datadog organization, create a
+dedicated API key and scoped application key, then export `DD_API_KEY`,
+`DD_APP_KEY`, and the region-specific `DD_SITE`. The application key needs
+`dashboards_read`; add `dashboards_write` only for the mutation probe. Exact
+setup steps are in [Datadog Sandbox Testing](datadog-sandbox-testing.md).
+
+Read-only contract smoke:
+
+```bash
+scripts/datadog-sandbox-smoke \
+  > /tmp/slo-rules-engine-datadog-sandbox-read.json
+```
+
+Temporary dashboard mutation smoke, only in the isolated organization:
+
+```bash
+scripts/datadog-sandbox-smoke \
+  --confirm-sandbox-mutation \
+  --service=slo-rules-engine-sandbox \
+  > /tmp/slo-rules-engine-datadog-sandbox-mutation.json
+```
+
+Optional telemetry lookup with `metrics_read`:
+
+```bash
+bin/rules-ctl discover-telemetry \
+  --provider=datadog \
+  --service=slo-rules-engine-sandbox \
+  > /tmp/slo-rules-engine-datadog-sandbox-telemetry.json
+```
+
+**What to expect:**
+
+- Read-only smoke prints `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with
+  `mode: read_only`, passed credential/API-key/catalog checks, and either a
+  passed dashboard-detail check or an `empty_catalog` skip.
+- Read-only smoke performs `GET /api/v1/validate`, the first paginated custom
+  dashboard catalog read, and at most one dashboard detail read. It makes no
+  provider changes.
+- Confirmed mutation smoke creates one uniquely tagged empty dashboard, finds
+  it through catalog/detail reads by high-confidence `source_ref`, deletes it,
+  verifies absence, and prints only the temporary provider ID and source
+  identity.
+- Mutation failures attempt cleanup. An interrupted process may require manual
+  removal of the dashboard tagged `service:slo-rules-engine-sandbox`.
+- Telemetry discovery prints the normal normalized evidence envelope. An empty
+  trial is expected to report insufficient signals while still proving
+  authenticated metric-catalog access and normalization.
+- Missing credentials exit nonzero with `missing_credentials`. API failures
+  expose only a stable code, error class, and HTTP status; keys, private
+  dashboard payloads, and raw response bodies are never printed.
+
+**Safety boundary:** the mutation flag is an operator assertion that the target
+organization is disposable or explicitly approved for testing. The probe
+creates no SLO, monitor, route, or telemetry and does not bypass the reviewed
+manifest, journal, ownership, and verification gates of normal `apply` or
+`prune`.
 
 ## Maintenance Rule
 
