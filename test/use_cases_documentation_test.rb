@@ -41,6 +41,8 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'backend_resource_present_after_delete'
     assert_includes document, 'Raw responses and raw backend error messages are not persisted'
     assert_includes readme, 'canonical payload or confirmed delete absence'
+    assert_includes document, 'paginated custom-dashboard catalog'
+    assert_includes readme, 'manual dashboard-list membership is not required'
   end
 
   private

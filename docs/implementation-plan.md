@@ -164,6 +164,7 @@ This is the running plan for the long refactor.
 - [ ] Complete import and adoption behavior for managed resources with explicit identity confidence.
 - [ ] Reconcile update, recreate, and prune behavior against current backend state without accepting weak ownership evidence.
 - [x] Capture resulting backend identifiers and provider verification evidence after every confirmed mutation.
+- [x] Discover and verify managed dashboards through the paginated custom-dashboard catalog instead of assuming manual dashboard-list membership.
 - [ ] Add public-safe contract fixtures for every verified Datadog request and response shape.
 
 ## Phase 12: Apply-Exact-Plan Workflow

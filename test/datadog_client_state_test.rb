@@ -3,6 +3,94 @@
 require_relative 'support/datadog_apply_test_case'
 
 class DatadogApplyTest < Minitest::Test
+  DATADOG_FIXTURE_DIR = File.expand_path('fixtures/datadog', __dir__)
+
+  def test_datadog_client_finds_managed_dashboard_outside_manual_lists
+    desired_title = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    http = RoutingHttp.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
+        '200',
+        File.read(File.join(DATADOG_FIXTURE_DIR, 'dashboard_catalog_page.json'))
+      ),
+      '/api/v1/dashboard/dashboard-123' => FakeResponse.new(
+        '200',
+        File.read(File.join(DATADOG_FIXTURE_DIR, 'dashboard_detail.json'))
+      )
+    )
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.existing_state(
+      desired: {
+        dashboards: [
+          {
+            title: desired_title,
+            source: 'artifacts.dashboards[0]'
+          }
+        ]
+      }
+    )
+
+    dashboard = state.fetch(:dashboards).fetch(desired_title)
+    assert_equal 'dashboard-123', dashboard.fetch(:id)
+    assert_equal desired_title, dashboard.fetch(:payload).fetch(:title)
+    assert_equal({ strategy: 'source_ref', confidence: 'high' }, dashboard.fetch(:match_identity))
+  end
+
+  def test_datadog_client_finds_managed_dashboard_after_a_full_catalog_page
+    desired_title = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
+    first_page = 100.times.map do |index|
+      {
+        id: "unmanaged-#{index}",
+        title: "Unmanaged dashboard #{index}",
+        layout_type: 'ordered'
+      }
+    end
+    routes = {
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
+        '200',
+        JSON.generate(dashboards: first_page)
+      ),
+      '/api/v1/dashboard?count=100&start=100' => FakeResponse.new(
+        '200',
+        File.read(File.join(DATADOG_FIXTURE_DIR, 'dashboard_catalog_page.json'))
+      ),
+      '/api/v1/dashboard/dashboard-123' => FakeResponse.new(
+        '200',
+        File.read(File.join(DATADOG_FIXTURE_DIR, 'dashboard_detail.json'))
+      )
+    }
+    first_page.each do |summary|
+      routes["/api/v1/dashboard/#{summary.fetch(:id)}"] = FakeResponse.new(
+        '200',
+        JSON.generate(summary.merge(tags: []))
+      )
+    end
+    client = SloRulesEngine::Datadog::Client.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: RoutingHttp.new(routes),
+      sleep_fn: ->(_seconds) {}
+    )
+
+    state = client.existing_state(
+      desired: {
+        dashboards: [
+          {
+            title: desired_title,
+            source: 'artifacts.dashboards[0]'
+          }
+        ]
+      }
+    )
+
+    assert_equal 'dashboard-123', state.fetch(:dashboards).fetch(desired_title).fetch(:id)
+  end
+
   def test_datadog_client_imports_existing_state_for_desired_resource_names
     http = RoutingHttp.new(
       '/api/v1/slo/search?page%5Bnumber%5D=0&page%5Bsize%5D=20&query=checkout-api+http-requests+public-api+successful-requests' => FakeResponse.new(
@@ -21,11 +109,7 @@ class DatadogApplyTest < Minitest::Test
         '200',
         '{"id":456,"name":"SLO burn rate: checkout-api/http-requests/public-api/successful-requests","type":"slo alert","query":"burn_rate(\"generated-slo-1\").over(\"30d\").long_window(\"1h\").short_window(\"5m\") > 14.4","message":"Error budget burn is elevated for checkout-api http-requests public-api successful-requests.","tags":["managed_by:slo-rules-engine","service:checkout-api","route_key:checkout-api"],"options":{"include_tags":true,"thresholds":{"critical":14.4}}}'
       ),
-      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
-        '200',
-        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
-      ),
-      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
         '200',
         '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"}]}'
       ),
@@ -93,11 +177,7 @@ class DatadogApplyTest < Minitest::Test
 
   def test_datadog_client_ignores_unmanaged_dashboard_title_fallback_match
     http = RoutingHttp.new(
-      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
-        '200',
-        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
-      ),
-      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
         '200',
         '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"}]}'
       ),
@@ -155,11 +235,7 @@ class DatadogApplyTest < Minitest::Test
         '200',
         '{"id":789,"name":"legacy telemetry gap monitor","type":"query alert","query":"avg(last_10m):count:http.server.request.duration{route:/checkout,service:checkout-api}.as_count() < 0","message":"Telemetry is missing for checkout-api http-requests public-api successful-requests.","tags":["managed_by:slo-rules-engine","service:checkout-api","route_key:checkout-api","source_ref:artifacts.telemetry_gap_monitors.0"],"options":{"include_tags":true,"notify_no_data":true,"no_data_timeframe":10,"thresholds":{"critical":0}}}'
       ),
-      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
-        '200',
-        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
-      ),
-      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
         '200',
         '{"dashboards":[{"id":"abc123","title":"legacy dashboard title","url":"/dashboard/abc123"}]}'
       ),
@@ -273,11 +349,7 @@ class DatadogApplyTest < Minitest::Test
     desired_dashboard_title = @manifest.fetch(:artifacts).fetch(:dashboards).fetch(0).fetch(:title)
 
     http = RoutingHttp.new(
-      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
-        '200',
-        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
-      ),
-      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
         '200',
         '{"dashboards":[{"id":"abc123","title":"legacy dashboard a","url":"/dashboard/abc123"},{"id":"def456","title":"legacy dashboard b","url":"/dashboard/def456"}]}'
       ),
@@ -396,11 +468,7 @@ class DatadogApplyTest < Minitest::Test
         '200',
         '[{"id":456,"name":"SLO burn rate: checkout-api/http-requests/public-api/successful-requests","tags":["managed_by:slo-rules-engine","service:checkout-api"]},{"id":999,"name":"SLO burn rate: checkout-api/orphan-sli/orphan-instance/orphan-slo","tags":["managed_by:slo-rules-engine","service:checkout-api"]}]'
       ),
-      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
-        '200',
-        '{"dashboard_lists":[{"id":101,"name":"Generated Dashboards"}]}'
-      ),
-      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
         '200',
         '{"dashboards":[{"id":"abc123","title":"checkout-api SLO decision dashboard","url":"/dashboard/abc123"},{"id":"def456","title":"checkout-api orphan dashboard","url":"/dashboard/def456"},{"id":"zzz999","title":"other-service SLO decision dashboard","url":"/dashboard/zzz999"}]}'
       ),
@@ -543,11 +611,7 @@ class DatadogApplyTest < Minitest::Test
           )
         )
       ),
-      '/api/v1/dashboard/lists/manual' => FakeResponse.new(
-        '200',
-        JSON.generate(dashboard_lists: [{ id: 101, name: 'Generated Dashboards' }])
-      ),
-      '/api/v1/dashboard/lists/manual/101/dashboards' => FakeResponse.new(
+      '/api/v1/dashboard?count=100&start=0' => FakeResponse.new(
         '200',
         JSON.generate(dashboards: [{ id: 'abc123', title: dashboard_title, url: '/dashboard/abc123' }])
       ),

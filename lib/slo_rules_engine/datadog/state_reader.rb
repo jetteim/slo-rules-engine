@@ -6,6 +6,7 @@ module SloRulesEngine
   module Datadog
     class StateReader
       MANAGED_MONITOR_TAG = 'managed_by:slo-rules-engine'
+      DASHBOARD_PAGE_SIZE = 100
 
       def initialize(requester:)
         @requester = requester
@@ -85,28 +86,14 @@ module SloRulesEngine
         end
         source_matches_by_title = Hash.new { |hash, key| hash[key] = [] }
         title_matches_by_title = Hash.new { |hash, key| hash[key] = [] }
-        lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
-        lists.each do |list|
-          list_id = fetch_value(list, :id)
-          next unless list_id
-
-          path = "/api/v1/dashboard/lists/manual/#{list_id}/dashboards"
-          entries = Array(fetch_value(request('GET', path), :dashboards, []))
-          entries.each do |entry|
-            title = fetch_value(entry, :title)
-            detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
-            source = extract_source_ref(Array(fetch_value(detail, :tags, [])).map(&:to_s))
-            tags = Array(fetch_value(detail, :tags, [])).map(&:to_s)
-            match = {
-              id: fetch_value(entry, :id),
-              title: title,
-              payload: normalize_dashboard_payload(detail)
-            }.compact
-            if source && desired_by_source.key?(source)
-              source_matches_by_title[desired_by_source.fetch(source)] << match
-            elsif tags.include?(MANAGED_MONITOR_TAG) && desired_by_title.key?(title)
-              title_matches_by_title[desired_by_title.fetch(title)] << match
-            end
+        dashboard_catalog.each do |entry|
+          source = extract_source_ref(entry.fetch(:tags))
+          title = entry.fetch(:title)
+          match = entry.slice(:id, :title, :payload)
+          if source && desired_by_source.key?(source)
+            source_matches_by_title[desired_by_source.fetch(source)] << match
+          elsif entry.fetch(:tags).include?(MANAGED_MONITOR_TAG) && desired_by_title.key?(title)
+            title_matches_by_title[desired_by_title.fetch(title)] << match
           end
         end
         desired_titles.each_with_object({}) do |entry, dashboards|
@@ -158,28 +145,46 @@ module SloRulesEngine
       end
 
       def load_managed_dashboards(service)
-        dashboards = []
-        lists = Array(fetch_value(request('GET', '/api/v1/dashboard/lists/manual'), :dashboard_lists, []))
-        lists.each do |list|
-          list_id = fetch_value(list, :id)
-          next unless list_id
+        dashboard_catalog.filter_map do |entry|
+          tags = entry.fetch(:tags)
+          next unless tags.include?(MANAGED_MONITOR_TAG)
+          next unless tags.include?("service:#{service}")
 
-          path = "/api/v1/dashboard/lists/manual/#{list_id}/dashboards"
-          entries = Array(fetch_value(request('GET', path), :dashboards, []))
-          entries.each do |entry|
-            detail = request('GET', "/api/v1/dashboard/#{fetch_value(entry, :id)}")
-            tags = Array(fetch_value(detail, :tags, [])).map(&:to_s)
-            next unless tags.include?(MANAGED_MONITOR_TAG)
-            next unless tags.include?("service:#{service}")
-
-            dashboards << {
-              id: fetch_value(entry, :id),
-              title: fetch_value(entry, :title),
-              source: extract_source_ref(tags)
-            }.compact
-          end
+          {
+            id: entry.fetch(:id),
+            title: entry.fetch(:title),
+            source: extract_source_ref(tags)
+          }.compact
         end
-        dashboards
+      end
+
+      def dashboard_catalog
+        dashboard_summaries.filter_map do |summary|
+          id = fetch_value(summary, :id)
+          next unless id
+
+          detail = request('GET', "/api/v1/dashboard/#{id}")
+          {
+            id: fetch_value(detail, :id) || id,
+            title: fetch_value(detail, :title) || fetch_value(summary, :title),
+            tags: Array(fetch_value(detail, :tags, [])).map(&:to_s),
+            payload: normalize_dashboard_payload(detail)
+          }
+        end
+      end
+
+      def dashboard_summaries
+        start = 0
+        summaries = []
+        loop do
+          query = URI.encode_www_form(count: DASHBOARD_PAGE_SIZE, start: start)
+          page = Array(fetch_value(request('GET', "/api/v1/dashboard?#{query}"), :dashboards, []))
+          summaries.concat(page)
+          break if page.length < DASHBOARD_PAGE_SIZE
+
+          start += page.length
+        end
+        summaries
       end
 
       def find_slo_match(name, source)

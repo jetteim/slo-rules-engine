@@ -219,11 +219,15 @@ Import:
 
 - observed snapshot: current matched API state
 - findings: missing expected resources, managed orphans, and weak identity
+- dashboard evidence: paginated custom-dashboard summaries followed by full
+  detail reads for managed tags, source identity, and canonical payload
 
 Prune:
 
 - observed snapshot: service-scoped managed backend state
 - changes: managed orphan deletes with provider resource IDs, ownership confidence, and risk
+- dashboard scope: all custom dashboards with matching engine/service tags,
+  independent of manual dashboard-list membership
 
 ### Prometheus Stack
 

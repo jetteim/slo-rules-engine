@@ -93,6 +93,10 @@ Explicit features:
   payload and provider identity convergence or confirmed delete absence.
   Request evidence contains only method/path, response fingerprints, and
   top-level response keys; API failures are sanitized before persistence.
+- **Datadog dashboard catalog reconciliation:** dashboard discovery, import,
+  apply verification, and prune ownership use the paginated custom-dashboard
+  catalog plus full dashboard details. Managed dashboards do not need manual
+  dashboard-list membership to be found.
 - **Payload provenance:** Datadog apply operations preserve the source artifact path through managed `source_ref` tags and use that identity during import, diff, apply, and prune.
 - **Managed tag contract:** Datadog apply-ready payloads require managed identity tags such as `managed_by`, `service`, and `source_ref`, while reconciliation ignores unmanaged backend tags so provider-owned semantics drive drift detection.
 - **Provider field contract:** Datadog apply-ready payloads validate SLO timeframe/threshold consistency, burn-rate query and threshold consistency, and telemetry-gap no-data monitor semantics before live mutation.

@@ -1,0 +1,11 @@
+{
+  "dashboards": [
+    {
+      "id": "dashboard-123",
+      "title": "checkout-api SLO decision dashboard",
+      "description": "Generated dashboard summary",
+      "layout_type": "ordered",
+      "url": "/dashboard/dashboard-123"
+    }
+  ]
+}

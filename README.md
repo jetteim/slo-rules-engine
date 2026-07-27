@@ -233,6 +233,9 @@ The initial delivery integration is `notification_router`, which generates conte
   failed operation, and verify resulting provider or managed-file state.
 - Datadog reconciliation requires managed ownership evidence for risky updates
   or deletes and never persists raw API responses or backend error messages.
+- Datadog dashboard reconciliation reads the paginated custom-dashboard catalog
+  and full dashboard details; manual dashboard-list membership is not required
+  for discovery, import, apply verification, or prune ownership.
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 
 ## Documentation
@@ -242,6 +245,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Prometheus Stack Walkthrough](docs/prometheus-stack-walkthrough.md)
 - [Release Bundle Contract](docs/release-bundle-contract.md)
 - [Provider State Contract](docs/provider-state-contract.md)
+- [Datadog Public Contract Evidence](docs/datadog-contract-evidence.md)
 - [Provider Contract](docs/provider-contract.md)
 - [Provider Contribution Guide](docs/provider-contribution-guide.md)
 - [Implementation Plan](docs/implementation-plan.md)

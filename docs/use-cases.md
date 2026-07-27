@@ -300,6 +300,9 @@ bin/rules-ctl diff \
 
 - Every command prints a JSON array with one plan per manifest; the redirections above create saved diff files.
 - Datadog changes are `create`, `update`, `recreate`, or `noop` and include changed paths, backend IDs, match identity, and risk when applicable.
+- Datadog dashboard comparison reads the paginated custom-dashboard catalog and
+  then each dashboard detail needed for managed-tag and canonical payload
+  checks. Manual dashboard-list membership is not required.
 - Prometheus Stack changes are `create`, `update`, or `noop` comparisons for `manifest.json` and each PrometheusRule, Grafana ConfigMap, and Alertmanager route-intent file.
 - Sloth changes are `create`, `update`, or `noop` comparisons for `manifest.json` and each native Sloth input file.
 - Every plan includes `slo-rules-engine/provider-state/v1` desired/observed snapshots, deterministic fingerprints, normalized changes, findings, and impact summary under `state_contract`.
@@ -323,6 +326,8 @@ For Prometheus Stack or Sloth, change `--provider`, use that provider's manifest
 
 - The command prints a JSON array of imported-state reports; the redirection above saves the report.
 - Datadog reports matched API state, missing expected resources, managed orphans, and match-identity confidence.
+- Datadog discovers managed dashboards from the custom-dashboard catalog and
+  full detail tags, including managed dashboards that are in no manual list.
 - Prometheus Stack reports the current managed manifest and every expected native YAML file, including missing-file findings.
 - Sloth reports the current managed manifest and every expected native input, including missing-input findings.
 - Every report includes versioned desired state, observed state, deterministic fingerprints, and normalized findings under `state_contract`.
@@ -416,6 +421,9 @@ bin/rules-ctl apply \
 - Each journal is saved at `./work/journals/<service>/<provider>/<journal-id>.json`.
 - Successful Datadog attempts record the returned or existing `provider_resource_id`, request method/path, response fingerprint, and response top-level keys. Raw responses and raw backend error messages are not persisted.
 - After Datadog mutation, the engine rereads backend state once and compares canonical payload plus provider resource identity. Missing resources, identity mismatch, payload drift, delete survival, or refresh failure produce stable verification findings and a nonzero result.
+- Datadog dashboard readback uses the paginated custom-dashboard catalog plus
+  full detail reads, so a newly created dashboard does not need manual-list
+  membership to pass convergence verification.
 - Successful file-backed attempts record the managed path as `provider_resource_id`; failed attempts record a public-safe error class, code, and message.
 - Confirmed execution stops after the first failed operation, marks untouched actionable operations `skipped`, emits `failed` or `partial`, and exits nonzero.
 - After execution, every attempted engine-owned file is parsed again and compared with the live plan. Journal verification evidence contains a timestamp, expected presence/content fingerprint, actual presence/content fingerprint, and stable finding codes for missing, unreadable, unexpectedly present, or mismatched files.

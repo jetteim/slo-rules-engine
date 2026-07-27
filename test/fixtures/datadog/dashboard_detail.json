@@ -1,0 +1,13 @@
+{
+  "id": "dashboard-123",
+  "title": "checkout-api SLO decision dashboard",
+  "description": "Generated dashboard for checkout-api",
+  "layout_type": "ordered",
+  "tags": [
+    "managed_by:slo-rules-engine",
+    "service:checkout-api",
+    "source_ref:artifacts.dashboards.0"
+  ],
+  "template_variables": [],
+  "widgets": []
+}
