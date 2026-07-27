@@ -171,20 +171,26 @@ Selector-based SLOs calculate success ratios from scoped counter rates. Threshol
 
 ## Live SLO And Error-Budget Status
 
-`rules-ctl status` reads one reviewed `prometheus_stack` manifest and queries
-only the generated recording-rule identifiers through the Prometheus-compatible
-instant-query API. The provider-neutral
+`rules-ctl status` reads either one reviewed `prometheus_stack` manifest, one
+current reviewed release bundle, or one explicit live-status portfolio. It
+queries only generated recording-rule identifiers through the
+Prometheus-compatible instant-query API. The provider-neutral
 `slo-rules-engine/live-slo-status/v1` report normalizes objective attainment,
 remaining/consumed budget, burn-rate windows, observation count, source age,
 freshness, reviewed context, provider resource identifiers, query evidence, and
-machine-readable findings.
+machine-readable findings. Bundle and portfolio modes wrap each unchanged
+target report in `slo-rules-engine/live-slo-status-aggregate/v1` with
+deterministic target and state rollups.
 
 The reader distinguishes `healthy`, `at_risk`, `exhausted`,
 `missing_telemetry`, and `unverifiable`. It treats those classifications as
 operational report data rather than CLI failures. Unreviewed or invalid
-manifests and unsupported providers fail before backend access. Raw backend
-error messages are not copied into the report. Datadog, Sloth, release-bundle,
-and portfolio status remain future Phase 13 increments.
+manifests, stale bundles, invalid portfolios, and incomplete or unknown
+per-target runtime mappings fail before backend access. Mixed-provider
+aggregates retain Datadog and Sloth targets as explicit unsupported coverage;
+an input with no readable target fails. Runtime URLs and raw backend error
+messages are not copied into reports. Datadog and Sloth readers remain
+deferred until their backend evidence contracts are available.
 
 ## Change
 

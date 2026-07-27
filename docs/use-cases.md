@@ -21,7 +21,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Apply reviewed state | Reviewed provider artifacts and mutation gates | Durable journal plus provider result and post-operation verification | Explicit `--confirm` and `--journal-dir` |
 | Remove managed state | Reviewed scope and ownership evidence | Durable journal plus confirmed delete result and absence verification | Explicit `--confirm` and `--journal-dir` |
 | Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
-| Inspect live SLO status | Reviewed SLO identity, evaluation window, objective, budget, burn policy, and response context | Versioned live-status report with per-SLO state and freshness | Prometheus-compatible instant-query reads only |
+| Inspect live SLO status | Reviewed SLO identity, evaluation window, objective, budget, burn policy, response context, and release/portfolio target coverage | Versioned per-manifest or aggregate live-status report with per-SLO state and freshness | Prometheus-compatible instant-query reads only |
 | Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
 | Validate Datadog contract | Explicit sandbox credential and dashboard API evidence | Public-safe sandbox smoke JSON | Read-only by default; one temporary dashboard only with explicit confirmation |
 
@@ -44,7 +44,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Bundle execution | New content-addressed `applied` bundle with predecessor lineage and one `execution_result` artifact per target |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
-| Live SLO status | `slo-rules-engine/live-slo-status/v1` JSON with state counts, reviewed identity/context, objective attainment, remaining budget, burn windows, provider resource names, timestamps, freshness, and machine-readable findings |
+| Live SLO status | `slo-rules-engine/live-slo-status/v1` for one manifest or `slo-rules-engine/live-slo-status-aggregate/v1` for a release/portfolio, with exact target coverage, state counts, reviewed identity/context, objective attainment, remaining budget, burn windows, provider resource names, timestamps, freshness, and machine-readable findings |
 | Datadog sandbox smoke | `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with public-safe read checks and optional temporary-dashboard lifecycle evidence |
 
 ### Provider Outputs
@@ -58,7 +58,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Approved exact plan | Deferred until the live backend recheck contract is verified | Immutable reviewed plan with manifest, review, handoff, desired-state, observed-state, and operation fingerprints | The same immutable contract, including the stored external-generator handoff |
 | Operation journal | Confirmed apply/prune persists request method/path, returned resource ID, response fingerprint, sanitized failures, and terminal backend verification | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
 | Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
-| Live status | Deferred until the safe backend read contract is resumed | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records | Deferred until downstream Sloth-generated recording-rule identity is captured |
+| Live status | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records; aggregate output embeds the complete target report | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage until downstream Sloth-generated recording-rule identity is captured |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
@@ -805,9 +805,10 @@ manifest, journal, ownership, and verification gates of normal `apply` or
 
 ## Use Case 16: Inspect Live SLO And Error-Budget Status
 
-**Task:** answer whether one reviewed Prometheus Stack SLO is attaining its
-objective, how much error budget remains, whether burn policy is breached, and
-whether the evidence is fresh enough to trust.
+**Task:** answer whether reviewed Prometheus Stack SLOs for one service, one
+reviewed release, or an explicit service portfolio are attaining their
+objectives, how much error budget remains, whether burn policy is breached, and
+whether each target's evidence is fresh enough to trust.
 
 The neutral DSL carries an explicit evaluation window:
 
@@ -838,17 +839,72 @@ bin/rules-ctl status \
 
 `PROMETHEUS_URL` supplies the default base URL when `--base-url` is omitted.
 
+Assess every readable target in one current reviewed release:
+
+```bash
+bin/rules-ctl status \
+  --bundle=./work/release-bundle.json \
+  --target-base-url=checkout-api/prometheus_stack=http://checkout-prometheus.example.test \
+  --target-base-url=search-api/prometheus_stack=http://search-prometheus.example.test \
+  --max-age-seconds=300 \
+  --output=./work/status/release.json
+```
+
+The release bundle may also contain Datadog or Sloth targets. Do not provide
+runtime mappings for those targets; the aggregate report retains them as
+unsupported coverage.
+
+For a cross-service portfolio independent of release packaging, create a
+credential-free input:
+
+```json
+{
+  "schema_version": "slo-rules-engine/live-status-portfolio/v1",
+  "kind": "LiveStatusPortfolio",
+  "targets": [
+    {
+      "uid": "checkout-api/prometheus_stack",
+      "manifest": "../generated/checkout-api/prometheus_stack/manifest.json"
+    },
+    {
+      "uid": "search-api/prometheus_stack",
+      "manifest": "../generated/search-api/prometheus_stack/manifest.json"
+    }
+  ]
+}
+```
+
+Then run:
+
+```bash
+bin/rules-ctl status \
+  --portfolio=./work/status/portfolio.json \
+  --target-base-url=checkout-api/prometheus_stack=http://checkout-prometheus.example.test \
+  --target-base-url=search-api/prometheus_stack=http://search-prometheus.example.test \
+  --output=./work/status/portfolio-report.json
+```
+
 **What to expect:**
 
-- Stdout is one `slo-rules-engine/live-slo-status/v1`
-  `LiveSLOStatusReport`; `--output` writes the same JSON and adds its saved
-  report path.
+- Single-manifest stdout is one `slo-rules-engine/live-slo-status/v1`
+  `LiveSLOStatusReport`. Bundle and portfolio stdout is one
+  `slo-rules-engine/live-slo-status-aggregate/v1`
+  `LiveSLOStatusAggregateReport`. In every mode, `--output` writes the same
+  JSON and adds its saved report path.
 - The report summary counts `healthy`, `at_risk`, `exhausted`,
   `missing_telemetry`, and `unverifiable` SLOs. Each status includes reviewed
   service/SLI/instance/SLO identity, objective and evaluation window,
   attainment, allowed/remaining/consumed budget, burn windows, observations,
   source timestamp, age, freshness limit, owner, dashboard, playbook, generated
   recording-rule identifiers, provider query evidence, and findings.
+- Aggregate output sorts target envelopes by `service/provider`, embeds the
+  complete single-manifest report under every readable target, and adds
+  `target_count`, `reported_targets`, `unsupported_targets`, `slo_count`, all
+  five state counts, `coverage_complete`, and `evidence_complete`.
+- The aggregate source contains the checked bundle ID/lifecycle/fingerprint or
+  the loaded portfolio and manifest fingerprints. Per-target runtime URLs are
+  never written to the source, target reports, saved report, release bundle, or
+  portfolio.
 - The reader performs eight `GET /api/v1/query` reads for the one-SLO fixture:
   observation, success, objective, allowed budget, remaining budget, two burn
   windows, and `timestamp(success_ratio)`. It performs no write, reload,
@@ -858,20 +914,35 @@ bin/rules-ctl status \
   budget is `exhausted`; absent or stale evidence is `missing_telemetry`; and
   ambiguous, invalid, failed, or incomplete evidence is `unverifiable`.
 - These five states are report data, so a successfully produced unhealthy
-  report exits zero. Invalid schema, missing reviewed provenance, invalid
-  options, multiple manifests, or a provider other than `prometheus_stack`
-  exits nonzero before a backend read.
+  report exits zero. In aggregate mode, one target's failed queries produce an
+  `unverifiable` target report while successful target reports remain present
+  and the command exits zero.
+- Bundle mode validates bundle schema, content identity, packaged
+  fingerprints, review state, and current source files before the first
+  backend read. Portfolio mode validates its schema, credential-free content,
+  every manifest, review provenance, unique UID, and exact
+  `service/provider` identity before the first read.
+- Missing, unknown, duplicate, unsupported-target, credential-bearing, or
+  invalid runtime mappings fail before any client is created. Direct
+  single-manifest use of Datadog or Sloth fails
+  `unsupported_live_status_provider`; a mixed aggregate retains those targets
+  as `outcome: unsupported`, sets `coverage_complete: false`, and makes no read
+  for them. An all-unsupported aggregate fails
+  `no_supported_live_status_targets`.
 - Query failure findings retain the provider expression and error class, but
   not the raw backend error message. The report never stores credentials.
-- Datadog live status remains postponed. Sloth status remains unavailable
-  until the engine can link its external generator handoff to the downstream
-  recording-rule identities. Bundle and portfolio aggregation are the next
-  Phase 13 increment.
+- No mode performs provider writes, configuration reloads, Kubernetes applies,
+  Grafana changes, Alertmanager changes, or notification delivery.
+- Datadog direct reads remain postponed. Sloth direct reads remain unavailable
+  until the engine can link its external-generator handoff to downstream
+  recording-rule identities.
 
 **Intent preserved:** objective, evaluation window, calculation basis, and
-response context come from reviewed neutral intent. PromQL record names and
-instant-query syntax stay in the Prometheus reader; the neutral status model
-contains only normalized values, identity, freshness, and findings.
+response context come from reviewed neutral intent. Release and portfolio
+aggregation preserve every target report instead of redefining or collapsing
+it. PromQL record names and instant-query syntax stay in the Prometheus reader;
+the neutral status model contains only normalized values, identity, freshness,
+coverage, and findings.
 
 ## Maintenance Rule
 

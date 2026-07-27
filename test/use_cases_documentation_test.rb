@@ -62,12 +62,19 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes readme, '--output=./work/applied.json'
     assert_includes document, 'Inspect Live SLO And Error-Budget Status'
     assert_includes document, 'slo-rules-engine/live-slo-status/v1'
+    assert_includes document, 'slo-rules-engine/live-slo-status-aggregate/v1'
+    assert_includes document, 'slo-rules-engine/live-status-portfolio/v1'
+    assert_includes document, '--target-base-url=checkout-api/prometheus_stack='
+    assert_includes document, 'coverage_complete'
+    assert_includes document, 'runtime URLs'
     assert_includes document, 'error_budget_remaining_ratio'
     assert_includes document, 'missing_telemetry'
     assert_includes document, 'unverifiable'
     assert_includes document, 'GET /api/v1/query'
     assert_includes readme, 'bin/rules-ctl status'
     assert_includes readme, '--max-age-seconds=300'
+    assert_includes readme, '--bundle=./work/release-bundle.json'
+    assert_includes readme, 'slo-rules-engine/live-slo-status-aggregate/v1'
   end
 
   private

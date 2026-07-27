@@ -337,7 +337,26 @@ remaining budget, burn windows, source timestamps, freshness, generated
 recording-rule identifiers, and query evidence. It performs only Prometheus
 `GET /api/v1/query` reads. Operationally unhealthy states still exit zero when
 the report was produced; invalid/unreviewed input and unsupported providers
-exit nonzero. Datadog, release-bundle, and portfolio status remain deferred.
+exit nonzero.
+
+Assess every readable target in a current reviewed release bundle:
+
+```bash
+bin/rules-ctl status \
+  --bundle=./work/release-bundle.json \
+  --target-base-url=checkout-api/prometheus_stack=http://localhost:9090 \
+  --output=./work/release-live-status.json
+```
+
+Or define a credential-free `slo-rules-engine/live-status-portfolio/v1` file
+whose targets name reviewed manifest paths, then pass one
+`--target-base-url=service/provider=URL` for every Prometheus Stack target.
+Both aggregate modes print `slo-rules-engine/live-slo-status-aggregate/v1`.
+Each readable target retains its complete per-manifest report; unsupported
+Datadog and Sloth targets remain visible as `unsupported` coverage rather than
+being omitted. Bundle schema, identity, embedded artifacts, review evidence,
+and current source fingerprints plus all runtime mappings are validated before
+the first backend read. Runtime URLs are never written into reports or bundles.
 
 ### Validate Datadog against an isolated sandbox
 
@@ -406,7 +425,8 @@ The initial delivery integration is `notification_router`, which generates conte
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 - Exact file-backed apply rejects changed observed state and same-scope
   concurrency before executing the stored operation list.
-- Live status is read-only, requires reviewed manifest provenance, and does not
+- Live status is read-only, requires reviewed manifest provenance, validates
+  aggregate inputs and per-target runtime before backend access, and does not
   infer provider queries outside the provider reader.
 
 ## Documentation

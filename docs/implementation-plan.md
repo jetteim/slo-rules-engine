@@ -192,10 +192,16 @@ This is the running plan for the long refactor.
 - [x] Add the read-only Prometheus-compatible status reader without moving PromQL into the neutral model.
 - [ ] Add the Datadog status reader after safe live backend evidence is available.
 - [x] Add a `status` command for exactly one reviewed Prometheus Stack manifest.
-- [ ] Extend `status` to one release bundle and a portfolio scope.
+- [x] Extend `status` to one release bundle and a portfolio scope.
 - [x] Distinguish healthy, at-risk, exhausted, missing-telemetry, and unverifiable states with machine-readable findings.
 - [x] Link status output to reviewed SLO identity, owner, dashboard, playbook, and current provider resource identifiers.
 - [x] Persist optional status reports with source timestamps and freshness metadata for later bundle review.
+- [x] Preserve complete per-target reports, explicit unsupported-provider
+  coverage, deterministic aggregate rollups, and partial query-failure
+  evidence without persisting runtime endpoints.
+- [x] Validate release-bundle freshness, portfolio manifests, review evidence,
+  target identity, and all runtime mappings before the first aggregate backend
+  read.
 
 ## Project Backlog: Atomic Coherence-Preserving Simplification
 

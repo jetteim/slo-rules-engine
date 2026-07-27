@@ -64,6 +64,23 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 - immediate managed-state recheck and execution of only stored operations
 - deterministic multi-target file-backed execution with immutable applied-bundle evidence
 
+### 5. Reviewed Reliability Intent To Current Operating Status
+
+**Trigger:** a team needs current objective, budget, burn, and telemetry
+freshness evidence for one service, a reviewed release, or an explicit service
+portfolio.
+
+**Outcome:** versioned per-SLO reports and deterministic aggregate rollups that
+retain each target's evidence and make unsupported coverage explicit.
+
+**Needed capability increments:**
+
+- window-correct Prometheus Stack SLO and error-budget recording rules
+- one-manifest GET-only status reads with normalized five-state classification
+- release-bundle source validation before live reads
+- credential-free portfolio inputs and explicit per-target runtime endpoints
+- aggregate target/state rollups with retained partial query-failure evidence
+
 ## What We Are Not Optimizing For
 
 - copying internal service definitions into this repository
@@ -72,13 +89,13 @@ Turn measured service telemetry into a review-ready onboarding queue, reviewed S
 
 ## Current Best Next Value
 
-1. aggregate the completed one-manifest Prometheus live-status contract across
-   reviewed release bundles and portfolio scopes without weakening per-target
-   freshness or findings
-2. keep Datadog live status, contract testing, and exact apply/resume postponed until
-   isolated credentials are available
-3. keep housekeeping paused unless feature work exposes a clean,
-   behavior-tested boundary
+1. execute the backlog's atomic coherence-preserving simplification checkpoint
+   now that the planned bundle, state-manager, exact-plan, and live-status
+   sequence is at a verified boundary
+2. keep Datadog live status, contract testing, and exact apply/resume postponed
+   until isolated credentials are available
+3. add Sloth live status only after downstream generated recording-rule
+   identity is captured as reviewed evidence
 
 ## Housekeeping Backlog
 

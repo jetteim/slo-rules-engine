@@ -16,8 +16,10 @@ class Net::HTTP
   def self.get_response(uri)
     expression = URI.decode_www_form(uri.query.to_s).to_h.fetch('query')
     File.open(ENV.fetch('PROMETHEUS_REQUEST_LOG'), 'a') do |file|
-      file.puts("#{uri.path}?#{uri.query}")
+      file.puts("#{uri.host} #{uri.path}?#{uri.query}")
     end
+    raise 'private backend failure' if ENV['PROMETHEUS_FAIL_HOST'] == uri.host
+
     value =
       if expression.start_with?('timestamp(')
         (Time.now.utc - 10).to_f
