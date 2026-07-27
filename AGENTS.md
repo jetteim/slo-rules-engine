@@ -8,21 +8,25 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Live SLO and error-budget status across reviewed release bundles and
-   portfolio scopes
+1. Atomic coherence-preserving simplification now that the planned feature
+   sequence is at a verified boundary
 2. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
-3. Datadog exact-plan parity only after live recheck/idempotency semantics are
+3. Sloth live status only after downstream generated recording-rule identity
+   is captured as reviewed evidence
+4. Datadog exact-plan parity only after live recheck/idempotency semantics are
    verified
-4. Atomic coherence-preserving simplification after the feature sequence
-   reaches a stable boundary
 
 The release-bundle create/plan/apply boundary, provider-neutral state/journal
 contracts, file-backed apply-exact-plan workflow, and one-manifest
-Prometheus-compatible live-status boundary are implemented. Live Datadog
-sandbox testing is explicitly postponed by the user. The next roadmap slice is
-bundle/portfolio aggregation over the existing neutral status contract,
-without resuming housekeeping or inventing Datadog backend semantics.
+Prometheus-compatible live-status boundary are implemented. Release-bundle and
+portfolio live-status aggregation are also implemented with explicit
+per-target runtime, source preflight, deterministic rollups, and retained
+partial evidence. Live Datadog sandbox testing is explicitly postponed by the
+user. The next roadmap slice is the backlog's single atomic
+coherence-preserving simplification checkpoint; it must preserve every
+requirement, use case, schema, provider artifact, safety gate, and verified
+behavior.
 
 Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages
 discovery evidence, reviewed handoffs and definitions, provider manifests,
@@ -86,8 +90,13 @@ record names. The versioned report distinguishes `healthy`, `at_risk`,
 `exhausted`, `missing_telemetry`, and `unverifiable`, preserves reviewed
 identity/context and provider evidence, detects reviewed/provider objective
 drift, sanitizes backend failures, and can save the same timestamped/freshness
-report printed to stdout. Datadog and Sloth readers plus release-bundle and
-portfolio aggregation remain open.
+report printed to stdout. `status --bundle=...` and `status --portfolio=...`
+emit `slo-rules-engine/live-slo-status-aggregate/v1`, retain every readable
+target report, expose unsupported Datadog/Sloth targets as coverage gaps, and
+require one runtime endpoint per readable target without persisting those URLs.
+Stale bundles, invalid portfolios, review gaps, target mismatches, and runtime
+mapping errors fail before the first backend read. Datadog and Sloth readers
+remain open and evidence-gated.
 
 ## Non-Negotiable Working Rules
 
@@ -164,6 +173,17 @@ Implemented by the latest feature slices:
   and contacts only `/api/v1/query`
 - Datadog live status is explicitly refused, and raw provider error messages
   are not copied into status evidence
+- `status --bundle=...` validates current release-bundle sources before backend
+  access and emits `slo-rules-engine/live-slo-status-aggregate/v1`
+- `status --portfolio=...` resolves credential-free
+  `slo-rules-engine/live-status-portfolio/v1` inputs relative to the portfolio
+  file and validates every manifest, review, UID, and provider identity
+- Aggregate status requires explicit `service/provider=URL` runtime mappings
+  for every Prometheus Stack target, validates all mappings before constructing
+  a client, and never persists runtime URLs
+- Aggregate reports preserve complete target reports, deterministic target and
+  five-state rollups, explicit unsupported Datadog/Sloth coverage, and one
+  target's query failures as `unverifiable` without dropping successful targets
 - Generated recording names satisfy the Prometheus metric-name contract
 - Threshold-based Prometheus SLOs require numeric `time_slice` semantics and fail validation otherwise
 - Prometheus Stack manifests now include a native Prometheus Operator `PrometheusRule`
@@ -333,8 +353,10 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: provider-neutral one-manifest live SLO/error-budget status
-  with window-correct Prometheus recording rules
+- latest checkpoint: release-bundle and portfolio live SLO/error-budget status
+  aggregation with source/runtime preflight and retained partial evidence
+- previous checkpoint: provider-neutral one-manifest live SLO/error-budget
+  status with window-correct Prometheus recording rules
 - previous checkpoint: fail-closed multi-target file-backed bundle apply with
   immutable applied-bundle evidence
 - previous checkpoint: explicit state-checked resume for journal-eligible exact
@@ -407,9 +429,8 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Aggregate live SLO/error-budget status across reviewed release bundles and
-   portfolio scopes while preserving per-target runtime, freshness, and
-   findings
+1. Execute the atomic coherence-preserving simplification checkpoint now that
+   the accepted feature sequence has reached a verified boundary
 2. Add Sloth live status only after downstream generated recording-rule
    identity is captured
 3. Run the Datadog sandbox probes and resume live provider-contract work only
@@ -422,42 +443,42 @@ Highest-value remaining gaps:
 Secondary gaps:
 
 1. Broader state-management parity for future providers after Datadog and Prometheus Stack prove the shared contract
-2. Additional CLI command extraction only when the bundle or state features expose a clean ownership boundary
+2. Additional CLI command extraction only when the atomic review demonstrates
+   a behavior-preserving ownership boundary
 3. Additional provider breadth only after the accepted feature sequence above
-4. Execute the atomic coherence-preserving simplification checkpoint after the
-   feature sequence reaches a stable behavioral boundary
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- extend the existing `status` command from exactly one reviewed manifest to
-  reviewed release-bundle and explicit portfolio inputs
-- define a versioned aggregate report that retains every per-target
-  `LiveSLOStatusReport` unchanged and adds deterministic target/state rollups
-- require explicit Prometheus-compatible runtime endpoint selection per target;
-  keep credentials and runtime URLs outside release bundles
-- validate bundle schema, identity, artifact fingerprints, and current manifest
-  sources before the first backend read
-- represent one target's query failure as normalized `unverifiable` evidence
-  without dropping successful target reports or weakening input validation
-- support optional saved aggregate reports with source bundle/manifest
-  fingerprints, checked timestamps, and per-target freshness
-- update README/use cases in the same slice with provider-specific reads,
-  exact aggregate output, partial evidence, and explicit non-mutation boundaries
-- keep Datadog status reads deferred until isolated live evidence is available;
-  do not infer its contract from Prometheus behavior
+- execute the backlog's repository-wide review, refactor, simplification, and
+  cleanup checkpoint as one behavior-preserving, revertible delivery unit
+- begin with a traceability map from every engineering use case, versioned
+  schema, provider output, mutation/refusal gate, and current roadmap intent to
+  executable characterization coverage
+- use the existing test-compaction and abstraction-layer reviews as hypotheses,
+  then re-audit the current code before selecting changes; do not mechanically
+  apply stale recommendations
+- consolidate only demonstrated duplication or accidental complexity where
+  characterization tests prove the public CLI, schemas, provider artifacts,
+  findings, safety behavior, and public-safe boundaries remain compatible
+- update architecture, use-case, roadmap, and handoff documentation to reflect
+  the simplified structure without introducing product behavior
+- capture before/after structural evidence and run the entire verification gate
+  before the single atomic commit/push
+- keep Datadog live testing and backend-semantic changes out of this checkpoint
 
 Rationale:
 
-- the one-manifest reader and five-state neutral contract are now verified
-- release bundles already carry reviewed target identity and artifact
-  fingerprints, so aggregation can reuse their safety boundary without adding
-  provider policy
-- operators need one report across a reviewed release or portfolio while still
-  seeing each target's exact freshness and failure evidence
-- explicit per-target runtime selection avoids persisting endpoints or assuming
-  that all services share one Prometheus backend
+- the planned Prometheus, release-bundle, provider-state, exact-plan, and
+  live-status feature sequence is now at a verified boundary
+- Datadog and Sloth follow-ups are blocked on external backend evidence, so
+  inventing new provider semantics would weaken the evidence-driven roadmap
+- prior housekeeping reviews identify candidates, but a fresh repository-wide
+  traceability pass is required to avoid losing intent accumulated by later
+  feature slices
+- one atomic checkpoint satisfies the backlog requirement and gives reviewers a
+  clean rollback boundary if structural changes obscure behavior
 
 ## Next Session Handoff
 
@@ -466,52 +487,52 @@ Prepared on 2026-07-27 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `e156a9d feat: report live prometheus slo
-  status`
+- latest verified feature checkpoint: `0990007 feat: aggregate live slo status`
+- previous verified feature checkpoint: `e156a9d feat: report live prometheus
+  slo status`
 - previous verified feature checkpoint: `f87cde0 feat: apply approved file
   bundles exactly`
-- previous verified feature checkpoint: `2d94384 feat: resume eligible exact
-  plan writes`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: `e156a9d` on local and remote `main`
+- target: `0990007` on local and remote `main`
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-27T16:24:41Z`
+- recorded timestamp: `2026-07-27T17:22:19Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 415 tests, 2,635 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 424 tests, 2,721 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
 - live verification: intentionally not run; no Prometheus endpoint was
   available and the user postponed Datadog live testing. HTTP behavior is
-  covered with an injected deterministic Prometheus response fixture.
-- blast radius: neutral SLO evaluation-window field/default/validation,
-  Prometheus SLO and remaining-budget recording expressions, Grafana panels,
-  Datadog `30d` provider validation, the new GET-only one-manifest `status`
-  command, versioned status values, and documentation. Existing state mutation
-  gates are unchanged.
-- rollback path: revert `e156a9d` to remove the one-manifest live-status
-  contract and restore the prior Prometheus recording-rule expressions
+  covered with an injected deterministic multi-host Prometheus fixture,
+  including one failed target with sanitized retained evidence.
+- blast radius: aggregate live-status schema/model, release-bundle and portfolio
+  input resolution, per-target runtime preflight, status CLI modes, saved
+  aggregate reports, HTTP fixtures, roadmap, contracts, README, and use cases.
+  The existing single-manifest report and every state mutation gate are
+  unchanged.
+- rollback path: revert `0990007` to remove release-bundle/portfolio status and
+  restore the verified one-manifest live-status boundary
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
-3. Do not resume housekeeping by default.
-4. Keep Datadog live testing postponed unless the user explicitly reopens it
+3. Treat the backlog's atomic coherence-preserving simplification checkpoint as
+   the next roadmap task; do not add product features in that checkpoint.
+4. Read both `docs/housekeeping` reviews, but validate their recommendations
+   against the current post-feature code before using them.
+5. Build and save the before-change requirement/use-case/schema/provider/safety
+   traceability map and add characterization coverage before structural edits.
+6. Make only demonstrated behavior-preserving simplifications, update the map
+   with after-change structure/evidence, and deliver the checkpoint as one
+   revertible commit.
+7. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-5. Use TDD to define aggregate bundle/portfolio status without changing the
-   verified per-manifest `LiveSLOStatusReport`.
-6. Inspect release-bundle target/artifact identity and source freshness before
-   choosing the aggregate input contract.
-7. Require explicit runtime endpoint mapping for every readable Prometheus
-   target and keep those values outside persisted release bundles.
-8. Preserve each target report and add deterministic aggregate rollups; do not
-   collapse missing or unverifiable evidence into a generic failure.
-9. Keep Datadog live testing postponed and do not generalize a Datadog status
-   contract without backend evidence.
+8. Preserve release-bundle, exact-plan, review, journal, live-status, and
+   verification gates exactly.
 
 ## Verification Commands
 
@@ -521,6 +542,7 @@ Use these before claiming a checkpoint:
 ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
 ruby -Ilib test/live_status_test.rb
+ruby -Ilib test/live_status_aggregate_test.rb
 ruby -Ilib test/live_status_cli_test.rb
 ruby -Ilib test/release_bundle_test.rb
 ruby -Ilib test/release_bundle_cli_test.rb
@@ -556,12 +578,11 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Inspect `lib/slo_rules_engine/live_status.rb`,
-   `lib/slo_rules_engine/cli/status_commands.rb`, release-bundle schema/builder,
-   and the current per-target runtime mapping patterns
-6. Inspect `docs/live-status-contract.md`, `docs/implementation-plan.md` Phase
-   13, and Use Case 16
-7. If the user says `proceed`, implement the release-bundle plus portfolio
-   aggregation slice described above
-8. Keep Datadog live testing postponed and preserve release-bundle, exact-plan,
-   review, journal, and verification gates
+5. Read `docs/housekeeping/test-suite-compaction-review.md` and
+   `docs/housekeeping/abstraction-layer-review.md`
+6. Inspect `docs/implementation-plan.md` backlog task, `docs/use-cases.md`, and
+   all versioned contract documents before choosing structural edits
+7. If the user says `proceed`, execute the atomic simplification checkpoint
+   described above with traceability and characterization first
+8. Keep Datadog live testing postponed and preserve every release-bundle,
+   exact-plan, review, journal, live-status, and verification gate
