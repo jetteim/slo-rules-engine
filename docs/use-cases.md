@@ -944,6 +944,14 @@ it. PromQL record names and instant-query syntax stay in the Prometheus reader;
 the neutral status model contains only normalized values, identity, freshness,
 coverage, and findings.
 
+## CLI Execution Boundary
+
+Every command in this guide still runs through `bin/rules-ctl`. The executable
+is a thin bootstrap for `lib/slo_rules_engine/cli.rb`, which composes the
+command-family modules and shared manifest/state orchestration. This structural
+boundary does not change any documented arguments, stdout, stderr, exit status,
+written artifact, provider read, provider write, or refusal behavior.
+
 ## Maintenance Rule
 
 Update or rewrite usage when any of these changes:

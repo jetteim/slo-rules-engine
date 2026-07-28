@@ -199,10 +199,7 @@ class LiveStatusCliTest < Minitest::Test
 
   def write_live_status_portfolio(dir)
     manifests = %w[checkout-api search-api].map do |service|
-      manifest = replace_live_status_service(
-        JSON.parse(JSON.generate(reviewed_provider_manifest('prometheus_stack'))),
-        service
-      )
+      manifest = reviewed_provider_manifest('prometheus_stack', service: service)
       path = File.join(dir, "#{service}.manifest.json")
       File.write(path, JSON.pretty_generate(manifest))
       [service, File.basename(path)]
@@ -222,21 +219,5 @@ class LiveStatusCliTest < Minitest::Test
       )
     )
     path
-  end
-
-  def replace_live_status_service(value, service)
-    case value
-    when Hash
-      value.transform_values { |entry| replace_live_status_service(entry, service) }
-    when Array
-      value.map { |entry| replace_live_status_service(entry, service) }
-    when String
-      value
-        .gsub('checkout-api', service)
-        .gsub('checkout_api', service.tr('-', '_'))
-        .gsub('checkout-prod', "#{service}-prod")
-    else
-      value
-    end
   end
 end

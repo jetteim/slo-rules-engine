@@ -316,23 +316,6 @@ class LiveStatusAggregateTest < Minitest::Test
   end
 
   def reviewed_manifest_for(service)
-    manifest = JSON.parse(JSON.generate(reviewed_provider_manifest('prometheus_stack')))
-    replace_service_identity(manifest, service)
-  end
-
-  def replace_service_identity(value, service)
-    case value
-    when Hash
-      value.transform_values { |entry| replace_service_identity(entry, service) }
-    when Array
-      value.map { |entry| replace_service_identity(entry, service) }
-    when String
-      value
-        .gsub('checkout-api', service)
-        .gsub('checkout_api', service.tr('-', '_'))
-        .gsub('checkout-prod', "#{service}-prod")
-    else
-      value
-    end
+    reviewed_provider_manifest('prometheus_stack', service: service)
   end
 end

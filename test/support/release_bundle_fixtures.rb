@@ -91,7 +91,7 @@ module ReleaseBundleFixtures
 
   private
 
-  def reviewed_provider_manifest(provider)
+  def reviewed_provider_manifest(provider, service: 'checkout-api')
     SloRulesEngine.clear_definitions
     load File.expand_path('../../examples/services/checkout.rb', __dir__)
     definition = SloRulesEngine.definitions.fetch(0)
@@ -102,9 +102,36 @@ module ReleaseBundleFixtures
       rejected_candidate_uids: ['request-traffic'],
       notes: ['Latency is accepted for the first onboarding draft.']
     )
-    SloRulesEngine.default_provider_registry.fetch(provider).generate(definition).to_h.merge(
+    manifest = SloRulesEngine.default_provider_registry.fetch(provider).generate(definition).to_h.merge(
       service: definition.service
     )
+    return manifest if service == definition.service
+
+    replace_fixture_service_identity(
+      JSON.parse(JSON.generate(manifest)),
+      from: definition.service,
+      to: service
+    )
+  ensure
+    SloRulesEngine.clear_definitions
+  end
+
+  def replace_fixture_service_identity(value, from:, to:)
+    case value
+    when Hash
+      value.transform_values do |entry|
+        replace_fixture_service_identity(entry, from: from, to: to)
+      end
+    when Array
+      value.map { |entry| replace_fixture_service_identity(entry, from: from, to: to) }
+    when String
+      value
+        .gsub(from, to)
+        .gsub(from.tr('-', '_'), to.tr('-', '_'))
+        .gsub('checkout-prod', "#{to}-prod")
+    else
+      value
+    end
   end
 
   def rewrite_json(path)

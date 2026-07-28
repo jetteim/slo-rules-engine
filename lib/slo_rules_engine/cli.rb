@@ -1,0 +1,773 @@
+# frozen_string_literal: true
+
+require 'optparse'
+require 'fileutils'
+require_relative '../sre'
+require_relative 'cli/catalog_commands'
+require_relative 'cli/bundle_commands'
+require_relative 'cli/journal_commands'
+require_relative 'cli/onboarding_commands'
+require_relative 'cli/plan_commands'
+require_relative 'cli/report_commands'
+require_relative 'cli/status_commands'
+require_relative 'cli/telemetry_commands'
+
+module RulesCtl
+  extend SloRulesEngine::CLI::CatalogCommands
+  extend SloRulesEngine::CLI::BundleCommands
+  extend SloRulesEngine::CLI::JournalCommands
+  extend SloRulesEngine::CLI::OnboardingCommands
+  extend SloRulesEngine::CLI::PlanCommands
+  extend SloRulesEngine::CLI::ReportCommands
+  extend SloRulesEngine::CLI::StatusCommands
+  extend SloRulesEngine::CLI::TelemetryCommands
+
+  module_function
+
+  def run(argv)
+    command = argv.shift
+    abort_usage unless command
+
+    case command
+    when 'validate'
+      validate(argv)
+    when 'validate-handoff'
+      validate_handoff(argv)
+    when 'generate'
+      generate(argv)
+    when 'manifest-review'
+      manifest_review(argv)
+    when 'apply'
+      apply(argv)
+    when 'diff'
+      diff(argv)
+    when 'import'
+      import_existing(argv)
+    when 'prune'
+      prune(argv)
+    when 'status'
+      status(argv)
+    when 'bundle'
+      bundle(argv)
+    when 'journal'
+      journal(argv)
+    when 'plan'
+      plan(argv)
+    when 'lookup-telemetry'
+      lookup_telemetry(argv)
+    when 'discover-telemetry'
+      discover_telemetry(argv)
+    when 'providers'
+      providers(argv)
+    when 'integrations'
+      integrations(argv)
+    when 'generate-routes'
+      generate_routes(argv)
+    when 'candidates'
+      candidates(argv)
+    when 'draft-definition'
+      draft_definition(argv)
+    when 'draft-from-handoff'
+      draft_from_handoff(argv)
+    when 'onboarding-summary'
+      onboarding_summary(argv)
+    when 'onboarding-artifact-index'
+      onboarding_artifact_index(argv)
+    when 'review-handoff'
+      review_handoff(argv)
+    when 'recommend-calculation-basis'
+      recommend_calculation_basis(argv)
+    when 'reality-check'
+      reality_check(argv)
+    when 'migration-report'
+      migration_report(argv)
+    when 'model-report'
+      model_report(argv)
+    else
+      abort_usage("unknown command: #{command}")
+    end
+  end
+
+  def validate(argv)
+    definitions = load_definitions(argv)
+    validator = SloRulesEngine::CoreValidator.new
+    results = definitions.map { |definition| validator.validate(definition).to_h.merge(service: definition.service) }
+    puts JSON.pretty_generate(results)
+    exit(results.all? { |result| result[:valid] } ? 0 : 1)
+  end
+
+  def generate(argv)
+    provider_key = nil
+    output_dir = nil
+    handoff_dir = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--output-dir=DIR', 'Write generated manifests under DIR') { |value| output_dir = value }
+      opts.on('--handoff-dir=DIR', 'Link generated manifest review reports to onboarding handoff packets') { |value| handoff_dir = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    registry = SloRulesEngine.default_provider_registry
+    provider = registry.fetch(provider_key)
+    definitions = load_definitions(argv)
+    validation = validate_for_provider(definitions, provider)
+    unless validation[:valid]
+      puts JSON.pretty_generate(validation)
+      exit 1
+    end
+    manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    validate_manifests!(manifests)
+    write_provider_manifests(output_dir, manifests, provider: provider, handoff_dir: handoff_dir) if output_dir
+    puts JSON.pretty_generate(manifests)
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'generate', error: error)
+  end
+
+  def manifest_review(argv)
+    provider_key = nil
+    manifest_paths = []
+    handoff_dir = nil
+    output_path = nil
+    report_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to inspect; repeat for provider-level reports') { |value| manifest_paths << value }
+      opts.on('--handoff-dir=DIR', 'Link review findings to onboarding handoff packets') { |value| handoff_dir = value }
+      opts.on('--output=FILE', 'Write the manifest review report to FILE') { |value| output_path = value }
+      opts.on('--report=FILE', 'Validate an existing manifest review report against current inputs') { |value| report_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    manifests = resolve_review_manifests(argv, provider, manifest_paths)
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+      manifests,
+      provider: provider.key,
+      handoff_dir: handoff_dir
+    )
+    report[:report] = { path: output_path } if output_path
+    saved_report = validate_saved_manifest_review_report(report_path, report) if report_path
+    report[:saved_report] = saved_report if saved_report
+    write_json_file(output_path, report) if output_path
+    puts JSON.pretty_generate(report)
+    exit 1 if saved_report && !saved_report[:fresh]
+    exit(report[:valid] ? 0 : 1)
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'manifest_review', error: error)
+  end
+
+  def apply(argv)
+    provider_key = nil
+    dry_run = false
+    confirm = false
+    output_dir = nil
+    journal_dir = nil
+    manifest_path = nil
+    handoff_dir = nil
+    review_report_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--dry-run', 'Plan apply without mutating backend state') { dry_run = true }
+      opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider apply') { |value| output_dir = value }
+      opts.on('--journal-dir=DIR', 'Durable operation journal directory for confirmed apply') { |value| journal_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to apply instead of regenerating from definitions') { |value| manifest_path = value }
+      opts.on('--handoff-dir=DIR', 'Require current onboarding handoff evidence before live apply') { |value| handoff_dir = value }
+      opts.on('--review-report=FILE', 'Require saved manifest review report freshness before live apply') { |value| review_report_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    mode = confirm && !dry_run ? 'live' : 'dry_run'
+    abort_usage('live apply requires --manifest reviewed manifest input') if mode == 'live' && manifest_path.to_s.empty?
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    validate_apply_review_evidence!(manifests, provider: provider, provider_key: provider_key, mode: mode) if mode == 'live'
+    validate_live_manifest_review!(manifests, provider: provider, provider_key: provider_key, mode: mode, handoff_dir: handoff_dir, action: 'apply', review_report_path: review_report_path) if mode == 'live' && (!handoff_dir.to_s.empty? || !review_report_path.to_s.empty?)
+    if provider.key == 'datadog'
+      if mode == 'live' && journal_dir.to_s.empty?
+        abort_usage('live Datadog apply requires --journal-dir')
+      end
+
+      applier = SloRulesEngine::Appliers::Datadog.new(
+        journal_dir: mode == 'live' ? journal_dir : nil
+      )
+      plans = []
+      manifests.each do |manifest|
+        plan = mode == 'live' ? applier.apply(manifest) : applier.plan(manifest)
+        plans << plan
+        break if failed_execution?(plan)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      exit 1 if plans.any? { |plan| failed_execution?(plan) }
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+      if mode == 'live' && journal_dir.to_s.empty?
+        abort_usage('live file-backed apply requires --journal-dir')
+      end
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(
+        output_dir: output_dir,
+        journal_dir: mode == 'live' ? journal_dir : nil
+      )
+      plans = []
+      manifests.each do |manifest|
+        plan = mode == 'live' ? applier.apply(manifest) : applier.plan(manifest)
+        plans << plan
+        break if failed_execution?(plan)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      exit 1 if plans.any? { |plan| failed_execution?(plan) }
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have an applier yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::Datadog::PayloadError => error
+    render_provider_payload_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
+  rescue SloRulesEngine::Datadog::OwnershipError => error
+    render_provider_state_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
+  rescue SloRulesEngine::ProviderState::JournalConflict => error
+    render_operation_journal_error(
+      provider: provider,
+      provider_key: provider_key,
+      mode: mode,
+      error: error
+    )
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      output_dir: output_dir,
+      manifests: manifests || [],
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def diff(argv)
+    provider_key = nil
+    output_dir = nil
+    manifest_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider diff') { |value| output_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to diff instead of regenerating from definitions') { |value| manifest_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    if provider.key == 'datadog'
+      applier = SloRulesEngine::Appliers::Datadog.new
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.diff(manifest).to_h })
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: output_dir)
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.diff(manifest).to_h })
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have a diff adapter yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'diff',
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'diff', error: error)
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'diff',
+      output_dir: output_dir,
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def import_existing(argv)
+    provider_key = nil
+    output_dir = nil
+    manifest_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider import') { |value| output_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to import against instead of regenerating from definitions') { |value| manifest_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    if provider.key == 'datadog'
+      applier = SloRulesEngine::Appliers::Datadog.new
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.import(manifest).to_h })
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: output_dir)
+      puts JSON.pretty_generate(manifests.map { |manifest| applier.import(manifest).to_h })
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have an import adapter yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'import_existing',
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: 'import_existing', error: error)
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: 'import_existing',
+      output_dir: output_dir,
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def prune(argv)
+    provider_key = nil
+    dry_run = false
+    confirm = false
+    output_dir = nil
+    journal_dir = nil
+    manifest_path = nil
+    handoff_dir = nil
+    review_report_path = nil
+    parser = OptionParser.new do |opts|
+      opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
+      opts.on('--dry-run', 'Plan prune without mutating backend state') { dry_run = true }
+      opts.on('--confirm', 'Confirm live backend mutation when provider supports it') { confirm = true }
+      opts.on('--output-dir=DIR', 'Output directory for file-backed provider prune') { |value| output_dir = value }
+      opts.on('--journal-dir=DIR', 'Durable operation journal directory for confirmed prune') { |value| journal_dir = value }
+      opts.on('--manifest=FILE', 'Reviewed manifest JSON file to prune instead of regenerating from definitions') { |value| manifest_path = value }
+      opts.on('--handoff-dir=DIR', 'Require current onboarding handoff evidence before live prune') { |value| handoff_dir = value }
+      opts.on('--review-report=FILE', 'Require saved manifest review report freshness before live prune') { |value| review_report_path = value }
+    end
+    parser.parse!(argv)
+    abort_usage('missing --provider') unless provider_key
+
+    provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
+    mode = confirm && !dry_run ? 'live' : 'dry_run'
+    abort_usage('live prune requires --manifest reviewed manifest input') if mode == 'live' && manifest_path.to_s.empty?
+    manifests = resolve_state_manifests(argv, provider, manifest_path)
+    validate_live_manifest_review!(manifests, provider: provider, provider_key: provider_key, mode: mode, handoff_dir: handoff_dir, action: 'prune', review_report_path: review_report_path) if mode == 'live' && (!handoff_dir.to_s.empty? || !review_report_path.to_s.empty?)
+    if provider.key == 'datadog'
+      if mode == 'live' && journal_dir.to_s.empty?
+        abort_usage('live Datadog prune requires --journal-dir')
+      end
+
+      applier = SloRulesEngine::Appliers::Datadog.new(
+        journal_dir: mode == 'live' ? journal_dir : nil
+      )
+      plans = []
+      manifests.each do |manifest|
+        plan = applier.prune(manifest, mode: mode)
+        plans << plan
+        break if failed_execution?(plan)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      exit 1 if plans.any? { |plan| failed_execution?(plan) }
+      return
+    end
+
+    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
+      abort_usage('missing --output-dir') unless output_dir
+      if mode == 'live' && journal_dir.to_s.empty?
+        abort_usage('live file-backed prune requires --journal-dir')
+      end
+
+      applier = SloRulesEngine::Appliers::ManifestBundle.new(
+        output_dir: output_dir,
+        journal_dir: mode == 'live' ? journal_dir : nil
+      )
+      plans = []
+      manifests.each do |manifest|
+        plan = applier.prune(manifest, mode: mode)
+        plans << plan
+        break if failed_execution?(plan)
+      end
+      puts JSON.pretty_generate(plans.map(&:to_h))
+      exit 1 if plans.any? { |plan| failed_execution?(plan) }
+      return
+    end
+
+    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have a prune adapter yet"
+  rescue SloRulesEngine::Datadog::MissingCredentials => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'missing_credentials',
+        message: error.message
+      }
+    )
+    exit 1
+  rescue SloRulesEngine::Datadog::OwnershipError => error
+    render_provider_state_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
+  rescue SloRulesEngine::ManifestSchemaError => error
+    render_manifest_schema_error(provider: provider, provider_key: provider_key, mode: mode, error: error)
+  rescue SloRulesEngine::ProviderState::JournalConflict => error
+    render_operation_journal_error(
+      provider: provider,
+      provider_key: provider_key,
+      mode: mode,
+      error: error
+    )
+  rescue SloRulesEngine::UnsupportedApplyAction => error
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      output_dir: output_dir,
+      error: {
+        code: 'unsupported_apply_action',
+        message: error.message
+      }
+    )
+    exit 1
+  end
+
+  def load_apply_manifests(path, provider)
+    payload = JSON.parse(File.read(path), symbolize_names: true)
+    manifests = payload.is_a?(Array) ? payload : [payload]
+    manifests.each do |manifest|
+      manifest_provider = manifest.fetch(:provider) { manifest.fetch('provider', nil) }
+      abort_usage("manifest provider mismatch: #{manifest_provider.inspect}") unless manifest_provider == provider.key
+    end
+    validate_manifests!(manifests)
+    manifests
+  end
+
+  def resolve_state_manifests(argv, provider, manifest_path)
+    if manifest_path
+      abort_usage('manifest input does not accept definition files') unless argv.empty?
+      return load_apply_manifests(manifest_path, provider)
+    end
+
+    definitions = load_definitions(argv)
+    validation = validate_for_provider(definitions, provider)
+    unless validation[:valid]
+      puts JSON.pretty_generate(validation)
+      exit 1
+    end
+    manifests = definitions.map { |definition| provider.generate(definition).to_h.merge(service: definition.service) }
+    validate_manifests!(manifests)
+    manifests
+  end
+
+  def resolve_review_manifests(argv, provider, manifest_paths)
+    return resolve_state_manifests(argv, provider, nil) if manifest_paths.empty?
+
+    abort_usage('manifest input does not accept definition files') unless argv.empty?
+    manifest_paths.flat_map { |path| load_apply_manifests(path, provider) }
+  end
+
+  def load_definitions(paths)
+    abort_usage('missing definition file') if paths.empty?
+
+    SloRulesEngine.clear_definitions
+    paths.each { |path| load File.expand_path(path) }
+    SloRulesEngine.definitions
+  end
+
+  def validate_for_provider(definitions, provider)
+    core_validator = SloRulesEngine::CoreValidator.new
+    errors = []
+    warnings = []
+    definitions.each do |definition|
+      core_result = core_validator.validate(definition)
+      provider_result = provider.validate(definition)
+      errors.concat(core_result.errors.map(&:to_h))
+      errors.concat(provider_result.errors.map(&:to_h))
+      warnings.concat(core_result.warnings.map(&:to_h))
+      warnings.concat(provider_result.warnings.map(&:to_h))
+    end
+    {
+      valid: errors.empty?,
+      errors: errors,
+      warnings: warnings
+    }
+  end
+
+  def write_provider_manifests(output_dir, manifests, provider: nil, handoff_dir: nil)
+    manifests.each do |manifest|
+      path = File.join(output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'manifest.json')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, JSON.pretty_generate(manifest))
+    end
+    write_manifest_review_report(output_dir, manifests, provider: provider, handoff_dir: handoff_dir) if provider
+  end
+
+  def write_manifest_review_report(output_dir, manifests, provider:, handoff_dir: nil)
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+      manifests,
+      provider: provider.key,
+      handoff_dir: handoff_dir
+    )
+    path = File.join(output_dir, 'manifest-review', "#{provider.key}.json")
+    report[:report] = { path: path }
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, JSON.pretty_generate(report))
+  end
+
+  def write_json_file(path, payload)
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, JSON.pretty_generate(payload))
+  end
+
+  def validate_manifests!(manifests)
+    Array(manifests).each { |manifest| SloRulesEngine::ManifestSchemaValidator.validate!(manifest) }
+  end
+
+  def validate_apply_review_evidence!(manifests, provider:, provider_key:, mode:)
+    result = SloRulesEngine::ManifestReviewEvidenceValidator.validate(manifests)
+    return if result.valid?
+
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'missing_review_evidence',
+        message: 'live apply requires reviewed handoff provenance in every manifest'
+      },
+      errors: result.errors.map(&:to_h),
+      warnings: result.warnings.map(&:to_h)
+    )
+    exit 1
+  end
+
+  def validate_live_manifest_review!(manifests, provider:, provider_key:, mode:, handoff_dir:, action:, review_report_path: nil)
+    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+      manifests,
+      provider: provider&.key || provider_key,
+      handoff_dir: handoff_dir
+    )
+    saved_report = validate_saved_manifest_review_report(review_report_path, report) if review_report_path
+    unless saved_report.nil? || saved_report[:fresh]
+      puts JSON.pretty_generate(
+        valid: false,
+        provider: provider&.key || provider_key,
+        automation_mode: provider&.automation_mode,
+        state_actions: provider&.state_actions || [],
+        mode: mode,
+        error: {
+          code: saved_report.fetch(:findings).fetch(0).fetch(:code),
+          message: "live #{action} requires a fresh manifest-review report when --review-report is supplied"
+        },
+        saved_report: saved_report,
+        manifest_review: report
+      )
+      exit 1
+    end
+    return if report[:valid]
+
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'invalid_manifest_review',
+        message: "live #{action} requires current reviewed handoff evidence when --handoff-dir is supplied"
+      },
+      manifest_review: report
+    )
+    exit 1
+  end
+
+  def validate_saved_manifest_review_report(path, current_report)
+    saved_report = JSON.parse(File.read(path), symbolize_names: true)
+    SloRulesEngine::ManifestReviewQueue::FreshnessValidator.new.validate(saved_report, current_report, path: path)
+  end
+
+  def render_manifest_schema_error(provider:, provider_key:, mode:, error:)
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'invalid_manifest_schema',
+        message: error.message
+      },
+      errors: error.result.errors.map(&:to_h),
+      warnings: error.result.warnings.map(&:to_h)
+    )
+    exit 1
+  end
+
+  def render_provider_payload_error(provider:, provider_key:, mode:, error:)
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'invalid_provider_payload',
+        message: error.message
+      },
+      errors: error.result.errors.map(&:to_h),
+      warnings: error.result.warnings.map(&:to_h)
+    )
+    exit 1
+  end
+
+  def render_provider_state_error(provider:, provider_key:, mode:, error:)
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'unsafe_provider_state',
+        message: error.message
+      },
+      operation: error.operation.to_h,
+      errors: error.result.errors.map(&:to_h),
+      warnings: error.result.warnings.map(&:to_h)
+    )
+    exit 1
+  end
+
+  def failed_execution?(plan)
+    status = plan.execution&.dig(:result, :status)
+    %w[partial failed blocked].include?(status)
+  end
+
+  def render_operation_journal_error(provider:, provider_key:, mode:, error:)
+    puts JSON.pretty_generate(
+      valid: false,
+      provider: provider&.key || provider_key,
+      automation_mode: provider&.automation_mode,
+      state_actions: provider&.state_actions || [],
+      mode: mode,
+      error: {
+        code: 'operation_journal_conflict',
+        message: error.message
+      },
+      operation_journal: {
+        path: error.path
+      }
+    )
+    exit 1
+  end
+
+  def abort_usage(message = nil)
+    warn "Error: #{message}" if message
+    warn <<~USAGE
+      Usage:
+        bin/rules-ctl validate <definitionfile...>
+        bin/rules-ctl validate-handoff <handoff.json>
+        bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] [--handoff-dir=<dir>] <definitionfile...>
+        bin/rules-ctl manifest-review --provider=<provider> [--manifest=<manifest.json> ...] [--handoff-dir=<dir>] [--output=<file>] [--report=<file>] <definitionfile...>
+        bin/rules-ctl apply --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--journal-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
+        bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
+        bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
+        bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--journal-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
+        bin/rules-ctl status (--provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] | --bundle=<bundle.json> [--target-base-url=<service/provider>=<url> ...] | --portfolio=<portfolio.json> [--target-base-url=<service/provider>=<url> ...]) [--max-age-seconds=<seconds>] [--output=<file>]
+        bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
+        bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
+        bin/rules-ctl bundle apply <apply-ready-bundle.json> --confirm --approved-plan=<approved-plan.json> [--approved-plan=<approved-plan.json> ...] --journal-dir=<dir> --output=<applied-bundle.json>
+        bin/rules-ctl bundle status <bundle.json>
+        bin/rules-ctl journal create <provider-plan.json> --output=<journal.json>
+        bin/rules-ctl journal status <journal.json>
+        bin/rules-ctl plan approve <apply-ready-bundle.json> --target=<service/provider> --reviewer=<identity> --reviewed-at=<timestamp> --output=<approved-plan.json> [--note=<text> ...]
+        bin/rules-ctl plan status <approved-plan.json>
+        bin/rules-ctl plan apply <approved-plan.json> --confirm --journal-dir=<dir>
+        bin/rules-ctl plan resume <approved-plan.json> --confirm --journal-dir=<dir>
+        bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
+        bin/rules-ctl providers list
+        bin/rules-ctl integrations list
+        bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
+        bin/rules-ctl candidates <telemetry.json>
+        bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
+        bin/rules-ctl draft-from-handoff --service=<name> --owner=<owner> [--environment=<env>] <handoff.json>
+        bin/rules-ctl onboarding-summary [--handoff-dir=<dir>] <discovery-index.json>
+        bin/rules-ctl onboarding-artifact-index [--handoff-dir=<dir>] [--draft-dir=<dir>] [--manifest-dir=<dir>] [--provider=<provider>] [--output=<file>] <discovery-index.json>
+        bin/rules-ctl review-handoff [--accept=<uid>] [--reject=<uid>] [--note=<text>] <handoff.json>
+        bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
+        bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
+        bin/rules-ctl migration-report <legacyfile...>
+        bin/rules-ctl model-report <definitionfile...>
+    USAGE
+    exit 2
+  end
+end

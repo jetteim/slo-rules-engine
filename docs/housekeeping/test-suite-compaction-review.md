@@ -4,6 +4,33 @@ Review date: 2026-06-01
 
 Scope: recommendation-only housekeeping review. No test or production behavior was changed for this review.
 
+## Completion Update: 2026-07-28
+
+The original recommendations have been re-audited against the current
+post-feature repository:
+
+- shared CLI, onboarding, release-bundle, and Datadog fixtures now exist under
+  `test/support`
+- Datadog coverage is split by payload translation, planning, state reading,
+  transport, execution, and sandbox behavior while the aggregate entrypoint is
+  preserved
+- process-level `cli_test.rb` remains the user-visible command contract;
+  `rules_ctl_test.rb` remains focused on injected internal error branches
+- focused, aggregate, public-safety, and full verification tiers are documented
+  in `AGENTS.md`
+- the two one-purpose command-module ownership suites are consolidated into
+  `cli_architecture_test.rb`, with the same ownership assertions plus explicit
+  thin-executable coverage
+- duplicated live-status service-manifest transformation now lives in
+  `ReleaseBundleFixtures`
+
+The current before/after metrics, test traceability, and accepted deferrals are
+recorded in
+[Atomic Coherence-Preserving Simplification](atomic-coherence-simplification.md).
+No process-level safety, mutation, freshness, exact-plan, or live-status
+coverage was removed. This recommendation review is complete; further test
+compaction requires a concrete behavior change or demonstrated duplication.
+
 ## Evidence Snapshot
 
 - Test suite size: 22 Ruby test files, 6,645 test lines.

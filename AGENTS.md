@@ -8,8 +8,7 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Atomic coherence-preserving simplification now that the planned feature
-   sequence is at a verified boundary
+1. Read-only `bundle verify` for applied file-backed release bundles
 2. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
 3. Sloth live status only after downstream generated recording-rule identity
@@ -22,11 +21,12 @@ contracts, file-backed apply-exact-plan workflow, and one-manifest
 Prometheus-compatible live-status boundary are implemented. Release-bundle and
 portfolio live-status aggregation are also implemented with explicit
 per-target runtime, source preflight, deterministic rollups, and retained
-partial evidence. Live Datadog sandbox testing is explicitly postponed by the
-user. The next roadmap slice is the backlog's single atomic
-coherence-preserving simplification checkpoint; it must preserve every
-requirement, use case, schema, provider artifact, safety gate, and verified
-behavior.
+partial evidence. The atomic coherence-preserving simplification checkpoint is
+complete with repository-wide traceability, current architecture
+documentation, a thin executable/library CLI boundary, consolidated structural
+tests, and shared public-safe manifest fixtures. Live Datadog sandbox testing
+is explicitly postponed by the user. The next roadmap slice is the remaining
+Phase 9 file-backed `bundle verify` transition.
 
 Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages
 discovery evidence, reviewed handoffs and definitions, provider manifests,
@@ -40,7 +40,8 @@ preflights one approved plan per file-backed target, rejects live/mixed bundles,
 executes exact plans in deterministic UID order, and writes an immutable
 `applied` successor only after every target succeeds or safely replays.
 `bundle status` detects schema errors, embedded tampering, identity mismatch,
-missing sources, and source drift.
+missing sources, and source drift. A read-only transition from `applied` to
+`verified` remains open.
 
 Current state-manager status: confirmed Prometheus Stack and Sloth apply/prune
 requires `--journal-dir`, persists atomic per-operation transitions and attempt
@@ -97,6 +98,13 @@ require one runtime endpoint per readable target without persisting those URLs.
 Stale bundles, invalid portfolios, review gaps, target mismatches, and runtime
 mapping errors fail before the first backend read. Datadog and Sloth readers
 remain open and evidence-gated.
+
+Current architecture status: `bin/rules-ctl` is a six-line bootstrap for
+`lib/slo_rules_engine/cli.rb`. The library facade composes eight focused command
+families and retains shared manifest/state orchestration. The current component,
+flow, dependency, contract, NFR, use-case, and test maps live in
+`docs/design.md` and
+`docs/housekeeping/atomic-coherence-simplification.md`.
 
 ## Non-Negotiable Working Rules
 
@@ -347,13 +355,16 @@ Implemented by the latest feature slices:
   `plan resume`; completed target replay is file-write-free
 - Sloth resume now leaves a downstream handoff skipped after a repaired prior
   write failure instead of misclassifying the handoff as a retryable write
-- The project backlog includes one atomic, revertible repository-wide
-  simplification checkpoint gated by requirements/use-case traceability and full
-  behavioral verification
+- The atomic repository-wide simplification checkpoint is complete with
+  before/after structural evidence, all-use-case and all-contract traceability,
+  a thin executable/library CLI boundary, consolidated structural coverage, and
+  full behavioral verification
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: release-bundle and portfolio live SLO/error-budget status
+- latest checkpoint: atomic coherence-preserving simplification with
+  repository-wide traceability and current architecture
+- previous checkpoint: release-bundle and portfolio live SLO/error-budget status
   aggregation with source/runtime preflight and retained partial evidence
 - previous checkpoint: provider-neutral one-manifest live SLO/error-budget
   status with window-correct Prometheus recording rules
@@ -429,8 +440,8 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Execute the atomic coherence-preserving simplification checkpoint now that
-   the accepted feature sequence has reached a verified boundary
+1. Add the open Phase 9 read-only `bundle verify` transition for applied
+   file-backed release bundles
 2. Add Sloth live status only after downstream generated recording-rule
    identity is captured
 3. Run the Datadog sandbox probes and resume live provider-contract work only
@@ -443,96 +454,95 @@ Highest-value remaining gaps:
 Secondary gaps:
 
 1. Broader state-management parity for future providers after Datadog and Prometheus Stack prove the shared contract
-2. Additional CLI command extraction only when the atomic review demonstrates
-   a behavior-preserving ownership boundary
-3. Additional provider breadth only after the accepted feature sequence above
+2. Automatic rollback execution only after a reviewed compensating-plan
+   contract exists; current exact failures provide manual guidance
+3. Further structural work only when a feature exposes a focused,
+   behavior-tested responsibility
 
 ## Recommended Next Slice
 
 Next recommended slice:
 
-- execute the backlog's repository-wide review, refactor, simplification, and
-  cleanup checkpoint as one behavior-preserving, revertible delivery unit
-- begin with a traceability map from every engineering use case, versioned
-  schema, provider output, mutation/refusal gate, and current roadmap intent to
-  executable characterization coverage
-- use the existing test-compaction and abstraction-layer reviews as hypotheses,
-  then re-audit the current code before selecting changes; do not mechanically
-  apply stale recommendations
-- consolidate only demonstrated duplication or accidental complexity where
-  characterization tests prove the public CLI, schemas, provider artifacts,
-  findings, safety behavior, and public-safe boundaries remain compatible
-- update architecture, use-case, roadmap, and handoff documentation to reflect
-  the simplified structure without introducing product behavior
-- capture before/after structural evidence and run the entire verification gate
-  before the single atomic commit/push
-- keep Datadog live testing and backend-semantic changes out of this checkpoint
+- define a versioned target-verification artifact and immutable `verified`
+  successor transition from one valid `applied` release bundle
+- support Prometheus Stack and Sloth file-backed targets using their embedded
+  approved-plan runtime, desired-state fingerprints, and current managed-file
+  reads; perform no writes or external-generator execution
+- validate bundle schema, identity, lineage, sources, target coverage,
+  execution-result integrity, and all verification inputs before the first
+  managed-file read
+- verify targets in deterministic UID order, preserve engine-owned versus
+  pending external Sloth evidence, and fail without writing a successor when
+  any engine-owned target does not converge
+- reject Datadog or mixed live/file verification before any target read until
+  safe live backend evidence defines its recheck contract
+- keep the applied predecessor immutable and content-address the verified
+  successor plus its transition and target-verification evidence
+- update release-bundle contract, engineering use case 10, README, feature
+  inventory, implementation plan, and handoff in the same slice
 
 Rationale:
 
-- the planned Prometheus, release-bundle, provider-state, exact-plan, and
-  live-status feature sequence is now at a verified boundary
-- Datadog and Sloth follow-ups are blocked on external backend evidence, so
-  inventing new provider semantics would weaken the evidence-driven roadmap
-- prior housekeeping reviews identify candidates, but a fresh repository-wide
-  traceability pass is required to avoid losing intent accumulated by later
-  feature slices
-- one atomic checkpoint satisfies the backlog requirement and gives reviewers a
-  clean rollback boundary if structural changes obscure behavior
+- `verified` is already a declared release-bundle lifecycle and `bundle verify`
+  is the remaining open Phase 9 feature
+- file-backed provider plans, managed paths, expected fingerprints, execution
+  journals, and shared verification results already provide the evidence
+  needed for a read-only recheck
+- an immutable verified successor closes the release lifecycle without
+  weakening exact-plan or mutation gates
+- Datadog verification remains evidence-gated and must not be inferred from
+  file semantics
 
 ## Next Session Handoff
 
-Prepared on 2026-07-27 for a restart-and-`proceed` workflow.
+Prepared on 2026-07-28 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest verified feature checkpoint: `0990007 feat: aggregate live slo status`
-- previous verified feature checkpoint: `e156a9d feat: report live prometheus
-  slo status`
-- previous verified feature checkpoint: `f87cde0 feat: apply approved file
-  bundles exactly`
+- latest verified checkpoint: `chore: complete atomic coherence simplification`
+  at the next `git log -1` entry
+- previous verified checkpoint: `f26abf2 docs: hand off aggregate status
+  checkpoint`
+- previous verified feature checkpoint: `0990007 feat: aggregate live slo
+  status`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: `0990007` on local and remote `main`
+- target: atomic simplification worktree based on `f26abf2`; delivered as one
+  commit
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-27T17:22:19Z`
+- recorded timestamp: `2026-07-28T08:27:57Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 424 tests, 2,721 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 424 tests, 2,766 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- live verification: intentionally not run; no Prometheus endpoint was
-  available and the user postponed Datadog live testing. HTTP behavior is
-  covered with an injected deterministic multi-host Prometheus fixture,
-  including one failed target with sanitized retained evidence.
-- blast radius: aggregate live-status schema/model, release-bundle and portfolio
-  input resolution, per-target runtime preflight, status CLI modes, saved
-  aggregate reports, HTTP fixtures, roadmap, contracts, README, and use cases.
-  The existing single-manifest report and every state mutation gate are
-  unchanged.
-- rollback path: revert `0990007` to remove release-bundle/portfolio status and
-  restore the verified one-manifest live-status boundary
+- live verification: not required for the feature-free structural checkpoint;
+  no backend behavior changed. Datadog live testing remains postponed.
+- blast radius: CLI implementation location/bootstrap, structural ownership
+  tests, public-safe test fixtures, architecture/housekeeping/roadmap/usage
+  documentation, and traceability evidence. Commands, schemas, provider
+  artifacts, reads/writes, and safety gates are unchanged.
+- rollback path: revert the single `chore: complete atomic coherence
+  simplification` commit
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
-3. Treat the backlog's atomic coherence-preserving simplification checkpoint as
-   the next roadmap task; do not add product features in that checkpoint.
-4. Read both `docs/housekeeping` reviews, but validate their recommendations
-   against the current post-feature code before using them.
-5. Build and save the before-change requirement/use-case/schema/provider/safety
-   traceability map and add characterization coverage before structural edits.
-6. Make only demonstrated behavior-preserving simplifications, update the map
-   with after-change structure/evidence, and deliver the checkpoint as one
-   revertible commit.
+3. Do not resume housekeeping; the atomic checkpoint is complete.
+4. Use TDD to define the file-backed `applied` to `verified` release-bundle
+   transition and target-verification contract.
+5. Reuse embedded approved-plan runtime and shared managed-file verification
+   evidence; do not write files or execute Sloth.
+6. Fail all source, lineage, target, execution, and provider-coverage preflight
+   before the first managed-file read.
 7. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-8. Preserve release-bundle, exact-plan, review, journal, live-status, and
-   verification gates exactly.
+8. Preserve release-bundle predecessor immutability, exact-plan, review,
+   journal, live-status, and mutation gates exactly.
 
 ## Verification Commands
 
@@ -541,6 +551,7 @@ Use these before claiming a checkpoint:
 ```bash
 ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
+ruby -Ilib test/cli_architecture_test.rb
 ruby -Ilib test/live_status_test.rb
 ruby -Ilib test/live_status_aggregate_test.rb
 ruby -Ilib test/live_status_cli_test.rb
@@ -578,11 +589,11 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Read `docs/housekeeping/test-suite-compaction-review.md` and
-   `docs/housekeeping/abstraction-layer-review.md`
-6. Inspect `docs/implementation-plan.md` backlog task, `docs/use-cases.md`, and
-   all versioned contract documents before choosing structural edits
-7. If the user says `proceed`, execute the atomic simplification checkpoint
-   described above with traceability and characterization first
-8. Keep Datadog live testing postponed and preserve every release-bundle,
-   exact-plan, review, journal, live-status, and verification gate
+5. Read `docs/release-bundle-contract.md` and Phase 9 of
+   `docs/implementation-plan.md`
+6. Inspect `lib/slo_rules_engine/release_bundle/`, approved-plan documents, and
+   managed-file verification/result contracts
+7. If the user says `proceed`, implement the file-backed `bundle verify` slice
+   described above with TDD and preflight-first safety
+8. Keep Datadog live testing postponed and preserve every exact-plan, review,
+   journal, live-status, and mutation gate

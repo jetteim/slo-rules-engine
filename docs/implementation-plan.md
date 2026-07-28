@@ -120,7 +120,11 @@ This is the running plan for the long refactor.
 - [x] Split Datadog backend state reader from client transport concerns.
 - [x] Extract report CLI command module after command-family coverage exists.
 - [x] Extract Datadog request transport and retry behavior from the Datadog client.
-- [ ] Pause further housekeeping unless a future behavior change exposes a clean seam without reducing readability.
+- [x] Pause incremental housekeeping unless a future behavior change exposes a
+  clean seam without reducing readability.
+- [x] Move CLI orchestration into the library boundary, retain a thin
+  executable, consolidate command-ownership coverage, and centralize duplicated
+  public-safe manifest fixtures through the atomic coherence checkpoint.
 
 ## Phase 8: Prometheus Stack Provider Completion
 
@@ -205,7 +209,7 @@ This is the running plan for the long refactor.
 
 ## Project Backlog: Atomic Coherence-Preserving Simplification
 
-- [ ] Execute one repository-wide review, refactor, simplification, and cleanup
+- [x] Execute one repository-wide review, refactor, simplification, and cleanup
   checkpoint as a single revertible delivery unit, without adding product
   features or weakening any requirement, intent, provider contract, output,
   safety gate, public-safe boundary, or supported use case. Completion requires
@@ -217,3 +221,5 @@ This is the running plan for the long refactor.
   recorded before/after structural evidence; and the full verification suite.
   The checkpoint is atomic: it is complete only when all preservation and
   verification gates pass, and the entire branch/PR can be reverted as one unit.
+  Completion evidence and accepted deferrals are recorded in
+  `docs/housekeeping/atomic-coherence-simplification.md`.

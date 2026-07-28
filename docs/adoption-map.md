@@ -89,11 +89,11 @@ retain each target's evidence and make unsupported coverage explicit.
 
 ## Current Best Next Value
 
-1. execute the backlog's atomic coherence-preserving simplification checkpoint
-   now that the planned bundle, state-manager, exact-plan, and live-status
-   sequence is at a verified boundary
-2. keep Datadog live status, contract testing, and exact apply/resume postponed
-   until isolated credentials are available
+1. add the open Phase 9 `bundle verify` transition for applied file-backed
+   releases using the existing provider-state verification contract, producing
+   an immutable content-addressed `verified` successor without rewriting files
+2. keep Datadog live status, contract testing, exact apply/resume, and bundle
+   verification postponed until isolated credentials are available
 3. add Sloth live status only after downstream generated recording-rule
    identity is captured as reviewed evidence
 
@@ -121,9 +121,14 @@ Completed guardrails:
 11. Datadog state reader split: `lib/slo_rules_engine/datadog/state_reader.rb`
 12. Report CLI command extraction: `lib/slo_rules_engine/cli/report_commands.rb`
 13. Datadog request transport extraction: `lib/slo_rules_engine/datadog/request_transport.rb`
+14. Atomic coherence-preserving simplification: thin executable, library CLI
+    boundary, consolidated architecture coverage, shared public-safe manifest
+    fixture, current architecture map, and repository-wide traceability
+    evidence in `docs/housekeeping/atomic-coherence-simplification.md`
 
 Recommended remaining housekeeping sequence:
 
-1. Pause further housekeeping unless a future change exposes a clean, behavior-tested seam.
-2. Extract another focused CLI command module only if another command family changes.
-3. Revisit test-suite compaction after the current collaborator and command-module count settles.
+1. Treat the atomic housekeeping checkpoint as complete.
+2. Make no further structural change unless a feature exposes a focused,
+   behavior-tested responsibility.
+3. Preserve the thin executable and library orchestration boundary.

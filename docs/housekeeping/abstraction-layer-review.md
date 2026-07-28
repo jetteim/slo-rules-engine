@@ -4,6 +4,32 @@ Review date: 2026-06-01
 
 Scope: recommendation-only housekeeping review. No production abstraction changes were made for this review.
 
+## Completion Update: 2026-07-28
+
+The original pressure points were re-audited after the release-bundle,
+provider-state, exact-plan, and live-status feature sequence:
+
+- Datadog payload translation, risk policy, state planning, state reading, and
+  request transport are now focused collaborators behind the stable applier and
+  client facades
+- onboarding, catalog, telemetry, report, bundle, journal, approved-plan, and
+  status commands now have focused command-family modules
+- `bin/rules-ctl` is now a thin bootstrap; reusable orchestration lives at
+  `lib/slo_rules_engine/cli.rb`
+- shared manifest/state helpers remain in the CLI library facade because they
+  intentionally preserve common loading, validation, freshness, error, and
+  usage behavior across command families
+- large provider-state journal/execution, DSL, and manifest-review files remain
+  intact where splitting by line count would increase semantic risk without
+  removing a responsibility
+
+The current layer map, dependency rules, flows, and safety boundaries are in
+[`docs/design.md`](../design.md). The requirement/component/test decision record
+is
+[Atomic Coherence-Preserving Simplification](atomic-coherence-simplification.md).
+This abstraction review is complete. Future extraction requires a new focused
+responsibility and characterization evidence, not a file-size threshold.
+
 ## Current Layer Map
 
 Core model and DSL:

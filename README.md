@@ -431,6 +431,7 @@ The initial delivery integration is `notification_router`, which generates conte
 
 ## Documentation
 
+- [Architecture](docs/design.md)
 - [Engineering Use Cases](docs/use-cases.md)
 - [Telemetry-First Walkthrough](docs/telemetry-first-walkthrough.md)
 - [Prometheus Stack Walkthrough](docs/prometheus-stack-walkthrough.md)
