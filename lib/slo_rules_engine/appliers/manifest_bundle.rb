@@ -280,7 +280,10 @@ module SloRulesEngine
             schema_version: ProviderState::JOURNAL_SCHEMA_VERSION,
             journal_id: existing_execution.dig(:journal_status_report, :journal_id),
             path: existing_execution.fetch(:journal_path),
-            status: existing_execution.fetch(:journal_status)
+            status: existing_execution.fetch(:journal_status),
+            fingerprint: ProviderState::Fingerprint.content(
+              @journal_store.read(existing_execution.fetch(:journal_path))
+            )
           },
           result: ProviderState::Value.copy(existing_execution.fetch(:result)),
           replay: {

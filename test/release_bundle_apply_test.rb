@@ -193,7 +193,8 @@ class ReleaseBundleApplyTest < Minitest::Test
           schema_version: SloRulesEngine::ProviderState::JOURNAL_SCHEMA_VERSION,
           journal_id: "operation-journal-#{'a' * 64}",
           path: "/tmp/#{target_uid.tr('/', '-')}.json",
-          status: status == 'partial' ? 'partial' : 'succeeded'
+          status: status == 'partial' ? 'partial' : 'succeeded',
+          fingerprint: 'b' * 64
         },
         result: {
           schema_version: SloRulesEngine::ProviderState::SCHEMA_VERSION,

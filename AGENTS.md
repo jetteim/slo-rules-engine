@@ -8,11 +8,11 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Read-only `bundle verify` for applied file-backed release bundles
+1. Capture reviewed Sloth downstream generated-rule identity as explicit
+   evidence before adding Sloth live status
 2. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
-3. Sloth live status only after downstream generated recording-rule identity
-   is captured as reviewed evidence
+3. Sloth live status after the downstream identity evidence contract exists
 4. Datadog exact-plan parity only after live recheck/idempotency semantics are
    verified
 
@@ -25,8 +25,8 @@ partial evidence. The atomic coherence-preserving simplification checkpoint is
 complete with repository-wide traceability, current architecture
 documentation, a thin executable/library CLI boundary, consolidated structural
 tests, and shared public-safe manifest fixtures. Live Datadog sandbox testing
-is explicitly postponed by the user. The next roadmap slice is the remaining
-Phase 9 file-backed `bundle verify` transition.
+is explicitly postponed by the user. Phase 9 is now complete through a
+read-only file-backed `bundle verify` transition.
 
 Current release-bundle status: `slo-rules-engine/release-bundle/v1` packages
 discovery evidence, reviewed handoffs and definitions, provider manifests,
@@ -39,9 +39,12 @@ and writes a new content-addressed `apply_ready` bundle. `bundle apply`
 preflights one approved plan per file-backed target, rejects live/mixed bundles,
 executes exact plans in deterministic UID order, and writes an immutable
 `applied` successor only after every target succeeds or safely replays.
+`bundle verify` preflights execution, approved-plan, runtime, provider-plan,
+and full journal fingerprints before managed-file reads, then creates an
+immutable `verified` successor only when every engine-owned file freshly
+converges. Sloth downstream execution remains explicitly pending.
 `bundle status` detects schema errors, embedded tampering, identity mismatch,
-missing sources, and source drift. A read-only transition from `applied` to
-`verified` remains open.
+missing sources, and source drift.
 
 Current state-manager status: confirmed Prometheus Stack and Sloth apply/prune
 requires `--journal-dir`, persists atomic per-operation transitions and attempt
@@ -74,12 +77,24 @@ with live backend validation.
 Current multi-target apply status: successful Prometheus Stack and Sloth bundle
 execution records one generated
 `slo-rules-engine/bundle-target-execution/v1` artifact per target with approved
-plan, journal, and `ProviderStateResult` references. Missing/duplicate/unknown
+plan, managed runtime, full journal fingerprint/reference, and
+`ProviderStateResult`. Missing/duplicate/unknown
 approval coverage, bundle/evidence mismatch, stale sources, unsupported live
 targets, and incompatible output destinations fail before the first target.
 Execution stops on the first incomplete target, preserves earlier target
 results, and requires explicit `plan resume` before a rerun can finish the
 applied transition. Completed targets replay without rewriting files.
+
+Current multi-target verification status: `bundle verify` accepts one valid
+file-backed `applied` bundle, validates all source, lineage, target, execution,
+plan, runtime, result, and terminal-journal evidence before the first managed
+file read, and checks targets/entries deterministically through the shared
+`ManagedFileVerifier`. Success writes one generated
+`slo-rules-engine/bundle-target-verification/v1` artifact per target in a new
+content-addressed `verified` successor. Prometheus Stack converges fully;
+Sloth engine-owned manifest/input files converge while external generator and
+downstream Prometheus requirements stay pending. Drift writes no successor.
+Datadog or mixed live/file bundles fail before journal or target reads.
 
 Current live-status status: neutral SLO intent now includes an explicit
 evaluation window with a `30d` compatibility default. Prometheus Stack
@@ -359,10 +374,19 @@ Implemented by the latest feature slices:
   before/after structural evidence, all-use-case and all-contract traceability,
   a thin executable/library CLI boundary, consolidated structural coverage, and
   full behavioral verification
+- `bundle verify` now closes the file-backed release lifecycle with immutable
+  per-target verification artifacts, fresh expected/actual managed-file
+  fingerprints, fail-closed evidence preflight, and explicit pending Sloth
+  external state
+- Applied target execution artifacts now preserve approved runtime and a full
+  terminal journal fingerprint so later verification does not trust a mutable
+  path alone
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: atomic coherence-preserving simplification with
+- latest checkpoint: read-only file-backed bundle verification and immutable
+  verified release evidence
+- previous checkpoint: atomic coherence-preserving simplification with
   repository-wide traceability and current architecture
 - previous checkpoint: release-bundle and portfolio live SLO/error-budget status
   aggregation with source/runtime preflight and retained partial evidence
@@ -440,10 +464,9 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Add the open Phase 9 read-only `bundle verify` transition for applied
-   file-backed release bundles
-2. Add Sloth live status only after downstream generated recording-rule
-   identity is captured
+1. Capture reviewed Sloth downstream generated recording-rule identity in a
+   credential-free, source-linked evidence artifact
+2. Add Sloth live status only after that identity evidence is complete
 3. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
 4. Extend exact approval/apply/resume to Datadog only after verified backend
@@ -463,85 +486,75 @@ Secondary gaps:
 
 Next recommended slice:
 
-- define a versioned target-verification artifact and immutable `verified`
-  successor transition from one valid `applied` release bundle
-- support Prometheus Stack and Sloth file-backed targets using their embedded
-  approved-plan runtime, desired-state fingerprints, and current managed-file
-  reads; perform no writes or external-generator execution
-- validate bundle schema, identity, lineage, sources, target coverage,
-  execution-result integrity, and all verification inputs before the first
-  managed-file read
-- verify targets in deterministic UID order, preserve engine-owned versus
-  pending external Sloth evidence, and fail without writing a successor when
-  any engine-owned target does not converge
-- reject Datadog or mixed live/file verification before any target read until
-  safe live backend evidence defines its recheck contract
-- keep the applied predecessor immutable and content-address the verified
-  successor plus its transition and target-verification evidence
-- update release-bundle contract, engineering use case 10, README, feature
-  inventory, implementation plan, and handoff in the same slice
+- define a versioned, credential-free Sloth downstream-evidence artifact that
+  links one reviewed Sloth manifest/native input fingerprint to saved
+  Sloth-generated Prometheus rule content
+- parse generated rule YAML structurally and capture the exact recording-rule
+  identities needed for objective attainment, remaining error budget, burn
+  rate, observations, and freshness without running Sloth or reading a backend
+- require explicit reviewer identity/timestamp and complete reviewed SLO
+  coverage; reject stale source/input fingerprints, ambiguous rule mappings,
+  credentials, and unrelated generated rules
+- keep evidence capture read-only and provider-specific; do not move generated
+  PromQL identities into the neutral DSL
+- update usage with the precise stdout/file output, source reads, zero-write
+  provider boundary, and refusal behavior
 
 Rationale:
 
-- `verified` is already a declared release-bundle lifecycle and `bundle verify`
-  is the remaining open Phase 9 feature
-- file-backed provider plans, managed paths, expected fingerprints, execution
-  journals, and shared verification results already provide the evidence
-  needed for a read-only recheck
-- an immutable verified successor closes the release lifecycle without
-  weakening exact-plan or mutation gates
-- Datadog verification remains evidence-gated and must not be inferred from
-  file semantics
+- Phase 9 now closes at a verified file-backed release without claiming Sloth
+  downstream execution
+- Sloth live status remains blocked specifically on reviewed generated-rule
+  identity, so capturing that evidence is the smallest complete capability
+  that removes a real product blocker
+- saved generated rules can be validated locally without backend credentials,
+  provider writes, or hidden metric/query translation
+- Datadog work remains correctly evidence-gated and postponed
 
 ## Next Session Handoff
 
-Prepared on 2026-07-28 for a restart-and-`proceed` workflow.
+Prepared on 2026-07-29 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest verified checkpoint: `chore: complete atomic coherence simplification`
+- latest verified checkpoint: `feat: verify applied file release bundles`
   at the next `git log -1` entry
-- previous verified checkpoint: `f26abf2 docs: hand off aggregate status
-  checkpoint`
-- previous verified feature checkpoint: `0990007 feat: aggregate live slo
-  status`
+- previous verified checkpoint: `01f4e6d chore: complete atomic coherence
+  simplification`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with `verification ok`
 
 Verification evidence:
 
-- target: atomic simplification worktree based on `f26abf2`; delivered as one
-  commit
+- target: read-only file-backed `applied` to `verified` release transition
 - command: `./scripts/verify.sh`
-- recorded timestamp: `2026-07-28T08:27:57Z`
+- recorded timestamp: `2026-07-29T13:27:39Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 424 tests, 2,766 assertions, 0 failures, 0 errors
+- result: exit 0, `verification ok`, 432 tests, 2,833 assertions, 0 failures, 0 errors
 - metric/log/trace names: none; verification used local files and fake backend clients only
-- live verification: not required for the feature-free structural checkpoint;
-  no backend behavior changed. Datadog live testing remains postponed.
-- blast radius: CLI implementation location/bootstrap, structural ownership
-  tests, public-safe test fixtures, architecture/housekeeping/roadmap/usage
-  documentation, and traceability evidence. Commands, schemas, provider
-  artifacts, reads/writes, and safety gates are unchanged.
-- rollback path: revert the single `chore: complete atomic coherence
-  simplification` commit
+- live verification: not required; the feature reads local managed JSON/YAML
+  and durable journals only. Datadog live testing remains postponed.
+- blast radius: release-bundle execution/verification artifact schema,
+  terminal journal references, file-backed bundle CLI lifecycle, summary
+  rollups, and usage/contract documentation. Provider generation, neutral
+  intent, live backend reads, and provider mutation behavior are unchanged.
+- rollback path: revert the single `feat: verify applied file release bundles`
+  commit
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
-3. Do not resume housekeeping; the atomic checkpoint is complete.
-4. Use TDD to define the file-backed `applied` to `verified` release-bundle
-   transition and target-verification contract.
-5. Reuse embedded approved-plan runtime and shared managed-file verification
-   evidence; do not write files or execute Sloth.
-6. Fail all source, lineage, target, execution, and provider-coverage preflight
-   before the first managed-file read.
-7. Keep Datadog live testing postponed unless the user explicitly reopens it
+3. Do not resume housekeeping; the atomic checkpoint and Phase 9 are complete.
+4. Use TDD to define the reviewed Sloth downstream generated-rule evidence
+   contract described above.
+5. Keep evidence capture local and read-only; do not execute Sloth or contact
+   Prometheus.
+6. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-8. Preserve release-bundle predecessor immutability, exact-plan, review,
+7. Preserve release-bundle predecessor immutability, exact-plan, review,
    journal, live-status, and mutation gates exactly.
 
 ## Verification Commands
@@ -559,6 +572,8 @@ ruby -Ilib test/release_bundle_test.rb
 ruby -Ilib test/release_bundle_cli_test.rb
 ruby -Ilib test/release_bundle_apply_test.rb
 ruby -Ilib test/release_bundle_apply_cli_test.rb
+ruby -Ilib test/release_bundle_verify_test.rb
+ruby -Ilib test/release_bundle_verify_cli_test.rb
 ruby -Ilib test/provider_state_contract_test.rb
 ruby -Ilib test/provider_state_journal_test.rb
 ruby -Ilib test/provider_state_journal_cli_test.rb
@@ -589,11 +604,11 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Read `docs/release-bundle-contract.md` and Phase 9 of
-   `docs/implementation-plan.md`
-6. Inspect `lib/slo_rules_engine/release_bundle/`, approved-plan documents, and
-   managed-file verification/result contracts
-7. If the user says `proceed`, implement the file-backed `bundle verify` slice
-   described above with TDD and preflight-first safety
+5. Read the Sloth provider/status sections in `docs/features.md`,
+   `docs/use-cases.md`, and `docs/live-status-contract.md`
+6. Inspect Sloth manifests, native input generation, and current
+   Prometheus-compatible status identity requirements
+7. If the user says `proceed`, implement the reviewed Sloth downstream-evidence
+   slice described above with TDD and source-first safety
 8. Keep Datadog live testing postponed and preserve every exact-plan, review,
    journal, live-status, and mutation gate

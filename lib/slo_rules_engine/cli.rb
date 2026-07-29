@@ -746,6 +746,7 @@ module RulesCtl
         bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
         bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
         bin/rules-ctl bundle apply <apply-ready-bundle.json> --confirm --approved-plan=<approved-plan.json> [--approved-plan=<approved-plan.json> ...] --journal-dir=<dir> --output=<applied-bundle.json>
+        bin/rules-ctl bundle verify <applied-bundle.json> --output=<verified-bundle.json>
         bin/rules-ctl bundle status <bundle.json>
         bin/rules-ctl journal create <provider-plan.json> --output=<journal.json>
         bin/rules-ctl journal status <journal.json>

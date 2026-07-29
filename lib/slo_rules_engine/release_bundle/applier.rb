@@ -48,7 +48,7 @@ module SloRulesEngine
         completed = []
         ordered.each do |target, document|
           applied_plan = execute_target(document, completed)
-          execution = execution_record(target, applied_plan)
+          execution = execution_record(target, document, applied_plan)
           status = ProviderState::Value.fetch(ProviderState::Value.fetch(execution, :result), :status).to_s
           unless SUCCESS_STATUSES.include?(status)
             raise ApplyError.new(
@@ -273,7 +273,7 @@ module SloRulesEngine
         )
       end
 
-      def execution_record(target, applied_plan)
+      def execution_record(target, document, applied_plan)
         execution = applied_plan.execution
         unless execution.is_a?(Hash) &&
                ProviderState::Value.fetch(execution, :operation_journal).is_a?(Hash) &&
@@ -291,6 +291,7 @@ module SloRulesEngine
           target_uid: ProviderState::Value.fetch(target, :uid),
           service: ProviderState::Value.fetch(target, :service),
           provider: ProviderState::Value.fetch(target, :provider),
+          runtime: ProviderState::Value.copy(document.runtime),
           approved_plan: ProviderState::Value.copy(ProviderState::Value.fetch(execution, :approved_plan)),
           operation_journal: ProviderState::Value.copy(ProviderState::Value.fetch(execution, :operation_journal)),
           result: ProviderState::Value.copy(ProviderState::Value.fetch(execution, :result))
@@ -376,6 +377,28 @@ module SloRulesEngine
                      ProviderState::Value.fetch(transition, :action) == 'apply' &&
                      ProviderState::Value.fetch(transition, :predecessor_bundle_id) == predecessor_bundle_id &&
                      execution_plan_ids == Array(approved_plan_ids).map(&:to_s).sort
+        raise OutputConflict, path unless compatible
+
+        existing
+      rescue JSON::ParserError
+        raise OutputConflict, path
+      end
+
+      def preflight_verified(path, predecessor_bundle_id:)
+        path = File.expand_path(path)
+        return nil unless File.exist?(path)
+
+        existing = JSON.parse(File.read(path), symbolize_names: true)
+        status = StatusEvaluator.new.evaluate(existing)
+        transition = ProviderState::Value.fetch(existing, :transition)
+        targets = Array(ProviderState::Value.fetch(existing, :targets))
+        compatible = status[:valid] &&
+                     status[:effective_lifecycle] == 'verified' &&
+                     ProviderState::Value.fetch(transition, :action) == 'verify' &&
+                     ProviderState::Value.fetch(transition, :predecessor_bundle_id) == predecessor_bundle_id &&
+                     targets.all? do |target|
+                       !ProviderState::Value.fetch(target, :verification_artifact_uid).to_s.empty?
+                     end
         raise OutputConflict, path unless compatible
 
         existing

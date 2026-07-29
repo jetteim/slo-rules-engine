@@ -96,7 +96,10 @@ neutral Ruby definition
   -> content-addressed release bundle
   -> provider-state plan
   -> approved exact plan or confirmed provider action
-  -> durable journal and verified result
+  -> durable journal and verified provider result
+  -> applied release bundle
+  -> read-only managed-file verification
+  -> verified release bundle
 ```
 
 ### Reviewed Intent To Current Status

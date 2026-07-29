@@ -1,6 +1,6 @@
 # Release Bundle Contract
 
-The first-class release bundle is a self-contained, versioned JSON document that packages reviewed onboarding evidence and provider delivery artifacts. Bundle creation and file-backed planning require no backend calls; live API planning reads current provider state but never mutates it.
+The first-class release bundle is a self-contained, versioned JSON document that packages reviewed onboarding evidence and provider delivery artifacts. Bundle creation and file-backed planning require no backend calls; live API planning reads current provider state but never mutates it. File-backed bundle verification rereads managed files but never writes them or invokes an external generator.
 
 ## Identity
 
@@ -22,7 +22,7 @@ SLOReleaseBundle
 - reviewer attestation and per-scope decisions
 - sorted provider targets and artifact references
 - sorted packaged release-artifact fingerprints
-- deterministic lifecycle-transition metadata when the bundle was derived by `bundle plan`
+- deterministic lifecycle-transition metadata when the bundle was derived by `bundle plan`, `bundle apply`, or `bundle verify`
 - generated-artifact lineage metadata
 
 Local file source paths, lifecycle state, findings, summaries, and the onboarding artifact-index fingerprint do not define bundle identity. Rebuilding from unchanged release content, review metadata, and planning evidence produces the same ID.
@@ -36,7 +36,7 @@ Supported persisted lifecycle states:
 - `apply_ready`: every provider target also has a valid dry-run change plan
 - `stale`: current review evidence no longer matches its predecessor artifacts
 - `applied`: every file-backed target has terminal exact-execution evidence
-- `verified`: reserved for the future post-apply verification transition
+- `verified`: every file-backed target has fresh converged engine-owned state evidence; Sloth downstream generation may remain explicitly pending
 
 `bundle status` will report `invalid` as an effective status when the schema, an embedded artifact fingerprint, or the content-addressed bundle identity has been tampered with. `invalid` is not a persisted lifecycle state.
 
@@ -53,13 +53,15 @@ The v1 artifact inventory supports:
 - provider-level manifest-review report
 - optional dry-run provider change plan
 - generated target execution result
+- generated target verification result
 
 Each artifact includes a stable UID, kind, content type, SHA-256 fingerprint,
 source metadata, and embedded content. File-backed predecessors record an
 absolute source path. Bundle-native plans and execution results record generated
 lineage to the predecessor bundle and provider target instead of inventing a
 mutable source file. Provider targets reference the packaged manifest, review
-report, optional plan, and applied execution result by UID.
+report, optional plan, applied execution result, and fresh target verification
+result by UID.
 
 The bundle excludes credential ownership. Structured content containing credential-like keys such as `api_key`, `app_key`, `secret`, `password`, `token`, `authorization`, or `credentials` is rejected before it can be packaged.
 
@@ -162,10 +164,57 @@ Successful execution creates a new content-addressed `applied` bundle with an
 `apply` transition to the `apply_ready` predecessor. Each target references a
 generated `execution_result` artifact whose
 `slo-rules-engine/bundle-target-execution/v1` content includes the
-approved-plan reference, operation-journal reference, and terminal
-`ProviderStateResult`. Execution counts and statuses are included in aggregate
-and provider summaries. Identical replay persists identical bundle bytes;
-conflicting output is never overwritten.
+approved-plan reference, approved managed runtime, full operation-journal
+fingerprint and reference, and terminal `ProviderStateResult`. Execution counts
+and statuses are included in aggregate and provider summaries. Identical replay
+persists identical bundle bytes; conflicting output is never overwritten.
+
+## Read-Only File-Backed Verification
+
+`bundle verify` accepts one valid `applied` bundle. Before the first managed-file
+read it rechecks:
+
+- release-bundle schema, content identity, source freshness, `apply` lineage,
+  target coverage, and execution-artifact fingerprints
+- that every target uses `manifest_bundle` or `external_generator` automation
+- each packaged approved-plan reference and dry-run provider-plan fingerprint
+- each terminal journal's schema, content fingerprint, deterministic journal
+  identity, provider/service identity, approved-plan reference, and result
+  fingerprints
+- exact journal-entry agreement with the packaged change plan and containment
+  of every managed path under the approved service/provider runtime
+
+The command then checks targets in stable UID order and journal entries in
+recorded position order. `ManagedFileVerifier` parses each engine-owned JSON or
+YAML file and compares a fresh presence/content fingerprint with desired state
+from the approved operation. It never updates the journal, rewrites a managed
+file, invokes Sloth, contacts Prometheus, reloads configuration, or mutates any
+backend.
+
+Success creates a new content-addressed `verified` bundle with a `verify`
+transition to the immutable `applied` predecessor. Each target references one
+generated `target_verification` artifact whose
+`slo-rules-engine/bundle-target-verification/v1` content includes:
+
+- target, approved-plan, runtime, provider-plan, and terminal journal identity
+- one fresh expected/actual result for every engine-owned managed file
+- aggregate `status`, `engine_owned_status`, and `external_status`
+- pending Sloth external-generator requirements without claiming downstream
+  generator or Prometheus convergence
+
+A target qualifies when `engine_owned_status` is `succeeded`; its overall
+verification may remain `pending` only for recorded external Sloth work.
+Missing, unreadable, or changed engine-owned files return
+`bundle_target_verification_failed` and no verified successor is written.
+Datadog or mixed live/file bundles return
+`unsupported_bundle_verify_target` before journal or managed-file reads.
+Invalid journal, lineage, runtime, plan, or execution evidence returns
+`invalid_bundle_verification_inputs` before managed-file reads.
+
+An existing compatible verified output is rechecked using its original
+verification timestamp, so converged replay returns identical bundle bytes.
+An incompatible output returns `release_bundle_output_conflict` before managed
+state is inspected and is never overwritten.
 
 ## Status Safety
 
@@ -256,9 +305,16 @@ bin/rules-ctl bundle apply ./apply-ready-bundle.json \
   --output ./applied-bundle.json
 ```
 
-Creation, planning, and bundle execution are fail-closed. Stale, invalid,
+Verify the applied release against current engine-owned managed files:
+
+```bash
+bin/rules-ctl bundle verify ./applied-bundle.json \
+  --output ./verified-bundle.json
+```
+
+Creation, planning, bundle execution, and bundle verification are fail-closed. Stale, invalid,
 incomplete, or wrong-lifecycle predecessors; missing or unknown target runtime
 configuration; invalid dry-run plans; credential-like structured keys; invalid
 bundle schemas; incomplete/mismatched approvals; unsupported live targets; and
-incompatible applied-bundle outputs produce nonzero status. Planning and apply
-also reject in-place output so the predecessor remains immutable.
+incompatible successor outputs produce nonzero status. Planning, apply, and
+verify also reject in-place output so every predecessor remains immutable.

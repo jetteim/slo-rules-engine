@@ -15,6 +15,7 @@ Use the toolkit to:
 - package review evidence and provider plans into a content-addressed release bundle
 - approve one file-backed provider target and execute only its reviewed operations
 - execute every approved file-backed target and persist one immutable applied release
+- recheck an applied file-backed release and persist immutable verification evidence without rewriting managed state
 - compare reviewed desired state with existing backend or managed-file state
 - persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
@@ -55,6 +56,16 @@ target, validates the complete approval set before any write, executes targets
 in stable UID order through the same exact-plan boundary, and writes a new
 content-addressed `applied` bundle containing one execution-result artifact per
 target. Mixed or Datadog live-API bundles are rejected before execution.
+
+`bundle verify` turns a valid file-backed `applied` bundle into an immutable
+content-addressed `verified` successor only after fresh read-only convergence
+checks. It validates packaged plan, execution, runtime, and full journal
+fingerprints before reading managed state, then records one
+`target_verification` artifact per target under
+`slo-rules-engine/bundle-target-verification/v1`. Prometheus Stack and Sloth
+engine-owned files must converge; Sloth downstream generator/Prometheus evidence
+remains explicitly pending. Datadog and mixed live/file bundles are rejected
+before target reads.
 
 ## Usage By Use Case
 
@@ -181,7 +192,7 @@ rollback guidance; they are never retried implicitly. `plan resume` preserves
 attempt history, proves earlier successes still converge, retries only
 resumable file writes, and re-verifies the complete engine-owned file set.
 
-### Apply an approved multi-target file release
+### Apply and verify an approved multi-target file release
 
 Approve each target from the same file-only `apply_ready` bundle, then execute
 the bundle:
@@ -205,6 +216,9 @@ bin/rules-ctl bundle apply ./work/apply-ready.json \
   --approved-plan=./work/approved-sloth-plan.json \
   --journal-dir=./work/journals \
   --output=./work/applied.json
+
+bin/rules-ctl bundle verify ./work/applied.json \
+  --output=./work/verified.json
 ```
 
 Success writes and prints the immutable `applied` successor. Its target entries
@@ -214,6 +228,13 @@ summary fields include execution counts by status. Prometheus Stack and Sloth
 engine-owned files are written, while Sloth downstream generation remains an
 external handoff.
 
+Verification rereads the approved engine-owned JSON/YAML files without changing
+their modification times, journals, or predecessor bundle. Success writes and
+prints `verified.json`, whose targets reference generated
+`target_verification` artifacts containing fresh expected/actual fingerprints,
+`engine_owned_status: succeeded`, and `external_status: pending` for Sloth.
+The summary includes verification counts by status.
+
 Missing, duplicate, unknown, or bundle-mismatched approvals; stale bundle
 sources; live-API targets; and incompatible existing output files fail before
 the first target executes. Execution stops at the first incomplete target and
@@ -221,6 +242,14 @@ prints that target plus earlier completed target results without writing
 `applied.json`. Inspect and resume the failed approved plan with `plan resume`,
 then rerun `bundle apply`. Completed targets replay from their verified journals
 without file rewrites.
+
+Missing, unreadable, or changed managed files fail
+`bundle_target_verification_failed` without writing `verified.json`. Invalid
+journal, lineage, runtime, plan, or execution evidence fails preflight before
+managed reads. Live or mixed targets fail `unsupported_bundle_verify_target`.
+An incompatible `verified.json` fails before reads and is never overwritten;
+repeating a converged verification against a compatible output returns
+identical bytes.
 
 ### Persist an operation journal
 
@@ -410,6 +439,9 @@ The initial delivery integration is `notification_router`, which generates conte
 - Neutral SLO intent has an explicit evaluation window, defaulting to `30d`;
   Prometheus Stack uses it for attainment and remaining-budget rules.
 - Bundle planning is read-only and rejects stale or invalid predecessors.
+- Bundle verification is read-only, requires a valid applied file-backed
+  predecessor, and packages fresh managed-file evidence without updating
+  journals or invoking Sloth.
 - Journal creation accepts exactly one verified dry-run provider plan and never executes it.
 - Credentials stay in runtime environment configuration and are forbidden in release bundles.
 - Approved plans are credential-free, content-addressed, and limited to one

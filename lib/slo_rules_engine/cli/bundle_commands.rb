@@ -15,10 +15,12 @@ module SloRulesEngine
           bundle_plan(argv)
         when 'apply'
           bundle_apply(argv)
+        when 'verify'
+          bundle_verify(argv)
         when 'status'
           bundle_status(argv)
         else
-          abort_usage('usage: bundle create|plan|apply|status')
+          abort_usage('usage: bundle create|plan|apply|verify|status')
         end
       end
 
@@ -239,6 +241,73 @@ module SloRulesEngine
         puts JSON.pretty_generate(status)
         exit 1 unless status[:valid]
       rescue Errno::ENOENT, Errno::EACCES, JSON::ParserError => error
+        render_bundle_error(code: 'invalid_bundle_input', message: error.message)
+      end
+
+      def bundle_verify(argv)
+        input_path = argv.shift
+        output_path = nil
+        parser = OptionParser.new do |opts|
+          opts.on('--output=FILE', 'Write the immutable verified release bundle') do |value|
+            output_path = value
+          end
+        end
+        parser.parse!(argv)
+        abort_usage('missing applied release bundle path') if input_path.to_s.empty?
+        abort_usage('bundle verify requires --output') if output_path.to_s.empty?
+        abort_usage('unexpected arguments') unless argv.empty?
+        if File.expand_path(input_path) == File.expand_path(output_path)
+          render_bundle_error(
+            code: 'immutable_bundle_input',
+            message: 'bundle verify output must differ from the predecessor bundle path'
+          )
+        end
+
+        release_bundle = JSON.parse(File.read(input_path), symbolize_names: true)
+        store = SloRulesEngine::ReleaseBundle::Store.new
+        existing = store.preflight_verified(
+          output_path,
+          predecessor_bundle_id: release_bundle.fetch(:bundle_id)
+        )
+        checked_at = existing && Array(existing[:artifacts]).filter_map do |artifact|
+          next unless ProviderState::Value.fetch(artifact, :kind) == 'target_verification'
+
+          ProviderState::Value.fetch(ProviderState::Value.fetch(artifact, :content), :checked_at)
+        end.min
+        verified = SloRulesEngine::ReleaseBundle::Verifier.new.verify(
+          release_bundle,
+          checked_at: checked_at
+        )
+        store.write(output_path, verified)
+        puts JSON.pretty_generate(verified)
+      rescue SloRulesEngine::ReleaseBundle::VerifyError => error
+        render_bundle_error(
+          code: error.code,
+          message: error.message,
+          findings: error.findings,
+          target_uid: error.target_uid,
+          path: error.path
+        )
+      rescue SloRulesEngine::ReleaseBundle::ApplyError => error
+        render_bundle_error(
+          code: error.code,
+          message: error.message,
+          findings: error.findings,
+          path: error.path
+        )
+      rescue SloRulesEngine::ReleaseBundle::CredentialError => error
+        render_bundle_error(
+          code: 'credential_material_forbidden',
+          message: error.message,
+          errors: error.paths.map { |path| { path: path, message: 'credential-like keys are forbidden' } }
+        )
+      rescue SloRulesEngine::ReleaseBundle::SchemaError => error
+        render_bundle_error(
+          code: 'invalid_release_bundle',
+          message: error.message,
+          errors: error.result.errors.map(&:to_h)
+        )
+      rescue ArgumentError, KeyError, Errno::ENOENT, Errno::EACCES, JSON::ParserError => error
         render_bundle_error(code: 'invalid_bundle_input', message: error.message)
       end
 

@@ -9,6 +9,9 @@ module SloRulesEngine
       def build(review:, targets:, artifacts:, findings:)
         plan_artifacts = artifacts.select { |artifact| fetch_value(artifact, :kind) == 'change_plan' }
         execution_artifacts = artifacts.select { |artifact| fetch_value(artifact, :kind) == 'execution_result' }
+        verification_artifacts = artifacts.select do |artifact|
+          fetch_value(artifact, :kind) == 'target_verification'
+        end
         plans_by_uid = plan_artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         executions_by_uid = execution_artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         provider_summaries = targets.group_by { |target| fetch_value(target, :provider).to_s }.map do |provider, provider_targets|
@@ -47,6 +50,10 @@ module SloRulesEngine
         unless execution_artifacts.empty?
           summary[:execution_count] = execution_artifacts.length
           summary[:executions_by_status] = execution_status_counts(execution_artifacts)
+        end
+        unless verification_artifacts.empty?
+          summary[:verification_count] = verification_artifacts.length
+          summary[:verifications_by_status] = verification_status_counts(verification_artifacts)
         end
         summary
       end
@@ -92,6 +99,12 @@ module SloRulesEngine
       def execution_status_counts(artifacts)
         counts(artifacts.map do |artifact|
           fetch_value(fetch_value(fetch_value(artifact, :content), :result), :status)
+        end)
+      end
+
+      def verification_status_counts(artifacts)
+        counts(artifacts.map do |artifact|
+          fetch_value(fetch_value(artifact, :content), :status)
         end)
       end
 

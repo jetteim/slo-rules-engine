@@ -89,11 +89,11 @@ retain each target's evidence and make unsupported coverage explicit.
 
 ## Current Best Next Value
 
-1. add the open Phase 9 `bundle verify` transition for applied file-backed
-   releases using the existing provider-state verification contract, producing
-   an immutable content-addressed `verified` successor without rewriting files
-2. keep Datadog live status, contract testing, exact apply/resume, and bundle
-   verification postponed until isolated credentials are available
+1. capture reviewed Sloth downstream generated-rule identity as explicit
+   evidence before attempting Sloth live status or downstream bundle
+   verification
+2. keep Datadog live status, contract testing, exact apply/resume, and live
+   bundle verification postponed until isolated credentials are available
 3. add Sloth live status only after downstream generated recording-rule
    identity is captured as reviewed evidence
 

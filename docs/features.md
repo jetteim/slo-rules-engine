@@ -135,9 +135,17 @@ Explicit features:
   Sloth targets execute in stable UID order through the exact-plan executor.
   Success creates a new content-addressed applied bundle with per-target
   journal/result artifacts; partial targets require explicit resume.
+- **Read-only file-backed bundle verification:** one valid `applied` bundle is
+  preflighted against packaged execution, approved-plan, runtime, provider-plan,
+  and full journal fingerprints before managed files are read. Prometheus Stack
+  and Sloth engine-owned files are freshly compared with approved desired state
+  in stable order without writes. Success creates a content-addressed
+  `verified` successor with one
+  `slo-rules-engine/bundle-target-verification/v1` artifact per target; Sloth
+  downstream generator evidence remains explicitly pending.
 - **Exact-plan provider boundary:** Datadog approval/execution,
   Datadog resume, non-resumable operation retry, automatic rollback execution,
-  and live/file mixed-bundle apply remain explicit future work.
+  and live/file mixed-bundle apply or verification remain explicit future work.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 

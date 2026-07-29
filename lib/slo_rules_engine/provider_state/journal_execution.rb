@@ -546,7 +546,8 @@ module SloRulesEngine
             schema_version: JOURNAL_SCHEMA_VERSION,
             journal_id: Value.fetch(journal, :journal_id),
             path: journal_path,
-            status: Value.fetch(journal, :status)
+            status: Value.fetch(journal, :status),
+            fingerprint: Fingerprint.content(journal)
           ),
           result: result.to_h
         }
@@ -649,7 +650,8 @@ module SloRulesEngine
             schema_version: JOURNAL_SCHEMA_VERSION,
             journal_id: Value.fetch(journal, :journal_id),
             path: journal_path,
-            status: Value.fetch(journal, :status)
+            status: Value.fetch(journal, :status),
+            fingerprint: Fingerprint.content(journal)
           },
           result: result.to_h,
           resume: {

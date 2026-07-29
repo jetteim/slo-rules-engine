@@ -147,7 +147,10 @@ This is the running plan for the long refactor.
 - [x] Support multi-scope and multi-provider bundles with provider-level change and risk summaries.
 - [x] Add fail-closed multi-target file-backed `bundle apply` after Phase 10
   shared result contracts and Phase 12 exact-plan guarantees.
-- [ ] Add `bundle verify` after provider-specific verification evidence has a shared Phase 10 contract.
+- [x] Add read-only file-backed `bundle verify` with preflighted journal,
+  execution, runtime, and plan integrity; fresh managed-file convergence
+  evidence; explicit pending Sloth external state; and an immutable
+  content-addressed `verified` successor.
 
 ## Phase 10: Provider-Neutral State-Manager Hardening
 

@@ -14,7 +14,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Generate provider bundle | SLI, objective, response context, dashboard, route, and miss policy | Reviewed provider manifest and manifest-review report | Generation is local and read-only |
 | Package release | Reviewed evidence and target identity | Immutable review and apply-ready bundle JSON | Planning reads state but does not mutate it |
 | Approve and execute exact plan | One reviewed target, locked evidence, and exact operation list | Content-addressed approved plan, durable journal, and provider result | Explicit approval, `--confirm`, immediate state recheck, and same-scope lock |
-| Apply file-backed release | Complete approved-plan coverage for one apply-ready bundle | Immutable applied bundle with one execution result per target | All approvals preflight before deterministic exact execution |
+| Apply and verify file-backed release | Complete approved-plan coverage plus fresh engine-owned convergence for one release | Immutable applied and verified successors with per-target execution and verification evidence | Exact execution mutates approved files; later verification is read-only |
 | Inspect drift | Reviewed desired state compared with observed state | Provider plan with deterministic state fingerprints | Read-only provider or managed-file access |
 | Inventory state | Ownership and adoption evidence | Observed state and findings | Read-only provider or managed-file access |
 | Create operation journal | Exact provider plan identity and operation safety evidence | Immutable initial journal plus status assessment | Standalone journal creation does not execute |
@@ -42,6 +42,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Bundle planning | New content-addressed `apply_ready` JSON containing embedded provider plans, transition lineage, and provider summaries |
 | Exact-plan approval | `slo-rules-engine/approved-provider-plan/v1` JSON containing one target, reviewer attestation, release-bundle lineage, evidence fingerprints, managed runtime, and exact dry-run provider plan |
 | Bundle execution | New content-addressed `applied` bundle with predecessor lineage and one `execution_result` artifact per target |
+| Bundle verification | New content-addressed `verified` bundle with predecessor lineage and one `slo-rules-engine/bundle-target-verification/v1` artifact per target |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
 | Live SLO status | `slo-rules-engine/live-slo-status/v1` for one manifest or `slo-rules-engine/live-slo-status-aggregate/v1` for a release/portfolio, with exact target coverage, state counts, reviewed identity/context, objective attainment, remaining budget, burn windows, provider resource names, timestamps, freshness, and machine-readable findings |
@@ -58,6 +59,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Approved exact plan | Deferred until the live backend recheck contract is verified | Immutable reviewed plan with manifest, review, handoff, desired-state, observed-state, and operation fingerprints | The same immutable contract, including the stored external-generator handoff |
 | Operation journal | Confirmed apply/prune persists request method/path, returned resource ID, response fingerprint, sanitized failures, and terminal backend verification | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
 | Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
+| Verified release output | Deferred until live bundle recheck semantics are proven | Fresh expected/actual evidence for every approved managed file and a `verified` bundle target | Fresh engine-owned file evidence plus explicit pending external-generator/downstream status |
 | Live status | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records; aggregate output embeds the complete target report | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage until downstream Sloth-generated recording-rule identity is captured |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
@@ -491,10 +493,11 @@ not implement automatic rollback execution, Datadog exact apply/resume, retry
 of non-resumable operations, Sloth execution, Kubernetes apply, Grafana
 loading, or Alertmanager delivery.
 
-## Use Case 10: Apply An Approved Multi-Target File Release
+## Use Case 10: Apply And Verify An Approved Multi-Target File Release
 
 **Task:** execute every reviewed file-backed target from one `apply_ready`
-bundle and persist the release-level result only after every target succeeds.
+bundle, then prove its current engine-owned files still match the approved
+release without rewriting them.
 
 Use a file-only `apply_ready` bundle containing Prometheus Stack and Sloth
 targets. The Datadog-inclusive bundle in Use Case 5 demonstrates packaging and
@@ -527,6 +530,11 @@ bin/rules-ctl bundle apply ./work/apply-ready.json \
   --output=./work/applied.json
 
 bin/rules-ctl bundle status ./work/applied.json
+
+bin/rules-ctl bundle verify ./work/applied.json \
+  --output=./work/verified.json
+
+bin/rules-ctl bundle status ./work/verified.json
 ```
 
 **What to expect:**
@@ -549,6 +557,9 @@ bin/rules-ctl bundle status ./work/applied.json
   `execution_result` artifact containing
   `slo-rules-engine/bundle-target-execution/v1`, its approved-plan reference,
   durable operation-journal reference, and terminal `ProviderStateResult`.
+- New execution artifacts also preserve the approved managed runtime and full
+  terminal journal fingerprint, allowing later verification to reject a
+  replaced or edited journal rather than trusting its path alone.
 - The applied summary includes `execution_count`, `executions_by_status`, and
   provider execution rollups. `bundle status` reports `valid: true` and
   `effective_lifecycle: applied`.
@@ -567,12 +578,44 @@ bin/rules-ctl bundle status ./work/applied.json
   failed approved plan. Rerun `bundle apply`; earlier completed targets replay
   without writes and the applied successor is persisted once all targets are
   terminally successful.
+- `bundle verify` first validates the `applied` schema and identity, source
+  freshness, `apply` lineage, all target/execution references, approved-plan
+  and provider-plan fingerprints, full terminal journals, result fingerprints,
+  exact journal-entry coverage, and managed runtime containment. Any invalid
+  input returns `invalid_bundle_verification_inputs` before a managed-file read.
+- Verification reads each approved engine-owned JSON/YAML file in stable target
+  and journal-entry order. It performs no file, journal, Sloth, Prometheus,
+  Kubernetes, Grafana, Alertmanager, notification, or backend write.
+- Success writes and prints an immutable content-addressed `verified` successor.
+  Each target references a `target_verification` artifact containing
+  `slo-rules-engine/bundle-target-verification/v1`, its approved runtime/plan/
+  journal identity, fresh expected and actual fingerprints, resource evidence,
+  and `engine_owned_status: succeeded`. Summary output includes verification
+  counts by status.
+- Prometheus Stack verification is fully `succeeded`. Sloth target status is
+  release-qualified as `succeeded` for engine ownership while its nested
+  aggregate remains `status: pending` and `external_status: pending` with
+  `confirm_external_generator_completion` and
+  `refresh_downstream_provider_state` requirements. The tool does not claim
+  downstream generated-rule or Prometheus convergence.
+- A missing, unreadable, or changed engine-owned file returns
+  `bundle_target_verification_failed`, its target UID, and stable managed-file
+  findings. `verified.json` is not written.
+- Datadog and mixed live/file bundles return
+  `unsupported_bundle_verify_target` before journal or managed-file reads.
+  An incompatible existing output returns `release_bundle_output_conflict`
+  before managed reads and is never overwritten.
+- Verification keeps `applied.json`, journals, and managed-file modification
+  times unchanged. Repeating it with the same compatible output rechecks state
+  using the original evidence timestamp and returns identical successor bytes.
 
 **Safety boundary:** bundle apply never replans an alternative operation list.
 It accepts only file-backed exact plans from the same source bundle, performs
 all approval/output compatibility checks before the first target, stops at the
-first incomplete target, and never retries a partial plan implicitly. It does
-not support live API targets, automatic rollback, Sloth execution, Kubernetes
+first incomplete target, and never retries a partial plan implicitly. Bundle
+verification consumes only the applied evidence and current engine-owned file
+state; it does not turn pending external work into success. Neither transition
+supports live API targets, automatic rollback, Sloth execution, Kubernetes
 apply, Grafana loading, or Alertmanager delivery.
 
 ## Use Case 11: Apply Reviewed State

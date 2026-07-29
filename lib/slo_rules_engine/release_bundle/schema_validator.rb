@@ -7,6 +7,7 @@ module SloRulesEngine
     SCHEMA_VERSION = 'slo-rules-engine/release-bundle/v1'
     KIND = 'SLOReleaseBundle'
     EXECUTION_SCHEMA_VERSION = 'slo-rules-engine/bundle-target-execution/v1' unless const_defined?(:EXECUTION_SCHEMA_VERSION)
+    VERIFICATION_SCHEMA_VERSION = 'slo-rules-engine/bundle-target-verification/v1' unless const_defined?(:VERIFICATION_SCHEMA_VERSION)
     LIFECYCLE_STATES = %w[incomplete review_ready apply_ready stale applied verified].freeze
     ARTIFACT_KINDS = %w[
       onboarding_artifact_index
@@ -18,6 +19,7 @@ module SloRulesEngine
       manifest_review_report
       change_plan
       execution_result
+      target_verification
     ].freeze
 
     class SchemaError < StandardError
@@ -90,7 +92,8 @@ module SloRulesEngine
           artifacts,
           require_references: lifecycle != 'incomplete',
           require_plans: %w[apply_ready applied verified].include?(lifecycle),
-          require_executions: %w[applied verified].include?(lifecycle)
+          require_executions: %w[applied verified].include?(lifecycle),
+          require_verifications: lifecycle == 'verified'
         )
         validate_array(result, 'findings', fetch_value(bundle, :findings))
         validate_hash(result, 'summary', fetch_value(bundle, :summary))
@@ -106,17 +109,25 @@ module SloRulesEngine
         return unless transition.is_a?(Hash)
 
         action = fetch_value(transition, :action)
-        unless %w[plan apply].include?(action)
-          result.error('transition.action', 'must be plan or apply')
+        unless %w[plan apply verify].include?(action)
+          result.error('transition.action', 'must be plan, apply, or verify')
           return
         end
         predecessor_id = fetch_value(transition, :predecessor_bundle_id)
         unless predecessor_id.to_s.match?(/\Aslo-bundle-[0-9a-f]{64}\z/)
           result.error('transition.predecessor_bundle_id', 'must be a content-addressed slo-bundle identifier')
         end
-        predecessor_lifecycle = action == 'plan' ? 'review_ready' : 'apply_ready'
+        predecessor_lifecycle = {
+          'plan' => 'review_ready',
+          'apply' => 'apply_ready',
+          'verify' => 'applied'
+        }.fetch(action)
         validate_exact(result, 'transition.predecessor_lifecycle', fetch_value(transition, :predecessor_lifecycle), predecessor_lifecycle)
-        expected_lifecycle = action == 'plan' ? 'apply_ready' : 'applied'
+        expected_lifecycle = {
+          'plan' => 'apply_ready',
+          'apply' => 'applied',
+          'verify' => 'verified'
+        }.fetch(action)
         validate_exact(result, 'lifecycle', lifecycle, expected_lifecycle)
       end
 
@@ -194,7 +205,15 @@ module SloRulesEngine
         end
       end
 
-      def validate_targets(result, targets, artifacts, require_references:, require_plans:, require_executions:)
+      def validate_targets(
+        result,
+        targets,
+        artifacts,
+        require_references:,
+        require_plans:,
+        require_executions:,
+        require_verifications:
+      )
         result.error('targets', 'must contain at least one provider target') if targets.empty?
         artifact_uids = artifacts.to_h { |artifact| [fetch_value(artifact, :uid), artifact] }
         seen = {}
@@ -247,6 +266,19 @@ module SloRulesEngine
             expected_provider: provider
           )
           validate_execution_reference(result, path, target, execution) if execution
+
+          verification_uid = fetch_value(target, :verification_artifact_uid)
+          next unless require_verifications || verification_uid
+
+          verification = validate_artifact_reference(
+            result,
+            "#{path}.verification_artifact_uid",
+            verification_uid,
+            artifact_uids,
+            expected_kind: 'target_verification',
+            expected_provider: provider
+          )
+          validate_verification_reference(result, path, target, verification) if verification
         end
       end
 
@@ -311,13 +343,27 @@ module SloRulesEngine
           "#{path}.execution.approved_plan.approved_plan_id",
           fetch_value(approved_plan, :approved_plan_id)
         )
+        runtime = fetch_value(content, :runtime)
+        validate_hash(result, "#{path}.execution.runtime", runtime)
+        validate_presence(
+          result,
+          "#{path}.execution.runtime.output_dir",
+          fetch_value(runtime, :output_dir)
+        )
         operation_journal = fetch_value(content, :operation_journal)
         validate_hash(result, "#{path}.execution.operation_journal", operation_journal)
-        %i[journal_id path status].each do |key|
+        %i[journal_id path status fingerprint].each do |key|
           validate_presence(
             result,
             "#{path}.execution.operation_journal.#{key}",
             fetch_value(operation_journal, key)
+          )
+        end
+        fingerprint = fetch_value(operation_journal, :fingerprint)
+        unless fingerprint.to_s.match?(/\A[0-9a-f]{64}\z/)
+          result.error(
+            "#{path}.execution.operation_journal.fingerprint",
+            'must be a SHA-256 fingerprint'
           )
         end
         execution_result = fetch_value(content, :result)
@@ -338,6 +384,61 @@ module SloRulesEngine
         unless %w[succeeded noop].include?(status)
           result.error("#{path}.execution.result.status", 'must be succeeded or noop')
         end
+      end
+
+      def validate_verification_reference(result, path, target, artifact)
+        content = fetch_value(artifact, :content)
+        unless content.is_a?(Hash)
+          result.error("#{path}.verification_artifact_uid", 'must reference a target verification object')
+          return
+        end
+        {
+          schema_version: VERIFICATION_SCHEMA_VERSION,
+          kind: 'BundleTargetVerification',
+          target_uid: fetch_value(target, :uid),
+          service: fetch_value(target, :service),
+          provider: fetch_value(target, :provider),
+          status: 'succeeded'
+        }.each do |key, expected|
+          validate_exact(
+            result,
+            "#{path}.verification.#{key}",
+            fetch_value(content, key),
+            expected
+          )
+        end
+        validate_presence(
+          result,
+          "#{path}.verification.checked_at",
+          fetch_value(content, :checked_at)
+        )
+        verification = fetch_value(content, :verification)
+        validate_hash(result, "#{path}.verification.verification", verification)
+        return unless verification.is_a?(Hash)
+
+        validate_exact(
+          result,
+          "#{path}.verification.verification.engine_owned_status",
+          fetch_value(verification, :engine_owned_status),
+          'succeeded'
+        )
+        unless %w[succeeded pending].include?(fetch_value(verification, :status))
+          result.error(
+            "#{path}.verification.verification.status",
+            'must be succeeded or pending'
+          )
+        end
+        unless %w[succeeded pending not_required].include?(fetch_value(verification, :external_status))
+          result.error(
+            "#{path}.verification.verification.external_status",
+            'must be succeeded, pending, or not_required'
+          )
+        end
+        validate_array(
+          result,
+          "#{path}.verification.verification.resources",
+          fetch_value(verification, :resources)
+        )
       end
 
       def validate_array(result, path, value)
