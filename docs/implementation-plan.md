@@ -210,6 +210,34 @@ This is the running plan for the long refactor.
   target identity, and all runtime mappings before the first aggregate backend
   read.
 
+## Phase 14: Agent-Operable Dual CLI And MCP
+
+Detailed intent, requirements, feature packets, parity inventory, architecture,
+and article revalidation live in
+[`docs/agent-interface-roadmap.md`](agent-interface-roadmap.md).
+
+- [ ] **AICLI-F1:** define the versioned single command registry and register
+  every current Human CLI command with schemas, side effects, safety gates,
+  provider I/O, and parity metadata without changing behavior.
+- [ ] **AICLI-F2:** add offline catalog/describe plus a strict Agent CLI raw
+  JSON/file/stdin invocation path and versioned result/error envelopes.
+- [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz
+  coverage, and zero-I/O `validate_only` for every write-capable command.
+- [ ] **AICLI-F4:** add schema-checked field masks, declared limits/cursors,
+  NDJSON streaming, explicit truncation, and response sanitization/quarantine.
+- [ ] **AICLI-F5:** ship a versioned `SKILL.md` and compact agent context whose
+  invariants are checked against the registry.
+- [ ] **AICLI-F6:** expose eligible commands through an allowlisted MCP stdio
+  adapter generated from the registry with headless credential references and
+  no shell construction.
+- [ ] **AICLI-F7:** close Human CLI, Agent CLI, schema, skill, and MCP parity;
+  preserve existing Human CLI syntax/output/exit contracts; and pass every
+  security, context-budget, compatibility, and no-I/O gate.
+
+Phase 14 must not create a provider-payload bypass. Neutral intent, reviewed
+provenance, freshness, ownership, exact-plan, confirmation, journal, and final
+verification requirements apply identically through every interface.
+
 ## Project Backlog: Atomic Coherence-Preserving Simplification
 
 - [x] Execute one repository-wide review, refactor, simplification, and cleanup

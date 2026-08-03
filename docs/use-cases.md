@@ -987,6 +987,78 @@ it. PromQL record names and instant-query syntax stay in the Prometheus reader;
 the neutral status model contains only normalized values, identity, freshness,
 coverage, and findings.
 
+## Use Case 17: Operate The Reviewed Workflow From An AI Agent
+
+**Delivery status:** planned. The commands and schemas in this use case define
+the Phase 14 target contract; they are not available in the current binary.
+
+**Task:** let an AI agent discover and invoke the same reviewed onboarding,
+release, provider-state, and live-status behavior as an engineer without
+guessing flags, receiving unbounded output, or bypassing safety gates.
+
+Target discovery:
+
+```bash
+bin/rules-ctl agent catalog --format=json
+bin/rules-ctl agent describe bundle.verify --format=json
+```
+
+Target structured invocation:
+
+```bash
+bin/rules-ctl agent invoke bundle.verify \
+  --json-file=./work/requests/verify-bundle.json \
+  --fields=request_id,command_id,outcome,result.bundle_id,result.lifecycle,findings
+```
+
+The request file carries the complete versioned rules-engine command request,
+including the applied bundle path, verified output path, workspace root, and
+`validate_only`, plan, or execute mode where the command supports them. It does
+not carry provider credentials or arbitrary provider mutation payloads.
+
+**What to expect:**
+
+- `agent catalog` prints a bounded versioned JSON command inventory. `agent
+  describe` prints request/result/error schemas, side-effect class, provider
+  reads/writes, required review/approval/confirmation evidence, credential
+  references, field masks, limits, streaming support, and stable refusal codes.
+- `agent invoke` prints one versioned
+  `slo-rules-engine/agent-command-result/v1` JSON envelope on success or one
+  versioned JSON error envelope on failure. It never replaces result data with
+  prose usage text.
+- Inline JSON, JSON file, and stdin forms are mutually exclusive and normalize
+  to the same request as the Human CLI convenience form. Equivalence tests
+  prove the same domain result, provider reads/writes, refusal codes, and
+  persisted artifacts.
+- Unknown fields, invalid field masks, path traversal or symlink escape,
+  prohibited control characters, unsafe/pre-encoded identifiers, invalid URLs,
+  excessive depth/size, and credential-like request keys fail before handlers
+  or provider clients are constructed.
+- `validate_only` performs no file read/write, provider call, or credential
+  loading. Observational planning declares any state reads. Confirmed mutation
+  still requires current reviewed provenance, ownership, exact-plan evidence
+  where supported, explicit confirmation, durable journal, and verification.
+- Large collection results apply declared limits and cursors; eligible flows
+  can emit NDJSON. Field masks are schema-checked, and truncation is explicit.
+- Provider-controlled free text is sanitized before Agent CLI or MCP output.
+  Rejected prompt-injection-bearing text is represented by findings and
+  fingerprints, not emitted inline.
+- A shipped agent skill tells agents to inspect schemas, request minimal
+  fields, run validation-only first, distinguish plans from writes, obtain user
+  confirmation, and keep credentials outside requests.
+- The later MCP stdio surface exposes the same allowlisted command registry and
+  handlers without constructing a shell command. It does not gain capabilities
+  before the Agent CLI safety contract is complete.
+- Existing Human CLI syntax, stdout, exit codes, provider behavior, and saved
+  schema contracts remain compatible throughout rollout.
+
+**Safety boundary:** the Agent CLI and MCP are adapters, not policy bypasses.
+Raw structured requests express rules-engine commands; neutral reliability
+intent, review evidence, provider validation, freshness, ownership, exact-plan,
+confirmation, journal, and verification requirements remain unchanged. Until
+Phase 14 is implemented, agents must use the documented current Human CLI and
+must not assume the target commands above exist.
+
 ## CLI Execution Boundary
 
 Every command in this guide still runs through `bin/rules-ctl`. The executable
@@ -1009,5 +1081,14 @@ Update or rewrite usage when any of these changes:
 - exact-plan resume eligibility, state-recheck, attempt, or re-verification behavior changes
 - cross-provider evidence portability or binding requirements change
 - live-status schema, classification, freshness, provider reads, or supported scope changes
+- Human CLI command mapping, Agent CLI request mapping, command registry schema,
+  runtime introspection, side-effect metadata, field masks/limits, agent skill,
+  response sanitization, or MCP projection changes
+
+Every CLI change must update both Human CLI and Agent CLI sub-interfaces in the
+same checkpoint once Phase 14 begins; during bootstrap it must update the
+parity inventory and registry mapping that will generate both. Semantics,
+safety gates, provider reads/writes, and refusal behavior must remain
+equivalent even when syntax or presentation differs.
 
 Keep this guide organized around engineering tasks. Every use case must state concrete stdout, written-file, provider-read, provider-write, and refusal behavior that applies.

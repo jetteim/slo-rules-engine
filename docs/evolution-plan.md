@@ -180,6 +180,40 @@ Existing telemetry and prior implementation behavior are evidence for better mod
 - Missing backend metrics found before alert rollout.
 - Reality-check reports remain machine-readable.
 
+### 8. Agent-Safe Reliability Automation
+
+**Customer / beneficiary:** engineers and AI agents operating reviewed SLO
+workflows through automation.
+
+**Trigger:** an agent needs to discover telemetry, inspect schemas, produce
+review artifacts, plan state, or execute an explicitly approved change without
+guessing shell syntax or ingesting unbounded output.
+
+**Outcome:** every supported workflow is available through feature-parity Human
+CLI and Agent CLI sub-interfaces, with MCP projected later from the same command
+contract and with existing reliability/mutation gates intact.
+
+**Flow:**
+
+1. Discover the current command catalog and schema offline.
+2. Submit a complete strict structured request or use Human CLI convenience
+   syntax that normalizes to the same request.
+3. Validate adversarial input and side-effect policy before handler or client
+   construction.
+4. Run validation-only, observational planning, or confirmed execution as
+   distinct modes.
+5. Project, bound, stream, and sanitize result evidence for agent consumption.
+6. Return stable machine-readable outcomes and preserve review/journal lineage.
+
+**Measures:**
+
+- Every current command has Human/Agent registry and equivalence coverage.
+- Runtime schemas require no backend, network, or credentials.
+- Every write-capable command passes zero-I/O validation-only tests.
+- Collections declare field masks, limits, truncation, and NDJSON behavior.
+- MCP tool inventory, once shipped, has no independent business logic or
+  undocumented parity gap.
+
 ## Capability Map
 
 | Capability | Value Stream | Feature Candidates |
@@ -195,6 +229,10 @@ Existing telemetry and prior implementation behavior are evidence for better mod
 | Provider contribution safety | 5 | provider contract, provider guide, deterministic tests, unsupported-field warnings |
 | Backend state management | 6 | automation modes, artifact schemas, dry-run apply plans, diff harness, apply/prune commands, import existing resources |
 | Reality checking | 7 | provider binding checks, missing metric checks, backend telemetry lookup and discovery adapters |
+| Shared command contract | 8 | command registry, request/result schemas, side-effect metadata, parity validation |
+| Agent-safe invocation | 8 | Agent CLI JSON requests, runtime introspection, stable envelopes, input hardening |
+| Context-safe output | 8 | field masks, limits/cursors, NDJSON, truncation, response sanitization |
+| Agent distribution | 8 | versioned skill/context, headless credentials, MCP stdio adapter |
 
 ## Delivery Order
 
@@ -206,6 +244,9 @@ Existing telemetry and prior implementation behavior are evidence for better mod
 6. Add provider contribution guide and guardrails.
 7. Add low-volume and reality-check examples with synthetic telemetry.
 8. Keep provider apply behavior explicit for each provider: Datadog as live API, Prometheus-compatible bundles as manifest bundles, and Sloth as external-generator handoff.
+9. Add the shared command registry before any Agent CLI or MCP adapter; complete
+   input/mutation safety before exposing writes; close parity before general
+   availability.
 
 ## Guardrails
 
@@ -217,3 +258,7 @@ Existing telemetry and prior implementation behavior are evidence for better mod
 - Provider contributions must use synthetic fixtures and explicit unsupported-field handling.
 - Public-safety checks must remain part of the normal test path.
 - Live backend mutation must require explicit confirmation and provider credentials.
+- Human CLI, Agent CLI, and later MCP must share one command contract and the
+  same reliability intent, review, state, and mutation behavior.
+- Agents are untrusted operators: strict schemas, bounded output, field-specific
+  validation, zero-I/O validation, and response sanitization are release gates.

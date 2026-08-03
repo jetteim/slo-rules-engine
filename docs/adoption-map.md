@@ -81,6 +81,28 @@ retain each target's evidence and make unsupported coverage explicit.
 - credential-free portfolio inputs and explicit per-target runtime endpoints
 - aggregate target/state rollups with retained partial query-failure evidence
 
+### 6. Reviewed Workflow To Agent-Safe Automation
+
+**Trigger:** an AI agent needs to use the same onboarding, release, provider
+state, and status workflows as an engineer without relying on stale prompt
+documentation or ambiguous shell construction.
+
+**Outcome:** feature-parity Human CLI and Agent CLI sub-interfaces expose strict
+runtime-discoverable contracts, bounded/sanitized output, and identical safety
+gates; MCP later projects the same registry.
+
+**Needed capability increments:**
+
+- single versioned command registry covering every current command
+- strict raw command-request JSON plus offline catalog/schema introspection
+- shared adversarial input validation and zero-I/O `validate_only`
+- field masks, limits/cursors, NDJSON, explicit truncation, and response
+  sanitization
+- versioned agent skill/context plus headless credential rules
+- MCP stdio generated from the registry after safety and schema contracts are
+  stable
+- mandatory Human/Agent equivalence, compatibility, and security testing
+
 ## What We Are Not Optimizing For
 
 - copying internal service definitions into this repository
@@ -89,12 +111,14 @@ retain each target's evidence and make unsupported coverage explicit.
 
 ## Current Best Next Value
 
-1. capture reviewed Sloth downstream generated-rule identity as explicit
+1. establish the Phase 14 shared command registry and complete Human CLI command
+   inventory/parity metadata without changing existing behavior
+2. capture reviewed Sloth downstream generated-rule identity as explicit
    evidence before attempting Sloth live status or downstream bundle
    verification
-2. keep Datadog live status, contract testing, exact apply/resume, and live
+3. keep Datadog live status, contract testing, exact apply/resume, and live
    bundle verification postponed until isolated credentials are available
-3. add Sloth live status only after downstream generated recording-rule
+4. add Sloth live status only after downstream generated recording-rule
    identity is captured as reviewed evidence
 
 ## Housekeeping Backlog

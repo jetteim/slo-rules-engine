@@ -41,6 +41,14 @@ Provider generation must not require network access. Live apply flows require a 
 - Document state actions: `plan`, `apply`, `diff`, `import_existing`, and `prune`.
 - Document telemetry lookup and discovery behavior, including supported scopes and unsupported combinations.
 - Keep live mutation unavailable unless credentials and explicit confirmation are present.
+- Every provider-backed CLI change must update both Human CLI and Agent CLI
+  mappings, the shared command-contract schemas and side-effect metadata,
+  equivalence coverage, runtime introspection, and MCP projection when
+  available. During the Phase 14 bootstrap, update the parity inventory and
+  target Agent mapping even before that adapter ships.
+- A structured Agent CLI request must remain a rules-engine command request;
+  never add a raw provider-payload path around neutral intent, reviewed
+  evidence, ownership, planning, confirmation, journals, or verification.
 
 ## Telemetry Evidence Baseline
 

@@ -200,6 +200,42 @@ an input with no readable target fails. Runtime URLs and raw backend error
 messages are not copied into reports. Datadog and Sloth readers remain
 deferred until their backend evidence contracts are available.
 
+## Planned Agent-Operable Interfaces
+
+The [Agent Interface Roadmap](agent-interface-roadmap.md) defines a planned
+Phase 14 capability. It is not implemented yet.
+
+Planned features:
+
+- **One command contract:** a versioned registry covers every current command,
+  request/result/error schema, side effect, provider read/write, safety gate,
+  Human CLI mapping, Agent CLI mapping, skill reference, and later MCP tool.
+- **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
+  convenience flags and compatibility; a new Agent CLI accepts complete strict
+  JSON requests. Both normalize into the same handlers and safety behavior.
+- **Runtime introspection:** offline command catalog and describe output replace
+  prompt-baked command documentation for agents.
+- **Agent input hardening:** strict schemas and field-specific validation cover
+  unknown fields, bounds, path traversal/symlink escape, control characters,
+  unsafe IDs, embedded query/fragment syntax, pre-encoding, URLs, and
+  credential exclusion.
+- **Distinct safety modes:** zero-I/O `validate_only`, observational planning,
+  and confirmed execution are explicit and retain every current review,
+  ownership, exact-plan, confirmation, journal, and verification gate.
+- **Context-safe output:** schema-checked field masks, limits/cursors, NDJSON,
+  explicit truncation, stable error envelopes, and sanitization/quarantine for
+  provider-controlled free text.
+- **Agent distribution:** a versioned `SKILL.md`, compact context guidance,
+  headless credential references, and a later allowlisted MCP stdio adapter all
+  derive from the registry.
+- **Parity as a release gate:** every CLI change updates both sub-interfaces,
+  schemas, equivalence tests, runtime introspection, usage, and MCP projection
+  when available; no one-interface-only command is accepted.
+
+The raw structured path represents a full rules-engine command, not an
+arbitrary provider API payload. Neutral reliability intent and reviewed
+provider artifacts remain authoritative.
+
 ## Change
 
 - Provider abstraction means complete observability backend bundle.

@@ -27,6 +27,11 @@ Use the toolkit to:
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
+Phase 14 is planned, not implemented: the [Agent Interface Roadmap](docs/agent-interface-roadmap.md)
+defines a strict Agent CLI, runtime schema discovery, bounded and sanitized
+output, a versioned agent skill, and later MCP projection over the same command
+contract as the existing Human CLI.
+
 ## Provider Outputs
 
 | Provider | Generation output | Dry-run planning output | Confirmed state output |
@@ -474,6 +479,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Datadog Sandbox Testing](docs/datadog-sandbox-testing.md)
 - [Provider Contract](docs/provider-contract.md)
 - [Provider Contribution Guide](docs/provider-contribution-guide.md)
+- [Agent Interface Roadmap](docs/agent-interface-roadmap.md)
 - [Implementation Plan](docs/implementation-plan.md)
 
 ## Development

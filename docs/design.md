@@ -4,15 +4,16 @@
 
 The engine is a local Ruby application with explicit boundaries around neutral
 reliability intent, provider translation, reviewed evidence, state execution,
-and read-only status.
+and read-only status. Phase 14 adds planned Human and Agent CLI adapters plus a
+later MCP adapter without duplicating domain behavior.
 
 ```text
-Operator / CI
-  |
-  v
-bin/rules-ctl (thin executable)
-  |
-  v
+Operator / CI            AI agent                 MCP client (planned)
+  |                         |                         |
+Human CLI adapter      Agent CLI adapter        MCP stdio adapter
+  |                         |                         |
+  +------------- versioned command registry --------+
+                            |
 RulesCtl library orchestration + command-family modules
   |
   +--> DSL / neutral model / validation
@@ -29,6 +30,20 @@ telemetry, reports, release bundles, journals, approved plans, and live status.
 Shared manifest/state orchestration remains in the library facade because those
 commands intentionally share definition loading, provider validation, review
 freshness, error rendering, and usage behavior.
+
+### Planned Command Contract And Agent Interfaces
+
+The [Agent Interface Roadmap](agent-interface-roadmap.md) introduces one
+versioned command registry between interface adapters and current handlers.
+The Human CLI adapter preserves existing positional/convenience syntax. The
+Agent CLI adapter accepts strict complete JSON requests and returns stable JSON
+or NDJSON envelopes. Runtime catalog/schema output, field projection, limits,
+side-effect metadata, input hardening, validation-only behavior, sanitization,
+skill guidance, and MCP schemas all derive from the same registry.
+
+The registry is an orchestration contract, not a second policy layer. It cannot
+override neutral intent, provider validation, reviewed evidence, ownership,
+exact-plan, confirmation, journal, or verification requirements.
 
 ## Component Boundaries
 
@@ -121,6 +136,10 @@ reviewed Prometheus Stack manifest
 - Provider payloads remain provider-shaped inside shared state contracts.
 - CLI modules orchestrate domain collaborators; they do not implement provider
   policy.
+- Human CLI, Agent CLI, and MCP adapters depend on the command registry and
+  shared handlers; adapters must not call provider collaborators directly.
+- Command schema, side-effect metadata, skill guidance, and MCP tool metadata
+  must not become independent sources of truth.
 - Delivery integrations route alert context but do not evaluate SLOs.
 - File and backend mutations require explicit confirmation and durable
   execution evidence.
@@ -137,6 +156,12 @@ reviewed Prometheus Stack manifest
   requires explicit state recheck.
 - Backend failures are sanitized; credentials and raw private responses are not
   persisted.
+- Agent requests are untrusted: strict schemas, field-specific path/ID/URL
+  validation, size limits, and side-effect classification precede handlers.
+- Agent output is bounded, projectable, explicitly truncated or streamed, and
+  sanitizes provider-controlled free text before exposure.
+- `validate_only` performs no file/provider I/O; observational plans that read
+  state remain separately declared.
 - Public-safe terminology and fixtures are enforced by the verification suite.
 
 ## Architecture Traceability
@@ -146,4 +171,5 @@ in
 [Atomic Coherence-Preserving Simplification](housekeeping/atomic-coherence-simplification.md).
 The [Evolution Plan](evolution-plan.md) records the broader value-stream model,
 and the [Telemetry-First Adoption Map](adoption-map.md) records the current
-adoption path and roadmap.
+adoption path and roadmap. Phase 14 intent, requirements, parity, and target
+interfaces live in the [Agent Interface Roadmap](agent-interface-roadmap.md).
