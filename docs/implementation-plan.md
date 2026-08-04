@@ -209,6 +209,15 @@ This is the running plan for the long refactor.
 - [x] Validate release-bundle freshness, portfolio manifests, review evidence,
   target identity, and all runtime mappings before the first aggregate backend
   read.
+- [x] Capture content-addressed reviewed Sloth downstream evidence linking
+  current manifest/native-input fingerprints to complete unambiguous generated
+  recording-rule and provider-status query identities without provider calls.
+- [x] Recheck saved Sloth downstream evidence identity and every local source
+  fingerprint with stable stale findings before later consumers trust it.
+- [ ] Add the Sloth live-status reader using only fresh reviewed downstream
+  evidence and explicit Prometheus runtime configuration.
+- [ ] Extend release-bundle downstream verification to packaged current Sloth
+  evidence after the reader and bundle artifact contract are proven.
 
 ## Phase 14: Agent-Operable Dual CLI And MCP
 
@@ -217,7 +226,7 @@ and article revalidation live in
 [`docs/agent-interface-roadmap.md`](agent-interface-roadmap.md).
 
 - [x] **AICLI-F1:** define the versioned single command registry, register all
-  35 current Human CLI commands with schema references, side effects, safety
+  37 current Human CLI commands with schema references, side effects, safety
   gates, provider I/O, and output metadata, route Human dispatch through the
   registry, and publish a separate Human-command to Agent-JSON catalog without
   changing command behavior.

@@ -21,6 +21,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Apply reviewed state | Reviewed provider artifacts and mutation gates | Durable journal plus provider result and post-operation verification | Explicit `--confirm` and `--journal-dir` |
 | Remove managed state | Reviewed scope and ownership evidence | Durable journal plus confirmed delete result and absence verification | Explicit `--confirm` and `--journal-dir` |
 | Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
+| Review Sloth downstream rules | Reviewed Sloth intent plus externally generated rule identity | Content-addressed downstream evidence plus freshness status | Local source reads only; capture writes one explicit evidence file |
 | Inspect live SLO status | Reviewed SLO identity, evaluation window, objective, budget, burn policy, response context, and release/portfolio target coverage | Versioned per-manifest or aggregate live-status report with per-SLO state and freshness | Prometheus-compatible instant-query reads only |
 | Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
 | Validate Datadog contract | Explicit sandbox credential and dashboard API evidence | Public-safe sandbox smoke JSON | Read-only by default; one temporary dashboard only with explicit confirmation |
@@ -45,6 +46,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Bundle verification | New content-addressed `verified` bundle with predecessor lineage and one `slo-rules-engine/bundle-target-verification/v1` artifact per target |
 | Operation journal | `slo-rules-engine/provider-operation-journal/v1` JSON tied to provider, service, desired state, observed state, and plan fingerprints |
 | Confirmed execution | Durable live journal transitions plus a `ProviderStateResult`; Datadog rereads backend identity/payload or delete absence, file-backed providers reread managed content, and Sloth downstream generation remains explicitly `pending` |
+| Sloth downstream evidence | `slo-rules-engine/sloth-downstream-evidence/v1` linking reviewed manifest/native-input fingerprints to exact generated record and status-query identities, plus `slo-rules-engine/sloth-downstream-evidence-status/v1` freshness output |
 | Live SLO status | `slo-rules-engine/live-slo-status/v1` for one manifest or `slo-rules-engine/live-slo-status-aggregate/v1` for a release/portfolio, with exact target coverage, state counts, reviewed identity/context, objective attainment, remaining budget, burn windows, provider resource names, timestamps, freshness, and machine-readable findings |
 | Datadog sandbox smoke | `slo-rules-engine/datadog-sandbox-smoke/v1` JSON with public-safe read checks and optional temporary-dashboard lifecycle evidence |
 
@@ -60,7 +62,8 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Operation journal | Confirmed apply/prune persists request method/path, returned resource ID, response fingerprint, sanitized failures, and terminal backend verification | Confirmed apply/prune persists operation attempts and terminal per-file convergence evidence | Confirmed apply/prune persists verified engine-owned file outcomes and records external-generator handoff as intentionally skipped and pending |
 | Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
 | Verified release output | Deferred until live bundle recheck semantics are proven | Fresh expected/actual evidence for every approved managed file and a `verified` bundle target | Fresh engine-owned file evidence plus explicit pending external-generator/downstream status |
-| Live status | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records; aggregate output embeds the complete target report | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage until downstream Sloth-generated recording-rule identity is captured |
+| Downstream identity evidence | Not applicable | Generated recording-rule identities already exist in the reviewed manifest | Content-addressed reviewed mapping from current manifest/native input to saved Sloth-generated records and provider-specific status queries |
+| Live status | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records; aggregate output embeds the complete target report | Direct reads remain deferred; aggregate output remains explicit `unsupported` coverage until the reader consumes current downstream evidence |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
@@ -846,7 +849,79 @@ creates no SLO, monitor, route, or telemetry and does not bypass the reviewed
 manifest, journal, ownership, and verification gates of normal `apply` or
 `prune`.
 
-## Use Case 16: Inspect Live SLO And Error-Budget Status
+## Use Case 16: Review Sloth Downstream Generated Rules
+
+**Task:** prove that Prometheus recording rules generated by an externally run
+Sloth process still correspond exactly to the current reviewed Sloth manifest
+and native input before using those records for status or downstream release
+verification.
+
+Run the external handoff command recorded by Sloth `plan` or `apply`, save its
+Prometheus rule YAML, then capture the reviewed mapping:
+
+```bash
+bin/rules-ctl sloth-evidence capture \
+  --manifest=./managed/checkout-api/sloth/manifest.json \
+  --input=./managed/checkout-api/sloth/generated/sloth.yaml \
+  --generated-rules=./work/sloth-output/checkout-api-rules.yaml \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-08-04T12:00:00Z \
+  --output=./work/sloth-evidence/checkout-api.json
+```
+
+Repeat `--input` in manifest spec order when the reviewed manifest contains
+multiple `artifacts.sloth_specs` entries.
+
+Before relying on saved evidence, recheck every recorded source:
+
+```bash
+bin/rules-ctl sloth-evidence status \
+  ./work/sloth-evidence/checkout-api.json
+```
+
+**What to expect:**
+
+- Capture stdout and `--output` contain identical
+  `slo-rules-engine/sloth-downstream-evidence/v1`
+  `SlothDownstreamEvidence` JSON. Its `sloth-evidence-<sha256>` identity covers
+  the downstream review, current source fingerprints, exact generated record
+  identities, and provider-specific status bindings.
+- Every reviewed SLO includes its Sloth service/SLO/ID identity; objective,
+  allowed/remaining budget, current/period burn, time-period, metadata, base
+  and evaluation-window error-ratio records; exact selectors; source paths;
+  and reviewed objective/evaluation-window values.
+- The observation binding is the exact reviewed native
+  `sli.events.total_query`. Sloth's characterized default output has no
+  dedicated observation record, so the tool does not relabel an error ratio as
+  request volume. Success and freshness queries derive only from the captured
+  evaluation-window record inside this provider artifact.
+- Capture reads one reviewed manifest, every native input, and the saved
+  generated-rule YAML. Only after all checks pass does it write the explicit
+  output file. It makes zero provider reads and writes, loads no credentials,
+  executes no shell command, and does not run Sloth.
+- Missing review provenance, mismatched native inputs, missing/ambiguous or
+  unrelated recording rules, inconsistent Sloth IDs, objective/budget drift,
+  credential-like keys, unsafe YAML, or malformed sources print
+  `invalid_sloth_downstream_evidence`, include stable findings, exit one, and
+  leave the requested output absent.
+- Status stdout is one
+  `slo-rules-engine/sloth-downstream-evidence-status/v1`
+  `SlothDownstreamEvidenceStatus`. Fresh evidence reports every expected and
+  actual fingerprint and exits zero. Semantic source drift reports `stale`,
+  includes `stale_sloth_manifest`, `stale_sloth_native_input`, or
+  `stale_generated_rules`, and exits one.
+- Status validates the evidence schema, credential safety, and content ID
+  before reading its recorded source paths. A tampered evidence document fails
+  with `sloth_evidence_identity_mismatch` and does not trust those paths.
+- This artifact closes the reviewed generated-rule identity prerequisite. It
+  does not yet query Prometheus, enable direct Sloth `status`, or make release
+  bundle downstream verification complete.
+
+**Safety boundary:** PromQL names and queries remain provider evidence. The
+neutral SLO objective and response policy are unchanged, and reviewer
+attestation cannot authorize provider mutation.
+
+## Use Case 17: Inspect Live SLO And Error-Budget Status
 
 **Task:** answer whether reviewed Prometheus Stack SLOs for one service, one
 reviewed release, or an explicit service portfolio are attaining their
@@ -976,9 +1051,9 @@ bin/rules-ctl status \
   not the raw backend error message. The report never stores credentials.
 - No mode performs provider writes, configuration reloads, Kubernetes applies,
   Grafana changes, Alertmanager changes, or notification delivery.
-- Datadog direct reads remain postponed. Sloth direct reads remain unavailable
-  until the engine can link its external-generator handoff to downstream
-  recording-rule identities.
+- Datadog direct reads remain postponed. Sloth downstream identity evidence is
+  now available, but direct reads remain unavailable until the live-status
+  reader accepts and freshness-checks that evidence.
 
 **Intent preserved:** objective, evaluation window, calculation basis, and
 response context come from reviewed neutral intent. Release and portfolio
@@ -987,7 +1062,7 @@ it. PromQL record names and instant-query syntax stay in the Prometheus reader;
 the neutral status model contains only normalized values, identity, freshness,
 coverage, and findings.
 
-## Use Case 17: Operate The Reviewed Workflow From An AI Agent
+## Use Case 18: Operate The Reviewed Workflow From An AI Agent
 
 **Delivery status:** planned. AICLI-F1 has implemented the internal registry and
 the separate Human-to-Agent command catalog, but the Agent commands and strict
@@ -1035,7 +1110,7 @@ Current catalog mapping entity:
 }
 ```
 
-The implemented catalog contains this mapping shape for all 35 commands. It is
+The implemented catalog contains this mapping shape for all 37 commands. It is
 an internal versioned parity entity, not current CLI stdout. `agent catalog`
 will expose a bounded form in AICLI-F2.
 

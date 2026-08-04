@@ -193,6 +193,8 @@ Expected artifacts:
 - Prometheus event queries
 - page and ticket alert context labels
 - annotations carrying reviewed reliability intent
+- optional `slo-rules-engine/sloth-downstream-evidence/v1` reviewer evidence
+  linking current native input to saved generated Prometheus rules
 
 The Sloth provider does not execute the Sloth CLI or apply generated rules. It produces reviewable spec artifacts and an external-generator handoff plan.
 
@@ -205,11 +207,19 @@ Expected state behavior:
 - versioned provider-state plan/import evidence preserves native input state and external handoff intent
 - external-generator handoff commands point at the native Sloth spec files while retaining the reviewed engine manifest as provenance
 - no live backend mutation or Sloth CLI execution happens inside the engine
+- downstream evidence capture requires exact canonical manifest/native-input
+  parity, complete unambiguous record mappings for every reviewed SLO,
+  objective/budget agreement, reviewer attestation, and credential-free inputs
+- downstream evidence status validates content identity before rereading every
+  local source fingerprint; neither command makes a provider call
 
 Expected telemetry behavior:
 
 - reuse the Prometheus-compatible lookup and discovery baseline for onboarding and sanity checks
 - batch discovery support is inherited through the Prometheus-compatible discovery interface
+- direct live status remains deferred until the reader consumes fresh reviewed
+  downstream evidence; aggregate status continues to report Sloth as explicit
+  unsupported coverage
 
 ## Delivery Integrations
 

@@ -26,7 +26,8 @@ RulesCtl library orchestration + command-family modules
 
 `bin/rules-ctl` only loads `lib/slo_rules_engine/cli.rb` and dispatches `ARGV`.
 The library composes focused command-family modules for catalogs, onboarding,
-telemetry, reports, release bundles, journals, approved plans, and live status.
+telemetry, reports, release bundles, journals, approved plans, Sloth downstream
+evidence, and live status.
 Shared manifest/state orchestration remains in the library facade because those
 commands intentionally share definition loading, provider validation, review
 freshness, error rendering, and usage behavior.
@@ -36,7 +37,7 @@ freshness, error rendering, and usage behavior.
 The [Agent Interface Roadmap](agent-interface-roadmap.md) introduced one
 versioned command registry between interface adapters and current handlers.
 AICLI-F1 now implements `CommandDefinition`, `CommandRegistry`, and the separate
-`CommandCatalog` parity entity. The registry validates 35 immutable command
+`CommandCatalog` parity entity. The registry validates 37 immutable command
 definitions and drives current Human top-level and grouped-subcommand dispatch.
 The catalog pairs each executable Human command example with a planned
 versioned Agent JSON request.
@@ -94,6 +95,20 @@ Planning is observational. Confirmed mutation is fail-closed and journaled.
 identities and normalize objective, budget, burn, freshness, and coverage.
 Provider query syntax remains evidence in the reader. Live status never mutates
 provider state and never persists runtime endpoints.
+
+### Sloth Downstream Evidence
+
+`sloth/downstream_evidence.rb` owns the provider-specific bridge between one
+reviewed Sloth manifest/native input set and externally generated Prometheus
+rule YAML. It parses JSON and safe YAML structurally, validates complete
+per-SLO generated record identity and reviewed objective/budget agreement,
+persists a content-addressed reviewer attestation, and rechecks canonical
+source fingerprints without executing Sloth or contacting Prometheus.
+
+The artifact retains generated record selectors and the reviewed native total
+query as provider evidence. It does not add PromQL to the neutral model or
+change bundle/live-status behavior until those consumers explicitly accept the
+evidence schema.
 
 ## Primary Flows
 

@@ -80,6 +80,10 @@ Expected behavior:
 - unsupported actions fail clearly.
 - live API providers document credential requirements, retry behavior, and provider-schema translation limits.
 - manifest-bundle and external-generator providers document what gets written and what still requires an external handoff.
+- external-generator providers that later consume generated output define a
+  versioned, credential-free evidence artifact with source fingerprints,
+  reviewer attestation, complete/unique identity mapping, freshness status,
+  and explicit provider-I/O limits before enabling live reads.
 
 ## Contribution Checklist
 
@@ -96,6 +100,8 @@ Expected behavior:
 - Batch discovery tests cover invalid scope combinations and reusable normalized saved output where relevant.
 - Apply-plan tests cover dry-run behavior.
 - Negative-path tests cover unsupported scopes or missing credentials where relevant.
+- External generated-output tests cover missing, ambiguous, unrelated, stale,
+  and credential-bearing evidence where relevant.
 - Unsupported fields produce warnings.
 - `ruby -Ilib test/all_test.rb` passes.
 - `scripts/verify.sh` passes.

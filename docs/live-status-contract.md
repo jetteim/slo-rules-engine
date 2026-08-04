@@ -162,8 +162,9 @@ error class but never a raw backend error message or credential.
 ## Current Limits
 
 - no Datadog reader until safe live evidence work resumes
-- no Sloth reader until downstream generated recording-rule identity is
-  captured
+- no Sloth reader yet; the reviewed downstream generated-rule identity schema
+  now exists, but status does not consume it until the next provider-reader
+  slice adds freshness preflight and explicit runtime mapping
 - no automatic endpoint discovery or one-URL assumption across aggregate
   targets
 - freshness is evaluated from the success-ratio record; every provider sample

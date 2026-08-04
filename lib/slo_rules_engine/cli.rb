@@ -11,6 +11,7 @@ require_relative 'cli/onboarding_commands'
 require_relative 'cli/plan_commands'
 require_relative 'cli/report_commands'
 require_relative 'cli/status_commands'
+require_relative 'cli/sloth_evidence_commands'
 require_relative 'cli/telemetry_commands'
 
 module RulesCtl
@@ -21,6 +22,7 @@ module RulesCtl
   extend SloRulesEngine::CLI::PlanCommands
   extend SloRulesEngine::CLI::ReportCommands
   extend SloRulesEngine::CLI::StatusCommands
+  extend SloRulesEngine::CLI::SlothEvidenceCommands
   extend SloRulesEngine::CLI::TelemetryCommands
 
   module_function
@@ -701,6 +703,8 @@ module RulesCtl
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--journal-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
         bin/rules-ctl status (--provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] | --bundle=<bundle.json> [--target-base-url=<service/provider>=<url> ...] | --portfolio=<portfolio.json> [--target-base-url=<service/provider>=<url> ...]) [--max-age-seconds=<seconds>] [--output=<file>]
+        bin/rules-ctl sloth-evidence capture --manifest=<manifest.json> --input=<sloth.yaml> [--input=<sloth-N.yaml> ...] --generated-rules=<rules.yaml> --reviewer=<identity> --reviewed-at=<timestamp> --output=<evidence.json>
+        bin/rules-ctl sloth-evidence status <evidence.json>
         bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
         bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
         bin/rules-ctl bundle apply <apply-ready-bundle.json> --confirm --approved-plan=<approved-plan.json> [--approved-plan=<approved-plan.json> ...] --journal-dir=<dir> --output=<applied-bundle.json>

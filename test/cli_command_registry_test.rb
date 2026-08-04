@@ -14,6 +14,8 @@ class CliCommandRegistryTest < Minitest::Test
     import
     prune
     status
+    sloth-evidence.capture
+    sloth-evidence.status
     bundle.create
     bundle.plan
     bundle.apply
@@ -133,6 +135,19 @@ class CliCommandRegistryTest < Minitest::Test
     assert_equal 'none', providers.side_effect
     assert providers.io.values.all?(&:empty?)
     assert_empty providers.output.fetch(:persisted_artifacts)
+
+    capture = @registry.fetch('sloth-evidence.capture')
+    assert_equal 'local_write', capture.side_effect
+    assert_empty capture.io.fetch(:provider_reads)
+    assert_empty capture.io.fetch(:provider_writes)
+    assert_empty capture.io.fetch(:credentials)
+    assert_includes capture.safety_gates, 'reviewer_attestation'
+    assert_includes capture.output.fetch(:persisted_artifacts), 'sloth_downstream_evidence'
+
+    status = @registry.fetch('sloth-evidence.status')
+    assert_equal 'local_read', status.side_effect
+    assert_includes status.safety_gates, 'evidence_freshness'
+    assert_empty status.io.fetch(:provider_reads)
   end
 
   def test_separate_catalog_pairs_human_commands_with_agent_json_requests

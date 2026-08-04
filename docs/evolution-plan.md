@@ -208,7 +208,7 @@ contract and with existing reliability/mutation gates intact.
 **Measures:**
 
 - Every current command has Human/Agent registry and catalog coverage. AICLI-F1
-  meets this for all 35 current commands; executable equivalence remains an
+  meets this for all 37 current commands; executable equivalence remains an
   Agent CLI rollout gate.
 - Runtime schemas require no backend, network, or credentials.
 - Every write-capable command passes zero-I/O validation-only tests.

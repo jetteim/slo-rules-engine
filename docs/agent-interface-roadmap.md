@@ -9,7 +9,7 @@
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
 **Delivery status:** AICLI-F1 is implemented. The Human CLI now dispatches
-through a validated 35-command registry, and a separate versioned command
+through a validated 37-command registry, and a separate versioned command
 catalog pairs each current Human CLI example with its planned Agent CLI JSON
 request. The Agent CLI, runtime catalog/describe commands, strict request
 schemas, agent skill, response sanitizer, and MCP adapter remain planned.
@@ -46,7 +46,7 @@ Therefore the article's raw-payload guidance is adapted as follows:
 | Article capability | Current baseline | Roadmap gap and decision |
 | --- | --- | --- |
 | Raw Structured Requests Alongside Convenience Flags | Commands already consume JSON manifests, telemetry envelopes, bundles, journals, and plans, but orchestration still depends on positional arguments and bespoke flags. | Add one strict Agent CLI request object per command while retaining existing Human CLI syntax. |
-| Runtime Schema Introspection | A validated internal command registry and separate Human-to-Agent command catalog now cover all 35 commands, but neither is exposed through a supported CLI command and strict request/result/error schemas remain planned. | Add offline `agent catalog` and `agent describe` from the implemented registry/catalog foundation. |
+| Runtime Schema Introspection | A validated internal command registry and separate Human-to-Agent command catalog now cover all 37 commands, but neither is exposed through a supported CLI command and strict request/result/error schemas remain planned. | Add offline `agent catalog` and `agent describe` from the implemented registry/catalog foundation. |
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
 | Input Hardening | Manifest, bundle, credential-key, ownership, and managed-path validation are strong but distributed. There is no shared agent-input policy or adversarial fuzz suite. | Add strict request schemas, field-specific path/ID/URL rules, size/depth limits, and generated-input testing. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
@@ -145,6 +145,7 @@ interface syntax into domain handlers:
 | `import` | Yes | Full parity | Yes |
 | `prune` | Yes | Validate, plan, and confirmed execution remain distinct | Yes, mutation metadata mandatory |
 | `status` | Yes | Manifest, bundle, and portfolio forms | Yes |
+| `sloth-evidence capture/status` | Yes | Full parity with local-only side effects and reviewer/freshness gates | Yes |
 | `bundle create/plan/apply/verify/status` | Yes | Full lifecycle parity | Yes |
 | `journal create/status` | Yes | Full parity | Yes |
 | `plan approve/status/apply/resume` | Yes | Full parity with review and confirmation | Yes |
@@ -219,7 +220,7 @@ interface syntax into domain handlers:
 **Acceptance criteria:** every current command has an ID, versions, Human CLI mapping, request/result/error schema references, side effects, safety gates, provider I/O, output controls, and parity test; missing metadata blocks registry validation.
 
 **Evidence:** `CommandRegistry` validates completeness, uniqueness, immutability,
-root-adapter consistency, and required metadata for 35 commands. Human top-level
+root-adapter consistency, and required metadata for 37 commands. Human top-level
 and grouped-subcommand dispatch resolve through it. `CommandCatalog` is a
 separate versioned entity pairing current Human commands with planned Agent JSON
 requests. Existing CLI characterization remains unchanged. Strict executable
@@ -321,7 +322,9 @@ After drafting this roadmap, every recommendation in the source article was chec
 | Keep human ergonomics | AICLI-FR-001/004/025/026; AICLI-F7 | Covered with backward compatibility and mandatory dual-interface updates. |
 | Test agent-specific mistakes | AICLI-NFR-011/012; AICLI-F3/F7 | Covered with generated/fuzz inputs and fail-closed isolation. |
 
-No article theme remains orphaned at roadmap level. Implementation remains entirely open and must progress through the feature gates above; this revalidation does not claim that the Agent CLI or MCP already exists.
+No article theme remains orphaned at roadmap level. AICLI-F1 is implemented;
+AICLI-F2 through F7 remain open and must progress through the feature gates
+above. This revalidation does not claim that the Agent CLI or MCP exists.
 
 ## Accepted Deferrals
 

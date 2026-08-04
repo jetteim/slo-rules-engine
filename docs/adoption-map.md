@@ -80,6 +80,8 @@ retain each target's evidence and make unsupported coverage explicit.
 - release-bundle source validation before live reads
 - credential-free portfolio inputs and explicit per-target runtime endpoints
 - aggregate target/state rollups with retained partial query-failure evidence
+- content-addressed reviewed Sloth downstream identity evidence with local
+  freshness checks and no backend access
 
 ### 6. Reviewed Workflow To Agent-Safe Automation
 
@@ -93,7 +95,7 @@ gates; MCP later projects the same registry.
 
 **Needed capability increments:**
 
-- implemented single versioned command registry and separate 35-command
+- implemented single versioned command registry and separate 37-command
   Human-to-Agent JSON parity catalog
 - strict raw command-request JSON plus offline catalog/schema introspection
 - shared adversarial input validation and zero-I/O `validate_only`
@@ -112,13 +114,12 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. capture reviewed Sloth downstream generated-rule identity as explicit
-   evidence before attempting Sloth live status or downstream bundle
-   verification
+1. add Sloth live status using the implemented fresh reviewed downstream
+   evidence contract and explicit Prometheus runtime configuration
 2. keep Datadog live status, contract testing, exact apply/resume, and live
    bundle verification postponed until isolated credentials are available
-3. add Sloth live status only after downstream generated recording-rule
-   identity is captured as reviewed evidence
+3. extend release-bundle Sloth downstream verification only after the
+   evidence-backed live reader is proven
 4. resume AICLI-F2 from the implemented registry/catalog foundation when the
    provider-evidence checkpoint is complete
 

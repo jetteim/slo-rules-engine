@@ -19,6 +19,7 @@ class CliArchitectureTest < Minitest::Test
     SloRulesEngine::CLI::PlanCommands => %i[plan],
     SloRulesEngine::CLI::ReportCommands => %i[migration_report model_report],
     SloRulesEngine::CLI::StatusCommands => %i[status],
+    SloRulesEngine::CLI::SlothEvidenceCommands => %i[sloth_evidence],
     SloRulesEngine::CLI::TelemetryCommands => %i[
       lookup_telemetry
       discover_telemetry

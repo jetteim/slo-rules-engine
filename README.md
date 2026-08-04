@@ -20,6 +20,8 @@ Use the toolkit to:
 - persist a deterministic operation journal from one verified dry-run provider plan
 - apply or prune reviewed artifacts through explicit confirmed workflows
 - run telemetry reality checks before treating an SLO as operationally ready
+- capture reviewed, content-addressed Sloth generated-rule identity without
+  running Sloth or contacting Prometheus
 - read current Prometheus-compatible SLO attainment, remaining error budget,
   burn rate, and telemetry freshness from one reviewed manifest
 - validate Datadog credentials and dashboard reconciliation in an isolated
@@ -27,7 +29,7 @@ Use the toolkit to:
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
-Phase 14 foundation is implemented as a validated 35-command catalog and
+Phase 14 foundation is implemented as a validated 37-command catalog and
 registry. It pairs each current Human CLI example with a planned Agent CLI JSON
 request and now owns Human command dispatch. The
 [Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the remaining
@@ -74,6 +76,14 @@ fingerprints before reading managed state, then records one
 engine-owned files must converge; Sloth downstream generator/Prometheus evidence
 remains explicitly pending. Datadog and mixed live/file bundles are rejected
 before target reads.
+
+After an operator runs Sloth externally, `sloth-evidence capture` can bind the
+reviewed manifest and native input fingerprints to the saved generated
+Prometheus recording rules. The content-addressed artifact preserves exact
+objective, budget, burn, metadata, error-ratio, observation-query, and
+freshness bindings. `sloth-evidence status` rereads those local sources and
+fails when their semantic fingerprints drift. This standalone evidence does
+not yet make Sloth live status or bundle downstream verification complete.
 
 ## Usage By Use Case
 
@@ -352,6 +362,34 @@ bin/rules-ctl reality-check \
 
 The report identifies missing metrics, absent series, incomplete histogram evidence, and other provider-binding gaps. It does not silently adjust the reviewed objective or calculation basis.
 
+### Review Sloth-generated recording rules
+
+After running the external `sloth generate` handoff, bind its saved output back
+to the reviewed engine artifacts:
+
+```bash
+bin/rules-ctl sloth-evidence capture \
+  --manifest=./managed/checkout-api/sloth/manifest.json \
+  --input=./managed/checkout-api/sloth/generated/sloth.yaml \
+  --generated-rules=./work/sloth-output/checkout-api-rules.yaml \
+  --reviewer=team/payments-sre \
+  --reviewed-at=2026-08-04T12:00:00Z \
+  --output=./work/sloth-evidence/checkout-api.json
+
+bin/rules-ctl sloth-evidence status \
+  ./work/sloth-evidence/checkout-api.json
+```
+
+Capture prints and saves the same
+`slo-rules-engine/sloth-downstream-evidence/v1` JSON. It requires complete,
+unambiguous generated-record coverage for every reviewed SLO, matching native
+inputs, objective/budget agreement, reviewer attestation, and credential-free
+sources. Status prints
+`slo-rules-engine/sloth-downstream-evidence-status/v1`; fresh evidence exits
+zero, while stale source fingerprints exit one with stable findings. Both
+commands are local: neither runs Sloth nor reads or mutates a provider. See
+[Sloth Downstream Evidence](docs/sloth-downstream-evidence.md).
+
 ### Inspect live SLO and error-budget status
 
 Read the generated recording-rule series for one reviewed Prometheus Stack
@@ -463,6 +501,8 @@ The initial delivery integration is `notification_router`, which generates conte
   and full dashboard details; manual dashboard-list membership is not required
   for discovery, import, apply verification, or prune ownership.
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
+- Sloth downstream evidence capture is local and credential-free; it requires
+  complete reviewed record identity and does not run Sloth or query Prometheus.
 - Exact file-backed apply rejects changed observed state and same-scope
   concurrency before executing the stored operation list.
 - Live status is read-only, requires reviewed manifest provenance, validates
@@ -478,6 +518,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Release Bundle Contract](docs/release-bundle-contract.md)
 - [Provider State Contract](docs/provider-state-contract.md)
 - [Live SLO Status Contract](docs/live-status-contract.md)
+- [Sloth Downstream Evidence](docs/sloth-downstream-evidence.md)
 - [Datadog Public Contract Evidence](docs/datadog-contract-evidence.md)
 - [Datadog Sandbox Testing](docs/datadog-sandbox-testing.md)
 - [Provider Contract](docs/provider-contract.md)

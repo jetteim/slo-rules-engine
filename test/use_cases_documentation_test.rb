@@ -81,6 +81,14 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes readme, '--max-age-seconds=300'
     assert_includes readme, '--bundle=./work/release-bundle.json'
     assert_includes readme, 'slo-rules-engine/live-slo-status-aggregate/v1'
+    assert_includes document, 'Review Sloth Downstream Generated Rules'
+    assert_includes document, 'bin/rules-ctl sloth-evidence capture'
+    assert_includes document, 'bin/rules-ctl sloth-evidence status'
+    assert_includes document, 'slo-rules-engine/sloth-downstream-evidence/v1'
+    assert_includes document, 'slo-rules-engine/sloth-downstream-evidence-status/v1'
+    assert_includes document, 'stale_generated_rules'
+    assert_includes document, 'zero provider reads and writes'
+    assert_includes readme, 'Sloth Downstream Evidence'
   end
 
   private

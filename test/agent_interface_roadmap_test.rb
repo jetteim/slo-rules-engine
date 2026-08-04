@@ -27,6 +27,7 @@ class AgentInterfaceRoadmapTest < Minitest::Test
     'import',
     'prune',
     'status',
+    'sloth-evidence capture/status',
     'bundle create/plan/apply/verify/status',
     'journal create/status',
     'plan approve/status/apply/resume',
@@ -101,11 +102,11 @@ class AgentInterfaceRoadmapTest < Minitest::Test
     assert_includes design, 'Human CLI adapter'
     assert_includes design, 'Agent CLI adapter'
     assert_includes design, 'CommandCatalog'
-    assert_includes use_cases, '## Use Case 17: Operate The Reviewed Workflow From An AI Agent'
+    assert_includes use_cases, '## Use Case 18: Operate The Reviewed Workflow From An AI Agent'
     assert_includes use_cases, '**Delivery status:** planned'
     assert_includes use_cases, 'slo-rules-engine/cli-command-catalog/v1'
     assert_includes readme, 'Agent Interface Roadmap'
-    assert_includes readme, '35-command catalog'
+    assert_includes readme, '37-command catalog'
     assert_includes File.read(ROADMAP_PATH), '**AICLI-F1 status:** implemented'
   end
 

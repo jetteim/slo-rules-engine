@@ -147,6 +147,14 @@ Explicit features:
   Datadog resume, non-resumable operation retry, automatic rollback execution,
   and live/file mixed-bundle apply or verification remain explicit future work.
 - **External-generator import:** Sloth import reads the managed manifest and every expected native input and reports missing external-generator input files.
+- **Reviewed Sloth downstream evidence:** `sloth-evidence capture` structurally
+  maps current reviewed Sloth manifest/native-input fingerprints to saved
+  generated Prometheus records, exact provider status queries, and downstream
+  reviewer attestation in one content-addressed credential-free artifact.
+- **Sloth evidence freshness:** `sloth-evidence status` validates artifact
+  identity before rereading manifest, native input, and generated-rule sources;
+  semantic drift returns stable stale findings and a nonzero exit without any
+  backend call.
 - **Future provider contract:** new providers must document generation, reality-check, telemetry lookup, and apply behavior before being considered production-grade.
 
 ## Sloth Provider Generation
@@ -160,6 +168,16 @@ manifest plus native Sloth YAML input files under
 and verified engine-owned file fingerprints, then marks the external
 `sloth generate` handoff as intentionally skipped and pending; the engine still
 does not execute the Sloth CLI or mutate downstream Prometheus resources.
+
+After external generation, `rules-ctl sloth-evidence capture` requires current
+reviewed manifest/native-input parity, complete unambiguous generated-rule
+coverage for every SLO, objective and allowed-budget agreement, one consistent
+Sloth identity, explicit reviewer/timestamp attestation, and credential-free
+sources. It preserves the reviewed native total-event query for observations
+because characterized Sloth output has no dedicated observation record.
+`sloth-evidence status` rechecks every canonical source fingerprint. These
+commands make no provider call and do not yet enable the Sloth live reader or
+downstream bundle verification.
 
 ## Prometheus Stack Provider Generation
 
@@ -197,8 +215,9 @@ manifests, stale bundles, invalid portfolios, and incomplete or unknown
 per-target runtime mappings fail before backend access. Mixed-provider
 aggregates retain Datadog and Sloth targets as explicit unsupported coverage;
 an input with no readable target fails. Runtime URLs and raw backend error
-messages are not copied into reports. Datadog and Sloth readers remain
-deferred until their backend evidence contracts are available.
+messages are not copied into reports. Datadog remains evidence-gated. Sloth's
+downstream identity contract now exists, while its reader remains the next
+provider-status implementation slice.
 
 ## Planned Agent-Operable Interfaces
 
@@ -208,7 +227,7 @@ MCP surfaces are not implemented yet.
 
 Implemented foundation:
 
-- **Validated command registry:** all 35 current command IDs declare Human and
+- **Validated command registry:** all 37 current command IDs declare Human and
   planned Agent mappings, contract references, side effects, local/provider
   I/O, credential categories, safety gates, output controls, and MCP
   eligibility. Missing or duplicate metadata fails closed.
