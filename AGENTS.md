@@ -555,14 +555,14 @@ Rationale:
 
 ## Next Session Handoff
 
-Prepared on 2026-08-03 for a restart-and-`proceed` workflow.
+Prepared on 2026-08-04 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest verified checkpoint: `95566ab docs: add agent-safe CLI roadmap`
-- previous verified checkpoint: `afbe5db feat: verify applied file release
-  bundles`
+- latest verified checkpoint: `83f5dfa feat: add shared CLI command registry`
+- previous verified checkpoint: `574fc11 docs: hand off agent CLI roadmap
+  checkpoint`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff:
@@ -571,55 +571,53 @@ Current safe boundary:
 
 Verification evidence:
 
-- target: article-derived Agent Interface Roadmap, current-command parity
-  inventory, dual-interface maintenance rule, and roadmap traceability
+- target: AICLI-F1 shared command definitions, registry-driven Human CLI
+  dispatch, and a separate versioned Human-to-Agent command catalog
 - command: `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh`
-- recorded timestamp: `2026-08-03T09:44:58Z`
+- recorded timestamp: `2026-08-04T17:43:11Z`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 436 tests, 3,086 assertions, 0 failures,
+- result: exit 0, `verification ok`, 442 tests, 5,193 assertions, 0 failures,
   0 errors, 0 skips
-- focused result: `ruby -Ilib test/agent_interface_roadmap_test.rb` passed with
-  4 tests, 249 assertions, 0 failures, 0 errors
-- article revalidation: the published article was reread after the roadmap was
-  added; deterministic headless output precedence, exactly-once URL path
-  encoding, noninteractive identity, skill frontmatter/context, and explicit
-  extension deferral were added where the second pass found underspecified
-  coverage
+- focused result: `ruby -Ilib test/cli_command_registry_test.rb` passed with
+  6 tests, 2,089 assertions, 0 failures, 0 errors; roadmap, use-case,
+  architecture, Human CLI, and rules-ctl focused suites also passed
+- parity evidence: the registry and catalog contain the same 35 stable command
+  IDs, every registered command has one current Human CLI usage and one
+  versioned target Agent JSON request, and duplicate IDs/paths fail validation
 - runtime note: macOS system Ruby 2.6.10 lacks `Array#filter_map`, already used
   throughout the repository; the canonical suite passed with installed Ruby
-  4.0.1. No runtime compatibility code was changed in this documentation slice.
+  4.0.1. No runtime compatibility code was changed in this implementation slice.
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
-- live verification: not required. The checkpoint defines roadmap and
-  compatibility contracts, adds structural coverage, and corrects one missing
-  Human CLI usage line; it performs no provider reads or writes. Datadog live
-  testing remains postponed.
-- blast radius: roadmap, project priorities, architecture/evolution/features,
-  engineering use cases, provider contribution guidance, permanent CLI
-  maintenance rules, and Human CLI usage text. Existing handler, provider,
-  neutral intent, artifact schema, and state behavior are unchanged.
-- rollback path: revert `95566ab docs: add agent-safe CLI roadmap`
+- live verification: not required. Registry serialization and dispatch tests
+  are credential-free, and this slice performs no provider reads or writes.
+  Datadog live testing remains postponed.
+- blast radius: top-level and grouped Human CLI routing now resolves immutable
+  command definitions from the registry. Existing leaf handlers, arguments,
+  stdout, exit semantics, provider logic, neutral intent, artifact schemas,
+  state behavior, and mutation gates are unchanged. Agent invocation remains
+  planned metadata and is not executable yet.
+- rollback path: revert `83f5dfa feat: add shared CLI command registry`
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping; the atomic checkpoint and Phase 9 are complete.
-4. Use TDD to implement AICLI-F1 from
-   `docs/agent-interface-roadmap.md`: define the versioned command definition
-   and registry, then register all current Human CLI commands without changing
-   behavior.
-5. Derive inventory/parity validation from the registry and characterize
-   current Human CLI normalization/stdout/exit behavior. Do not implement MCP
-   or expose agent mutation in this first slice.
-6. Update both Human and target Agent CLI mappings, runtime metadata, README,
-   and engineering use cases for every CLI change, as required by the new
-   permanent rule.
-7. Keep the reviewed Sloth downstream-evidence feature immediately after
-   AICLI-F1 in provider-feature priority.
-8. Keep Datadog live testing postponed unless the user explicitly reopens it
+4. Use TDD to implement the reviewed Sloth downstream-evidence artifact in the
+   recommended next slice; keep it credential-free and read-only.
+5. Parse saved Sloth-generated Prometheus rule YAML structurally and require
+   reviewed, complete, unambiguous mappings back to current manifest/native
+   input fingerprints.
+6. Update usage with exact stdout, saved artifact, source-read, provider-I/O,
+   and refusal expectations for the new workflow.
+7. Preserve the completed AICLI-F1 registry/catalog parity and update both the
+   Human CLI usage and target Agent JSON mapping for every CLI change.
+8. Keep AICLI-F2 behind the Sloth evidence checkpoint; Agent CLI invocation is
+   not implemented by the AICLI-F1 metadata alone.
+9. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-9. Preserve release-bundle predecessor immutability, exact-plan, review,
+10. Preserve release-bundle predecessor immutability, exact-plan, review,
    journal, live-status, and mutation gates exactly.
 
 ## Verification Commands
@@ -628,6 +626,7 @@ Use these before claiming a checkpoint:
 
 ```bash
 ruby -Ilib test/agent_interface_roadmap_test.rb
+ruby -Ilib test/cli_command_registry_test.rb
 ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
 ruby -Ilib test/cli_architecture_test.rb
@@ -670,12 +669,12 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Read `docs/agent-interface-roadmap.md`, especially AICLI-F1, the parity
-   inventory, requirements, and verification strategy
-6. Inspect `lib/slo_rules_engine/cli.rb`, its command-family modules, and current
-   CLI characterization tests
-7. If the user says `proceed`, implement AICLI-F1 with TDD and no command
-   behavior change
+5. Read `docs/agent-interface-roadmap.md` for the completed AICLI-F1 boundary
+   and deferred AICLI-F2 execution contract
+6. Inspect `lib/slo_rules_engine/cli/command_registry.rb` and
+   `test/cli_command_registry_test.rb` before changing any CLI surface
+7. If the user says `proceed`, implement the reviewed Sloth downstream-evidence
+   artifact with TDD and no provider call
 8. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
 9. Keep Datadog live testing postponed and preserve every exact-plan, review,
