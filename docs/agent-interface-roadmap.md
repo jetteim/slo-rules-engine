@@ -8,7 +8,11 @@
 
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
-**Delivery status:** roadmap only. The Human CLI is implemented. The Agent CLI, runtime command registry, agent skill, response sanitizer, and MCP adapter described here do not exist yet.
+**Delivery status:** AICLI-F1 is implemented. The Human CLI now dispatches
+through a validated 35-command registry, and a separate versioned command
+catalog pairs each current Human CLI example with its planned Agent CLI JSON
+request. The Agent CLI, runtime catalog/describe commands, strict request
+schemas, agent skill, response sanitizer, and MCP adapter remain planned.
 
 ## Article Summary And Intent
 
@@ -42,11 +46,11 @@ Therefore the article's raw-payload guidance is adapted as follows:
 | Article capability | Current baseline | Roadmap gap and decision |
 | --- | --- | --- |
 | Raw Structured Requests Alongside Convenience Flags | Commands already consume JSON manifests, telemetry envelopes, bundles, journals, and plans, but orchestration still depends on positional arguments and bespoke flags. | Add one strict Agent CLI request object per command while retaining existing Human CLI syntax. |
-| Runtime Schema Introspection | Output artifacts are versioned and documented, but there is no offline command catalog or queryable request/result schema. | Add `agent catalog` and `agent describe` from a versioned command registry. |
+| Runtime Schema Introspection | A validated internal command registry and separate Human-to-Agent command catalog now cover all 35 commands, but neither is exposed through a supported CLI command and strict request/result/error schemas remain planned. | Add offline `agent catalog` and `agent describe` from the implemented registry/catalog foundation. |
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
 | Input Hardening | Manifest, bundle, credential-key, ownership, and managed-path validation are strong but distributed. There is no shared agent-input policy or adversarial fuzz suite. | Add strict request schemas, field-specific path/ID/URL rules, size/depth limits, and generated-input testing. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
-| Multiple Surfaces From One Contract | The executable and Ruby library share orchestration; there is no Agent CLI or MCP server. Headless Datadog credentials already come from environment variables. | Use one registry for Human CLI, Agent CLI, schema introspection, skills metadata, and a later MCP stdio adapter. |
+| Multiple Surfaces From One Contract | Human top-level and grouped-subcommand dispatch now resolve through one registry; the paired Agent JSON mappings are planned contracts only. There is no Agent CLI or MCP server. | Extend the same registry/catalog into Agent CLI validation, schema introspection, skills metadata, and a later MCP stdio adapter. |
 | Validation-Only Safety And Response Sanitization | Mutation planning, confirmation, review gates, journals, and sanitized backend errors exist. Some current dry-run planning may read backend state, and there is no prompt-injection-aware response policy. | Add a distinct `validate_only` mode with no backend calls or writes, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
 
 ## Target Architecture
@@ -79,6 +83,12 @@ The single command registry owns:
 - MCP eligibility and tool metadata
 - examples and skill guidance references
 
+The separate `slo-rules-engine/cli-command-catalog/v1` entity is the compact
+parity view. Every entry contains `id`, `human_cli`, and `agent_cli_json`. The
+Human form is executable now. The Agent JSON form is a versioned target request
+example and is not executable until AICLI-F2 provides strict schemas and the
+Agent CLI adapter.
+
 Adapters only parse or render. They do not reimplement review policy, provider translation, state planning, or mutation logic.
 
 ## Capability Map
@@ -102,6 +112,25 @@ The two CLI sub-interfaces are:
 Feature parity means both sub-interfaces reach the same command handler with equivalent normalized inputs and enforce identical provider support, review evidence, freshness, exact-plan, confirmation, journal, credential, mutation, and refusal rules. Syntax and presentation may differ; reliability semantics and side effects may not.
 
 No CLI feature is complete when only one sub-interface exposes it. A command may be intentionally unavailable from both interfaces until its safety contract exists, but it may not silently exist in only one. Once MCP ships, its eligible tool inventory must also be generated from this registry and parity-tested.
+
+The implemented command catalog makes that comparison explicit without mixing
+interface syntax into domain handlers:
+
+```json
+{
+  "id": "bundle.verify",
+  "human_cli": "bin/rules-ctl bundle verify ./applied.json --output=./verified.json",
+  "agent_cli_json": {
+    "schema_version": "slo-rules-engine/agent-command-request/v1",
+    "command_id": "bundle.verify",
+    "command_version": 1,
+    "arguments": {
+      "bundle_file": "./applied.json",
+      "output_file": "./verified.json"
+    }
+  }
+}
+```
 
 ### Current Command Inventory To Preserve
 
@@ -183,9 +212,18 @@ No CLI feature is complete when only one sub-interface exposes it. A command may
 
 ### AICLI-F1: Shared Command Registry And Parity Baseline
 
+**AICLI-F1 status:** implemented.
+
 **Value:** establishes one inventory and makes interface drift measurable before adding another adapter.
 
 **Acceptance criteria:** every current command has an ID, versions, Human CLI mapping, request/result/error schema references, side effects, safety gates, provider I/O, output controls, and parity test; missing metadata blocks registry validation.
+
+**Evidence:** `CommandRegistry` validates completeness, uniqueness, immutability,
+root-adapter consistency, and required metadata for 35 commands. Human top-level
+and grouped-subcommand dispatch resolve through it. `CommandCatalog` is a
+separate versioned entity pairing current Human commands with planned Agent JSON
+requests. Existing CLI characterization remains unchanged. Strict executable
+Agent request schemas remain AICLI-F2 scope.
 
 **Architecture impact:** new command-contract component between adapters and existing handlers; no provider or neutral-model dependency reversal.
 
@@ -239,7 +277,7 @@ No CLI feature is complete when only one sub-interface exposes it. A command may
 
 ## Delivery Order
 
-1. Deliver AICLI-F1 as the architectural foundation and register current commands without changing their behavior.
+1. AICLI-F1 delivered the architectural foundation and registered current commands without changing their behavior.
 2. Deliver AICLI-F2 first for read-only catalog, validation, reporting, and one state-planning vertical slice; expand only through registry-backed mappings.
 3. Complete AICLI-F3 before exposing any Agent CLI local write or provider mutation.
 4. Deliver AICLI-F4 for high-volume discovery/status/reporting paths before claiming context-safe operation.

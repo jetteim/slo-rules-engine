@@ -31,15 +31,21 @@ Shared manifest/state orchestration remains in the library facade because those
 commands intentionally share definition loading, provider validation, review
 freshness, error rendering, and usage behavior.
 
-### Planned Command Contract And Agent Interfaces
+### Command Contract And Planned Agent Interfaces
 
-The [Agent Interface Roadmap](agent-interface-roadmap.md) introduces one
+The [Agent Interface Roadmap](agent-interface-roadmap.md) introduced one
 versioned command registry between interface adapters and current handlers.
+AICLI-F1 now implements `CommandDefinition`, `CommandRegistry`, and the separate
+`CommandCatalog` parity entity. The registry validates 35 immutable command
+definitions and drives current Human top-level and grouped-subcommand dispatch.
+The catalog pairs each executable Human command example with a planned
+versioned Agent JSON request.
+
 The Human CLI adapter preserves existing positional/convenience syntax. The
-Agent CLI adapter accepts strict complete JSON requests and returns stable JSON
-or NDJSON envelopes. Runtime catalog/schema output, field projection, limits,
-side-effect metadata, input hardening, validation-only behavior, sanitization,
-skill guidance, and MCP schemas all derive from the same registry.
+planned Agent CLI adapter will validate strict complete JSON requests and return
+stable JSON or NDJSON envelopes. Runtime catalog/schema output, field
+projection, limits, input hardening, validation-only behavior, sanitization,
+skill guidance, and MCP schemas must derive from this implemented foundation.
 
 The registry is an orchestration contract, not a second policy layer. It cannot
 override neutral intent, provider validation, reviewed evidence, ownership,
@@ -140,6 +146,8 @@ reviewed Prometheus Stack manifest
   shared handlers; adapters must not call provider collaborators directly.
 - Command schema, side-effect metadata, skill guidance, and MCP tool metadata
   must not become independent sources of truth.
+- `CommandCatalog` is the compact Human-command to Agent-JSON parity view;
+  `CommandRegistry` remains the validated resolver and full metadata source.
 - Delivery integrations route alert context but do not evaluate SLOs.
 - File and backend mutations require explicit confirmation and durable
   execution evidence.

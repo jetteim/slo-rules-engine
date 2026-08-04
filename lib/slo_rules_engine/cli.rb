@@ -3,6 +3,7 @@
 require 'optparse'
 require 'fileutils'
 require_relative '../sre'
+require_relative 'cli/command_registry'
 require_relative 'cli/catalog_commands'
 require_relative 'cli/bundle_commands'
 require_relative 'cli/journal_commands'
@@ -24,68 +25,25 @@ module RulesCtl
 
   module_function
 
+  def command_registry
+    SloRulesEngine::CLI::CommandRegistry.default
+  end
+
+  def dispatch_registered_subcommand(root, argv, usage)
+    subcommand = argv.shift
+    definition = command_registry.find_human([root, subcommand])
+    abort_usage(usage) unless definition
+
+    public_send(definition.handler, argv)
+  end
+
   def run(argv)
     command = argv.shift
     abort_usage unless command
+    handler = command_registry.handler_for_human_root(command)
+    abort_usage("unknown command: #{command}") unless handler
 
-    case command
-    when 'validate'
-      validate(argv)
-    when 'validate-handoff'
-      validate_handoff(argv)
-    when 'generate'
-      generate(argv)
-    when 'manifest-review'
-      manifest_review(argv)
-    when 'apply'
-      apply(argv)
-    when 'diff'
-      diff(argv)
-    when 'import'
-      import_existing(argv)
-    when 'prune'
-      prune(argv)
-    when 'status'
-      status(argv)
-    when 'bundle'
-      bundle(argv)
-    when 'journal'
-      journal(argv)
-    when 'plan'
-      plan(argv)
-    when 'lookup-telemetry'
-      lookup_telemetry(argv)
-    when 'discover-telemetry'
-      discover_telemetry(argv)
-    when 'providers'
-      providers(argv)
-    when 'integrations'
-      integrations(argv)
-    when 'generate-routes'
-      generate_routes(argv)
-    when 'candidates'
-      candidates(argv)
-    when 'draft-definition'
-      draft_definition(argv)
-    when 'draft-from-handoff'
-      draft_from_handoff(argv)
-    when 'onboarding-summary'
-      onboarding_summary(argv)
-    when 'onboarding-artifact-index'
-      onboarding_artifact_index(argv)
-    when 'review-handoff'
-      review_handoff(argv)
-    when 'recommend-calculation-basis'
-      recommend_calculation_basis(argv)
-    when 'reality-check'
-      reality_check(argv)
-    when 'migration-report'
-      migration_report(argv)
-    when 'model-report'
-      model_report(argv)
-    else
-      abort_usage("unknown command: #{command}")
-    end
+    public_send(handler, argv)
   end
 
   def validate(argv)

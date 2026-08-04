@@ -93,7 +93,8 @@ gates; MCP later projects the same registry.
 
 **Needed capability increments:**
 
-- single versioned command registry covering every current command
+- implemented single versioned command registry and separate 35-command
+  Human-to-Agent JSON parity catalog
 - strict raw command-request JSON plus offline catalog/schema introspection
 - shared adversarial input validation and zero-I/O `validate_only`
 - field masks, limits/cursors, NDJSON, explicit truncation, and response
@@ -111,15 +112,15 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. establish the Phase 14 shared command registry and complete Human CLI command
-   inventory/parity metadata without changing existing behavior
-2. capture reviewed Sloth downstream generated-rule identity as explicit
+1. capture reviewed Sloth downstream generated-rule identity as explicit
    evidence before attempting Sloth live status or downstream bundle
    verification
-3. keep Datadog live status, contract testing, exact apply/resume, and live
+2. keep Datadog live status, contract testing, exact apply/resume, and live
    bundle verification postponed until isolated credentials are available
-4. add Sloth live status only after downstream generated recording-rule
+3. add Sloth live status only after downstream generated recording-rule
    identity is captured as reviewed evidence
+4. resume AICLI-F2 from the implemented registry/catalog foundation when the
+   provider-evidence checkpoint is complete
 
 ## Housekeeping Backlog
 

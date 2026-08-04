@@ -207,7 +207,9 @@ contract and with existing reliability/mutation gates intact.
 
 **Measures:**
 
-- Every current command has Human/Agent registry and equivalence coverage.
+- Every current command has Human/Agent registry and catalog coverage. AICLI-F1
+  meets this for all 35 current commands; executable equivalence remains an
+  Agent CLI rollout gate.
 - Runtime schemas require no backend, network, or credentials.
 - Every write-capable command passes zero-I/O validation-only tests.
 - Collections declare field masks, limits, truncation, and NDJSON behavior.
@@ -244,8 +246,9 @@ contract and with existing reliability/mutation gates intact.
 6. Add provider contribution guide and guardrails.
 7. Add low-volume and reality-check examples with synthetic telemetry.
 8. Keep provider apply behavior explicit for each provider: Datadog as live API, Prometheus-compatible bundles as manifest bundles, and Sloth as external-generator handoff.
-9. Add the shared command registry before any Agent CLI or MCP adapter; complete
-   input/mutation safety before exposing writes; close parity before general
+9. Use the implemented shared command registry and separate Human-to-Agent JSON
+   catalog before adding any Agent CLI or MCP adapter; complete input/mutation
+   safety before exposing writes; close executable parity before general
    availability.
 
 ## Guardrails

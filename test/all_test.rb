@@ -3,6 +3,7 @@
 require_relative 'forbidden_terms_test'
 require_relative 'cli_test'
 require_relative 'cli_architecture_test'
+require_relative 'cli_command_registry_test'
 require_relative 'rules_ctl_test'
 require_relative 'dsl_test'
 require_relative 'validation_test'

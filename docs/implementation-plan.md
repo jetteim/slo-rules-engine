@@ -216,9 +216,11 @@ Detailed intent, requirements, feature packets, parity inventory, architecture,
 and article revalidation live in
 [`docs/agent-interface-roadmap.md`](agent-interface-roadmap.md).
 
-- [ ] **AICLI-F1:** define the versioned single command registry and register
-  every current Human CLI command with schemas, side effects, safety gates,
-  provider I/O, and parity metadata without changing behavior.
+- [x] **AICLI-F1:** define the versioned single command registry, register all
+  35 current Human CLI commands with schema references, side effects, safety
+  gates, provider I/O, and output metadata, route Human dispatch through the
+  registry, and publish a separate Human-command to Agent-JSON catalog without
+  changing command behavior.
 - [ ] **AICLI-F2:** add offline catalog/describe plus a strict Agent CLI raw
   JSON/file/stdin invocation path and versioned result/error envelopes.
 - [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz

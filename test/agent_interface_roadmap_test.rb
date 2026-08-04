@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require_relative '../lib/slo_rules_engine/cli'
 
 class AgentInterfaceRoadmapTest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
@@ -94,23 +95,28 @@ class AgentInterfaceRoadmapTest < Minitest::Test
 
     assert_includes agents, 'Every CLI change must update both the Human CLI and Agent CLI sub-interfaces'
     assert_includes implementation, '## Phase 14: Agent-Operable Dual CLI And MCP'
+    assert_includes implementation, '- [x] **AICLI-F1:**'
     assert_includes evolution, 'Agent-Safe Reliability Automation'
     assert_includes features, '## Planned Agent-Operable Interfaces'
     assert_includes design, 'Human CLI adapter'
     assert_includes design, 'Agent CLI adapter'
+    assert_includes design, 'CommandCatalog'
     assert_includes use_cases, '## Use Case 17: Operate The Reviewed Workflow From An AI Agent'
     assert_includes use_cases, '**Delivery status:** planned'
+    assert_includes use_cases, 'slo-rules-engine/cli-command-catalog/v1'
     assert_includes readme, 'Agent Interface Roadmap'
+    assert_includes readme, '35-command catalog'
+    assert_includes File.read(ROADMAP_PATH), '**AICLI-F1 status:** implemented'
   end
 
-  def test_current_human_cli_inventory_and_usage_are_not_missing_from_the_roadmap
+  def test_current_human_cli_registry_and_usage_are_not_missing_from_the_roadmap
     cli = File.read(File.join(ROOT, 'lib', 'slo_rules_engine', 'cli.rb'))
-    dispatcher = cli[/def run\(argv\)(.*?)\n  def validate\(/m, 1]
-    commands = dispatcher.scan(/when '([^']+)'/).flatten
+    registry = SloRulesEngine::CLI::CommandRegistry.default
 
-    commands.each do |command|
-      assert COMMAND_GROUPS.any? { |entry| entry == command || entry.start_with?("#{command} ") },
-             "missing #{command} from roadmap parity inventory"
+    registry.definitions.each do |definition|
+      root = definition.human_path.first
+      assert COMMAND_GROUPS.any? { |entry| entry.split.first == root },
+             "missing #{definition.id} from roadmap parity inventory"
     end
     assert_includes cli, 'bin/rules-ctl lookup-telemetry --provider=<provider>'
   end

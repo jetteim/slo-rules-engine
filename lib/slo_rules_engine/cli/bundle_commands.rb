@@ -7,21 +7,11 @@ module SloRulesEngine
   module CLI
     module BundleCommands
       def bundle(argv)
-        subcommand = argv.shift
-        case subcommand
-        when 'create'
-          bundle_create(argv)
-        when 'plan'
-          bundle_plan(argv)
-        when 'apply'
-          bundle_apply(argv)
-        when 'verify'
-          bundle_verify(argv)
-        when 'status'
-          bundle_status(argv)
-        else
-          abort_usage('usage: bundle create|plan|apply|verify|status')
-        end
+        dispatch_registered_subcommand(
+          'bundle',
+          argv,
+          'usage: bundle create|plan|apply|verify|status'
+        )
       end
 
       def bundle_create(argv)

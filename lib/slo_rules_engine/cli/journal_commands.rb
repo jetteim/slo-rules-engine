@@ -9,15 +9,7 @@ module SloRulesEngine
   module CLI
     module JournalCommands
       def journal(argv)
-        subcommand = argv.shift
-        case subcommand
-        when 'create'
-          journal_create(argv)
-        when 'status'
-          journal_status(argv)
-        else
-          abort_usage('usage: journal create|status')
-        end
+        dispatch_registered_subcommand('journal', argv, 'usage: journal create|status')
       end
 
       def journal_create(argv)

@@ -7,9 +7,10 @@ module SloRulesEngine
   module CLI
     module CatalogCommands
       def providers(argv)
-        subcommand = argv.shift
-        abort_usage('usage: providers list') unless subcommand == 'list'
+        dispatch_registered_subcommand('providers', argv, 'usage: providers list')
+      end
 
+      def providers_list(_argv)
         providers = SloRulesEngine.default_provider_registry.list.map do |provider|
           {
             key: provider.key,
@@ -22,9 +23,10 @@ module SloRulesEngine
       end
 
       def integrations(argv)
-        subcommand = argv.shift
-        abort_usage('usage: integrations list') unless subcommand == 'list'
+        dispatch_registered_subcommand('integrations', argv, 'usage: integrations list')
+      end
 
+      def integrations_list(_argv)
         integrations = SloRulesEngine.default_integration_registry.list.map do |integration|
           { key: integration.key, capabilities: integration.capabilities }
         end

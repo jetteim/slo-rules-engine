@@ -43,9 +43,10 @@ Provider generation must not require network access. Live apply flows require a 
 - Keep live mutation unavailable unless credentials and explicit confirmation are present.
 - Every provider-backed CLI change must update both Human CLI and Agent CLI
   mappings, the shared command-contract schemas and side-effect metadata,
-  equivalence coverage, runtime introspection, and MCP projection when
-  available. During the Phase 14 bootstrap, update the parity inventory and
-  target Agent mapping even before that adapter ships.
+  the separate `CommandCatalog` Human-command/Agent-JSON pair, equivalence
+  coverage, runtime introspection, and MCP projection when available. Until the
+  Agent adapter ships, its catalog request remains a planned mapping rather
+  than an executable claim.
 - A structured Agent CLI request must remain a rules-engine command request;
   never add a raw provider-payload path around neutral intent, reviewed
   evidence, ownership, planning, confirmation, journals, or verification.

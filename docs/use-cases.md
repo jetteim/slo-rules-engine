@@ -989,8 +989,9 @@ coverage, and findings.
 
 ## Use Case 17: Operate The Reviewed Workflow From An AI Agent
 
-**Delivery status:** planned. The commands and schemas in this use case define
-the Phase 14 target contract; they are not available in the current binary.
+**Delivery status:** planned. AICLI-F1 has implemented the internal registry and
+the separate Human-to-Agent command catalog, but the Agent commands and strict
+schemas in this use case are not available in the current binary.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
@@ -1011,6 +1012,33 @@ bin/rules-ctl agent invoke bundle.verify \
   --fields=request_id,command_id,outcome,result.bundle_id,result.lifecycle,findings
 ```
 
+Current catalog mapping entity:
+
+```json
+{
+  "schema_version": "slo-rules-engine/cli-command-catalog/v1",
+  "commands": [
+    {
+      "id": "bundle.verify",
+      "human_cli": "bin/rules-ctl bundle verify ./applied.json --output=./verified.json",
+      "agent_cli_json": {
+        "schema_version": "slo-rules-engine/agent-command-request/v1",
+        "command_id": "bundle.verify",
+        "command_version": 1,
+        "arguments": {
+          "bundle_file": "./applied.json",
+          "output_file": "./verified.json"
+        }
+      }
+    }
+  ]
+}
+```
+
+The implemented catalog contains this mapping shape for all 35 commands. It is
+an internal versioned parity entity, not current CLI stdout. `agent catalog`
+will expose a bounded form in AICLI-F2.
+
 The request file carries the complete versioned rules-engine command request,
 including the applied bundle path, verified output path, workspace root, and
 `validate_only`, plan, or execute mode where the command supports them. It does
@@ -1018,6 +1046,11 @@ not carry provider credentials or arbitrary provider mutation payloads.
 
 **What to expect:**
 
+- Current Human commands behave as before. Registry lookup adds no stdout,
+  files, provider reads, provider writes, credential loading, or new exit codes.
+- Developers can inspect the immutable `CommandCatalog` through the Ruby
+  library. Each entry pairs `human_cli` with `agent_cli_json`; parity tests fail
+  if an executable Human root or grouped subcommand is absent from the registry.
 - `agent catalog` prints a bounded versioned JSON command inventory. `agent
   describe` prints request/result/error schemas, side-effect class, provider
   reads/writes, required review/approval/confirmation evidence, credential
@@ -1056,8 +1089,8 @@ not carry provider credentials or arbitrary provider mutation payloads.
 Raw structured requests express rules-engine commands; neutral reliability
 intent, review evidence, provider validation, freshness, ownership, exact-plan,
 confirmation, journal, and verification requirements remain unchanged. Until
-Phase 14 is implemented, agents must use the documented current Human CLI and
-must not assume the target commands above exist.
+the AICLI-F2 Agent CLI is implemented, agents must use the documented current
+Human CLI and must not assume the target commands above exist.
 
 ## CLI Execution Boundary
 

@@ -7,19 +7,7 @@ module SloRulesEngine
   module CLI
     module PlanCommands
       def plan(argv)
-        subcommand = argv.shift
-        case subcommand
-        when 'approve'
-          plan_approve(argv)
-        when 'status'
-          plan_status(argv)
-        when 'apply'
-          plan_apply(argv)
-        when 'resume'
-          plan_resume(argv)
-        else
-          abort_usage('usage: plan approve|status|apply|resume')
-        end
+        dispatch_registered_subcommand('plan', argv, 'usage: plan approve|status|apply|resume')
       end
 
       def plan_approve(argv)

@@ -27,10 +27,13 @@ Use the toolkit to:
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
-Phase 14 is planned, not implemented: the [Agent Interface Roadmap](docs/agent-interface-roadmap.md)
-defines a strict Agent CLI, runtime schema discovery, bounded and sanitized
-output, a versioned agent skill, and later MCP projection over the same command
-contract as the existing Human CLI.
+Phase 14 foundation is implemented as a validated 35-command catalog and
+registry. It pairs each current Human CLI example with a planned Agent CLI JSON
+request and now owns Human command dispatch. The
+[Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the remaining
+strict Agent CLI, runtime schema discovery, bounded and sanitized output,
+versioned agent skill, and later MCP projection. Those agent-facing commands do
+not exist yet.
 
 ## Provider Outputs
 

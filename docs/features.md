@@ -203,11 +203,25 @@ deferred until their backend evidence contracts are available.
 ## Planned Agent-Operable Interfaces
 
 The [Agent Interface Roadmap](agent-interface-roadmap.md) defines a planned
-Phase 14 capability. It is not implemented yet.
+Phase 14 capability. Its AICLI-F1 foundation is implemented; the Agent CLI and
+MCP surfaces are not implemented yet.
+
+Implemented foundation:
+
+- **Validated command registry:** all 35 current command IDs declare Human and
+  planned Agent mappings, contract references, side effects, local/provider
+  I/O, credential categories, safety gates, output controls, and MCP
+  eligibility. Missing or duplicate metadata fails closed.
+- **Separate command catalog:**
+  `slo-rules-engine/cli-command-catalog/v1` pairs each usual Human CLI example
+  with a versioned planned Agent CLI JSON request.
+- **Registry-backed Human dispatch:** top-level and grouped Human commands
+  resolve through the registry while retaining existing handlers, stdout, exit
+  codes, and refusal behavior.
 
 Planned features:
 
-- **One command contract:** a versioned registry covers every current command,
+- **One command contract:** the implemented versioned registry covers every current command,
   request/result/error schema, side effect, provider read/write, safety gate,
   Human CLI mapping, Agent CLI mapping, skill reference, and later MCP tool.
 - **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
@@ -234,7 +248,8 @@ Planned features:
 
 The raw structured path represents a full rules-engine command, not an
 arbitrary provider API payload. Neutral reliability intent and reviewed
-provider artifacts remain authoritative.
+provider artifacts remain authoritative. Catalog Agent JSON examples are target
+contracts only until AICLI-F2 makes them executable through strict schemas.
 
 ## Change
 

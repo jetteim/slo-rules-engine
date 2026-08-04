@@ -8,13 +8,13 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Establish the Phase 14 shared command registry and complete Human CLI
-   inventory/parity metadata without changing existing behavior
-2. Capture reviewed Sloth downstream generated-rule identity as explicit
+1. Capture reviewed Sloth downstream generated-rule identity as explicit
    evidence before adding Sloth live status
-3. Production-grade Datadog reconciliation only when isolated backend evidence
+2. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
-4. Sloth live status after the downstream identity evidence contract exists
+3. Sloth live status after the downstream identity evidence contract exists
+4. Resume AICLI-F2 structured Agent CLI and runtime introspection from the
+   completed registry/catalog foundation after the provider-evidence checkpoint
 5. Datadog exact-plan parity only after live recheck/idempotency semantics are
    verified
 
@@ -118,17 +118,21 @@ remain open and evidence-gated.
 
 Current architecture status: `bin/rules-ctl` is a six-line bootstrap for
 `lib/slo_rules_engine/cli.rb`. The library facade composes eight focused command
-families and retains shared manifest/state orchestration. The current component,
-flow, dependency, contract, NFR, use-case, and test maps live in
+families, dispatches through the versioned command registry, and retains shared
+manifest/state orchestration. The current component, flow, dependency,
+contract, NFR, use-case, and test maps live in
 `docs/design.md` and
 `docs/housekeeping/atomic-coherence-simplification.md`.
 
-Current agent-interface status: Phase 14 is roadmap-only. The existing Human
-CLI remains the sole implemented interface. The target Agent CLI, runtime
-command registry/schema introspection, bounded/sanitized agent output,
-versioned skill, and MCP adapter are specified in
-`docs/agent-interface-roadmap.md` but are not implemented. The first slice is a
-behavior-preserving command registry and parity baseline.
+Current agent-interface status: AICLI-F1 is implemented. A validated immutable
+registry covers all 35 current commands and drives Human top-level and grouped
+subcommand dispatch. The separate
+`slo-rules-engine/cli-command-catalog/v1` entity pairs each executable Human CLI
+example with a planned versioned Agent JSON request. Missing/duplicate metadata
+fails closed, and current Human behavior remains characterized. The Agent CLI,
+runtime catalog/describe output, strict executable request schemas, input
+hardening, bounded/sanitized output, versioned skill, and MCP adapter remain
+planned.
 
 ## Non-Negotiable Working Rules
 
@@ -187,6 +191,15 @@ Implemented and already pushed:
 
 Implemented by the latest feature slices:
 
+- AICLI-F1 now provides immutable `CommandDefinition` values, a validated
+  35-command `CommandRegistry`, and a separate versioned `CommandCatalog` that
+  pairs current Human CLI examples with planned Agent CLI JSON requests
+- Human top-level and grouped subcommand dispatch now resolve through the
+  registry, so an unregistered Human command is unreachable; existing command
+  handlers, stdout, exit codes, provider behavior, and safety gates are unchanged
+- Registry coverage requires stable IDs/versions, Human and Agent mappings,
+  request/result/error contract references, side-effect class, local/provider
+  I/O, credential categories, safety gates, output controls, and MCP metadata
 - Phase 14 now has an article-derived, revalidated roadmap for a shared command
   registry, feature-parity Human/Agent CLI adapters, strict structured
   requests, runtime schema introspection, bounded/sanitized output,
@@ -404,7 +417,9 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: article-derived Agent Interface Roadmap with complete
+- latest checkpoint: AICLI-F1 shared command registry and separate 35-command
+  Human CLI to planned Agent JSON parity catalog
+- previous checkpoint: article-derived Agent Interface Roadmap with complete
   current-command parity inventory, requirements, feature packets,
   architecture, use case, and permanent dual-interface maintenance rule
 - previous checkpoint: read-only file-backed bundle verification and immutable
@@ -487,16 +502,15 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Implement AICLI-F1: a versioned command registry that characterizes every
-   current Human CLI command, its normalized request/result/error contract,
-   side effects, provider I/O, safety gates, and future Agent CLI mapping
-2. Capture reviewed Sloth downstream generated recording-rule identity in a
+1. Capture reviewed Sloth downstream generated recording-rule identity in a
    credential-free, source-linked evidence artifact
-3. Add Sloth live status only after that identity evidence is complete
-4. Run the Datadog sandbox probes and resume live provider-contract work only
+2. Add Sloth live status only after that identity evidence is complete
+3. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
-5. Extend exact approval/apply/resume to Datadog only after verified backend
+4. Extend exact approval/apply/resume to Datadog only after verified backend
    recheck and idempotency semantics exist
+5. Implement AICLI-F2 offline catalog/describe and the first strict structured
+   Agent CLI invocation slice from the completed registry/catalog foundation
 6. Add automatic rollback execution only after a reviewed compensating-plan
    contract exists; current exact failures provide manual guidance
 
@@ -512,30 +526,31 @@ Secondary gaps:
 
 Next recommended slice:
 
-- define the versioned command definition and registry contract described by
-  AICLI-F1 without changing command behavior
-- register every current command ID with Human CLI mapping, future Agent CLI
-  mapping, request/result/error schema references, side-effect class,
-  provider reads/writes, credentials, and safety gates
-- derive a parity inventory from the registry and fail tests when the current
-  Human CLI dispatcher or documented Agent target lacks coverage
-- characterize normalization and current stdout/exit behavior before adding
-  the Agent CLI adapter
-- update README and engineering use cases with precise current versus planned
-  behavior; do not present registry metadata as a working Agent CLI
+- define a versioned, credential-free Sloth downstream-evidence artifact that
+  links one reviewed Sloth manifest/native input fingerprint to saved
+  Sloth-generated Prometheus rule content
+- parse generated rule YAML structurally and capture the exact recording-rule
+  identities needed for objective attainment, remaining error budget, burn
+  rate, observations, and freshness without running Sloth or reading a backend
+- require explicit reviewer identity/timestamp and complete reviewed SLO
+  coverage; reject stale source/input fingerprints, ambiguous rule mappings,
+  credentials, and unrelated generated rules
+- keep evidence capture read-only and provider-specific; do not move generated
+  PromQL identities into the neutral DSL
+- update usage with the precise stdout/file output, source reads, zero-write
+  provider boundary, and refusal behavior
 
 Rationale:
 
-- the article-derived roadmap makes registry-backed parity the prerequisite for
-  Agent CLI, input hardening, skill generation, and MCP without duplicating
-  business logic
-- registry characterization can be completed locally with no provider access,
-  credentials, file mutation, or change to existing Human CLI behavior
-- a complete current-command inventory prevents later agent coverage from
-  quietly omitting low-frequency review, journal, plan, or bundle commands
-- neutral intent and every review/exact-plan/journal/mutation gate remain below
-  the adapter boundary
-- Sloth downstream evidence remains the next provider feature after AICLI-F1
+- AICLI-F1 is complete at a behavior-preserving registry/catalog boundary
+- Phase 9 still closes at a verified file-backed release without claiming Sloth
+  downstream execution
+- Sloth live status remains blocked specifically on reviewed generated-rule
+  identity, so capturing that evidence is the smallest complete capability
+  that removes a real product blocker
+- saved generated rules can be validated locally without backend credentials,
+  provider writes, or hidden metric/query translation
+- AICLI-F2 retains a complete foundation and can resume without losing parity
 - Datadog work remains correctly evidence-gated and postponed
 
 ## Next Session Handoff
