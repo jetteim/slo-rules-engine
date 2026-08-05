@@ -88,7 +88,12 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'slo-rules-engine/sloth-downstream-evidence-status/v1'
     assert_includes document, 'stale_generated_rules'
     assert_includes document, 'zero provider reads and writes'
+    assert_includes document, '--provider=sloth'
+    assert_includes document, '--evidence=./work/sloth-evidence/checkout-api.json'
+    assert_includes document, 'invalid_sloth_live_status_evidence'
+    assert_includes document, 'Official Sloth MCP Integration Path'
     assert_includes readme, 'Sloth Downstream Evidence'
+    assert_includes readme, 'Official Sloth MCP Integration Path'
   end
 
   private

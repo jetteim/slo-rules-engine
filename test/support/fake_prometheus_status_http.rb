@@ -23,6 +23,18 @@ class Net::HTTP
     value =
       if expression.start_with?('timestamp(')
         (Time.now.utc - 10).to_f
+      elsif expression.start_with?('slo:period_error_budget_remaining:ratio')
+        0.8
+      elsif expression.start_with?('slo:error_budget:ratio')
+        0.001
+      elsif expression.start_with?('slo:objective:ratio')
+        0.999
+      elsif expression.start_with?('1 - (slo:sli_error:ratio_rate')
+        0.9998
+      elsif expression.start_with?('slo:current_burn_rate:ratio') || expression.start_with?('slo:period_burn_rate:ratio')
+        0.2
+      elsif expression.start_with?('sum(rate(')
+        42
       elsif expression.end_with?(':error_budget_remaining_ratio')
         0.8
       elsif expression.end_with?(':error_budget_ratio')

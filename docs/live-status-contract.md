@@ -1,9 +1,10 @@
 # Live SLO Status Contract
 
 This contract separates reviewed reliability intent from provider-specific live
-evidence. It reads one reviewed Prometheus Stack manifest directly or aggregates
-readable targets from one current release bundle or explicit portfolio. It does
-not mutate provider state.
+evidence. It reads one reviewed Prometheus Stack manifest, one reviewed Sloth
+manifest linked to fresh downstream evidence, or aggregates readable targets
+from one current release bundle or explicit portfolio. It does not mutate
+provider state.
 
 ## Neutral Intent
 
@@ -80,6 +81,10 @@ A provider query failure remains inside that target's report as
 zero because the aggregate was produced. Invalid or stale source input and
 runtime preflight failures exit nonzero before any backend read.
 
+Direct Sloth status is intentionally ahead of aggregate Sloth support. Release
+bundles and portfolios do not yet package/map one current downstream-evidence
+artifact per Sloth target, so those target envelopes remain `unsupported`.
+
 ## Aggregate Inputs And Runtime
 
 Release-bundle mode accepts one valid `review_ready`, `apply_ready`, `applied`,
@@ -121,6 +126,14 @@ the command. Mappings for unsupported targets are rejected. Runtime URLs are
 used only to construct clients and are never persisted in bundles, portfolios,
 or reports.
 
+Direct Sloth input additionally requires `--evidence=<file>` and an explicit
+`--base-url`. Before constructing the provider client, the reader validates the
+evidence schema and content ID, rereads the manifest/native-input/generated-rule
+fingerprints, compares the evidence manifest fingerprint with the supplied
+manifest, checks service identity, and requires exact per-SLO coverage. Missing
+or stale evidence fails with `invalid_sloth_live_status_evidence` and stable
+provider findings without a backend request.
+
 ## Classification
 
 Classification is deterministic and uses this precedence:
@@ -155,16 +168,42 @@ For each SLO, the reader performs GET-only `/api/v1/query` calls for:
 - every generated burn-rate record
 - `timestamp(success_ratio)` for freshness
 
-No query is inferred from the neutral DSL. Every expression is taken from the
-reviewed provider manifest. The report retains the expression and sanitized
-error class but never a raw backend error message or credential.
+No query is inferred from the neutral DSL. Prometheus Stack expressions come
+from the reviewed provider manifest; Sloth expressions come from semantically
+validated fresh downstream evidence. The report retains the expression and
+sanitized error class but never a raw backend error message or credential.
+
+## Sloth Read Boundary
+
+For each SLO, the Sloth reader performs the same eight GET-only instant-query
+roles, but takes every expression from the fresh
+`slo-rules-engine/sloth-downstream-evidence/v1` `status_bindings` map:
+
+- the exact reviewed native total-events query for observations
+- success ratio derived from the captured evaluation-window error-ratio record
+- captured objective, allowed-budget, and remaining-budget selectors
+- captured current and evaluation-window burn-rate selectors
+- timestamp of the captured evaluation-window error-ratio record
+
+The manifest supplies reviewed service/SLI/instance/SLO identity and response
+context; the evidence supplies Sloth/Prometheus identities and queries. The
+report retains the evidence ID, exact `sloth_id`, captured record selectors,
+query values, sample timestamps, and read outcomes. The reader never executes
+Sloth, reloads Prometheus rules, applies Kubernetes resources, or infers a
+query from the neutral DSL.
+
+The current Sloth burn bindings use `1.0` as the provider's sustainable-budget
+burn threshold for status classification. This is not a rewrite of the
+reviewed alert-window policy and does not mutate Sloth alert rules.
 
 ## Current Limits
 
 - no Datadog reader until safe live evidence work resumes
-- no Sloth reader yet; the reviewed downstream generated-rule identity schema
-  now exists, but status does not consume it until the next provider-reader
-  slice adds freshness preflight and explicit runtime mapping
+- no aggregate Sloth reader until release/portfolio inputs package current
+  downstream evidence and preflight its runtime mapping
+- no official Sloth MCP runtime adapter yet; the upstream main-branch server is
+  documented as a version-gated, read-only comparison path, and its current
+  output lacks observations, exact record identity, and equivalent freshness
 - no automatic endpoint discovery or one-URL assumption across aggregate
   targets
 - freshness is evaluated from the success-ratio record; every provider sample

@@ -11,6 +11,7 @@ module SloRulesEngine
         manifest_path = nil
         bundle_path = nil
         portfolio_path = nil
+        evidence_path = nil
         base_url = nil
         target_base_urls = {}
         max_age_seconds = 300
@@ -20,6 +21,7 @@ module SloRulesEngine
           opts.on('--manifest=FILE', 'One reviewed provider manifest JSON file') { |value| manifest_path = value }
           opts.on('--bundle=FILE', 'One current reviewed release bundle') { |value| bundle_path = value }
           opts.on('--portfolio=FILE', 'One live-status portfolio') { |value| portfolio_path = value }
+          opts.on('--evidence=FILE', 'Fresh reviewed Sloth downstream evidence') { |value| evidence_path = value }
           opts.on('--base-url=URL', 'Prometheus-compatible API base URL') { |value| base_url = value }
           opts.on('--target-base-url=TARGET=URL', 'Prometheus API base URL for one aggregate target') do |value|
             target, url = value.split('=', 2)
@@ -41,9 +43,16 @@ module SloRulesEngine
           abort_usage('missing --provider') if provider_key.to_s.empty?
           abort_usage('--target-base-url is only valid with --bundle or --portfolio') unless target_base_urls.empty?
           abort_usage('--bundle and --portfolio do not accept --provider') if bundle_path || portfolio_path
+          if provider_key == 'sloth'
+            abort_usage('status --provider=sloth requires --evidence') if evidence_path.to_s.empty?
+            abort_usage('status --provider=sloth requires explicit --base-url') if base_url.to_s.empty?
+          else
+            abort_usage('--evidence is only valid with --provider=sloth') unless evidence_path.to_s.empty?
+          end
           return single_manifest_status(
             provider_key: provider_key,
             manifest_path: manifest_path,
+            evidence_path: evidence_path,
             base_url: base_url || ENV.fetch('PROMETHEUS_URL', 'http://localhost:9090'),
             max_age_seconds: max_age_seconds,
             output_path: output_path
@@ -52,6 +61,7 @@ module SloRulesEngine
 
         abort_usage('--provider is only valid with --manifest') unless provider_key.to_s.empty?
         abort_usage('--base-url is only valid with --manifest') unless base_url.to_s.empty?
+        abort_usage('--evidence is only valid with --manifest') unless evidence_path.to_s.empty?
         input = if bundle_path
                   SloRulesEngine::LiveStatus::InputResolver.new.from_bundle(bundle_path)
                 else
@@ -69,9 +79,9 @@ module SloRulesEngine
 
       private
 
-      def single_manifest_status(provider_key:, manifest_path:, base_url:, max_age_seconds:, output_path:)
+      def single_manifest_status(provider_key:, manifest_path:, evidence_path:, base_url:, max_age_seconds:, output_path:)
         provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
-        unless provider.key == 'prometheus_stack'
+        unless %w[prometheus_stack sloth].include?(provider.key)
           render_unsupported_status_provider(provider)
         end
 
@@ -79,10 +89,20 @@ module SloRulesEngine
         abort_usage('status requires exactly one reviewed manifest') unless manifests.length == 1
         validate_status_review_evidence!(manifests, provider)
 
-        report = SloRulesEngine::LiveStatus::PrometheusReader.new(
-          client: SloRulesEngine::TelemetryLookup::Prometheus::Client.new(base_url: base_url),
-          max_age_seconds: max_age_seconds
-        ).read(manifests.fetch(0))
+        validate_status_base_url!(base_url)
+        report = if provider.key == 'sloth'
+                   SloRulesEngine::LiveStatus::SlothReader.new(
+                     client_factory: lambda {
+                       SloRulesEngine::TelemetryLookup::Prometheus::Client.new(base_url: base_url)
+                     },
+                     max_age_seconds: max_age_seconds
+                   ).read(manifests.fetch(0), evidence_path: evidence_path)
+                 else
+                   SloRulesEngine::LiveStatus::PrometheusReader.new(
+                     client: SloRulesEngine::TelemetryLookup::Prometheus::Client.new(base_url: base_url),
+                     max_age_seconds: max_age_seconds
+                   ).read(manifests.fetch(0))
+                 end
         write_status_report(report.to_h, output_path)
       rescue SloRulesEngine::ManifestSchemaError => error
         render_manifest_schema_error(
@@ -93,6 +113,20 @@ module SloRulesEngine
         )
       rescue SloRulesEngine::LiveStatus::UnsupportedProvider
         render_unsupported_status_provider(provider)
+      rescue SloRulesEngine::Sloth::DownstreamEvidence::ContractError => error
+        render_sloth_status_evidence_error(provider, error)
+      end
+
+      def validate_status_base_url!(base_url)
+        uri = URI.parse(base_url.to_s)
+        valid = %w[http https].include?(uri.scheme) &&
+          !uri.host.to_s.empty? &&
+          uri.userinfo.nil? &&
+          uri.query.nil? &&
+          uri.fragment.nil?
+        abort_usage('Prometheus base URL must use HTTP(S), include a host, and exclude credentials, query, and fragment') unless valid
+      rescue URI::InvalidURIError
+        abort_usage('Prometheus base URL is invalid')
       end
 
       def write_status_report(payload, output_path)
@@ -140,8 +174,22 @@ module SloRulesEngine
           mode: 'live_status',
           error: {
             code: 'unsupported_live_status_provider',
-            message: 'live status currently supports only provider "prometheus_stack"'
+            message: 'live status currently supports providers "prometheus_stack" and "sloth"'
           }
+        )
+        exit 1
+      end
+
+      def render_sloth_status_evidence_error(provider, error)
+        puts JSON.pretty_generate(
+          valid: false,
+          provider: provider&.key,
+          mode: 'live_status',
+          error: {
+            code: 'invalid_sloth_live_status_evidence',
+            message: 'Sloth live status requires fresh downstream evidence for the exact reviewed manifest.'
+          },
+          findings: error.findings
         )
         exit 1
       end

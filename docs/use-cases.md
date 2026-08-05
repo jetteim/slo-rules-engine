@@ -22,7 +22,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Remove managed state | Reviewed scope and ownership evidence | Durable journal plus confirmed delete result and absence verification | Explicit `--confirm` and `--journal-dir` |
 | Verify telemetry | Provider binding backed by current evidence | Reality-check report | Read-only backend lookup |
 | Review Sloth downstream rules | Reviewed Sloth intent plus externally generated rule identity | Content-addressed downstream evidence plus freshness status | Local source reads only; capture writes one explicit evidence file |
-| Inspect live SLO status | Reviewed SLO identity, evaluation window, objective, budget, burn policy, response context, and release/portfolio target coverage | Versioned per-manifest or aggregate live-status report with per-SLO state and freshness | Prometheus-compatible instant-query reads only |
+| Inspect live SLO status | Reviewed SLO identity, evaluation window, objective, budget, burn policy, response context, downstream Sloth evidence, and release/portfolio target coverage | Versioned per-manifest or aggregate live-status report with per-SLO state and freshness | Prometheus-compatible instant-query reads only; Sloth requires fresh exact-manifest evidence |
 | Generate routes | Alert decision context without delivery secrets | Route catalog JSON | Delivery remains external |
 | Validate Datadog contract | Explicit sandbox credential and dashboard API evidence | Public-safe sandbox smoke JSON | Read-only by default; one temporary dashboard only with explicit confirmation |
 
@@ -63,7 +63,7 @@ Usage documentation is part of the feature contract. When command scope, provide
 | Confirmed engine output | Datadog resources, durable journal, and verified `ProviderStateResult` | Managed files, durable journal, and verified `ProviderStateResult` | Verified managed manifest/input files, durable journal, `ProviderStateResult`, and pending external handoff evidence |
 | Verified release output | Deferred until live bundle recheck semantics are proven | Fresh expected/actual evidence for every approved managed file and a `verified` bundle target | Fresh engine-owned file evidence plus explicit pending external-generator/downstream status |
 | Downstream identity evidence | Not applicable | Generated recording-rule identities already exist in the reviewed manifest | Content-addressed reviewed mapping from current manifest/native input to saved Sloth-generated records and provider-specific status queries |
-| Live status | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records; aggregate output embeds the complete target report | Direct reads remain deferred; aggregate output remains explicit `unsupported` coverage until the reader consumes current downstream evidence |
+| Live status | Direct reads remain deferred; aggregate output retains the target as explicit `unsupported` coverage | GET-only reads of generated observation, evaluation-window SLO, remaining-budget, burn-rate, and timestamp records; aggregate output embeds the complete target report | Direct GET-only reads use only fresh reviewed downstream-evidence bindings for the exact manifest; aggregate output remains explicit `unsupported` coverage until evidence packaging/runtime mapping is added |
 | External responsibility | Notification endpoint and credential ownership | Applying Kubernetes resources, Grafana sidecar loading, and Alertmanager receiver endpoints/credentials | Running Sloth, applying generated Prometheus rules, and configuring Alertmanager |
 
 ## Use Case 1: Find Candidate SLOs In Existing Telemetry
@@ -912,10 +912,12 @@ bin/rules-ctl sloth-evidence status \
   `stale_generated_rules`, and exits one.
 - Status validates the evidence schema, credential safety, and content ID
   before reading its recorded source paths. A tampered evidence document fails
-  with `sloth_evidence_identity_mismatch` and does not trust those paths.
-- This artifact closes the reviewed generated-rule identity prerequisite. It
-  does not yet query Prometheus, enable direct Sloth `status`, or make release
-  bundle downstream verification complete.
+  with `sloth_evidence_identity_mismatch` and does not trust those paths. A
+  rehashed document whose mappings are not exactly rebuilt from the linked
+  sources fails `sloth_evidence_source_derivation_mismatch`.
+- This artifact closes the reviewed generated-rule identity prerequisite and
+  is now required by direct Sloth `status`. Evidence capture/status still make
+  no Prometheus call; release-bundle downstream verification remains separate.
 
 **Safety boundary:** PromQL names and queries remain provider evidence. The
 neutral SLO objective and response policy are unchanged, and reviewer
@@ -923,10 +925,11 @@ attestation cannot authorize provider mutation.
 
 ## Use Case 17: Inspect Live SLO And Error-Budget Status
 
-**Task:** answer whether reviewed Prometheus Stack SLOs for one service, one
-reviewed release, or an explicit service portfolio are attaining their
-objectives, how much error budget remains, whether burn policy is breached, and
-whether each target's evidence is fresh enough to trust.
+**Task:** answer whether reviewed Prometheus Stack or evidence-linked Sloth
+SLOs for one service, one reviewed release, or an explicit service portfolio
+are attaining their objectives, how much error budget remains, whether burn
+policy is breached, and whether each target's evidence is fresh enough to
+trust.
 
 The neutral DSL carries an explicit evaluation window:
 
@@ -956,6 +959,25 @@ bin/rules-ctl status \
 ```
 
 `PROMETHEUS_URL` supplies the default base URL when `--base-url` is omitted.
+
+For one Sloth manifest, supply the current reviewed downstream evidence and an
+explicit Prometheus runtime:
+
+```bash
+bin/rules-ctl status \
+  --provider=sloth \
+  --manifest=./managed/checkout-api/sloth/manifest.json \
+  --evidence=./work/sloth-evidence/checkout-api.json \
+  --base-url=http://localhost:9090 \
+  --max-age-seconds=300 \
+  --output=./work/status/checkout-api-sloth.json
+```
+
+The Sloth form has no environment-derived endpoint fallback. Before client
+construction it validates the evidence schema/content ID, rereads every source
+fingerprint, matches the exact manifest fingerprint and service, requires
+complete SLO coverage, and retains the reviewed service/SLI/instance/SLO
+identity from the manifest.
 
 Assess every readable target in one current reviewed release:
 
@@ -1027,6 +1049,11 @@ bin/rules-ctl status \
   observation, success, objective, allowed budget, remaining budget, two burn
   windows, and `timestamp(success_ratio)`. It performs no write, reload,
   Kubernetes, Grafana, Alertmanager, or notification call.
+- The Sloth reader takes all eight expressions from
+  `status_bindings` in the fresh content-addressed evidence. It does not infer
+  PromQL from neutral intent, execute Sloth, reload rules, or accept a manifest
+  with a different fingerprint. Its provider resources include the evidence
+  ID, exact `sloth_id`, and captured recording-rule selectors.
 - A fresh attained SLO with no burn breach is `healthy`; a burn breach or
   internally inconsistent below-target result is `at_risk`; zero remaining
   budget is `exhausted`; absent or stale evidence is `missing_telemetry`; and
@@ -1041,24 +1068,38 @@ bin/rules-ctl status \
   every manifest, review provenance, unique UID, and exact
   `service/provider` identity before the first read.
 - Missing, unknown, duplicate, unsupported-target, credential-bearing, or
-  invalid runtime mappings fail before any client is created. Direct
-  single-manifest use of Datadog or Sloth fails
-  `unsupported_live_status_provider`; a mixed aggregate retains those targets
-  as `outcome: unsupported`, sets `coverage_complete: false`, and makes no read
+  invalid runtime mappings fail before any client is created. Direct Datadog
+  use fails `unsupported_live_status_provider`. Direct Sloth use fails
+  `invalid_sloth_live_status_evidence` before backend access when evidence is
+  missing, invalid, stale, linked to another manifest/service, or incomplete.
+  A mixed aggregate retains Datadog and Sloth targets as
+  `outcome: unsupported`, sets `coverage_complete: false`, and makes no read
   for them. An all-unsupported aggregate fails
   `no_supported_live_status_targets`.
 - Query failure findings retain the provider expression and error class, but
   not the raw backend error message. The report never stores credentials.
 - No mode performs provider writes, configuration reloads, Kubernetes applies,
   Grafana changes, Alertmanager changes, or notification delivery.
-- Datadog direct reads remain postponed. Sloth downstream identity evidence is
-  now available, but direct reads remain unavailable until the live-status
-  reader accepts and freshness-checks that evidence.
+- Datadog direct reads remain postponed. Sloth direct reads are available for
+  exactly one manifest; release/portfolio Sloth status remains postponed until
+  bundles can package current evidence and preflight evidence/runtime mappings.
+
+**Official Sloth MCP path:** current Sloth `main` can expose a stateless,
+read-only Streamable HTTP MCP endpoint from `sloth server --mcp-enabled`. The
+engine does not consume it yet. The planned provider adapter will version-gate
+the upstream surface, allowlist its six read-only tools, reconcile exact
+`sloth_id` values against reviewed downstream evidence, and first emit a
+supplemental comparison report. MCP-only status cannot claim parity yet because
+the upstream tools do not expose total observations, exact source record
+selectors, or contract-equivalent sample freshness. Setup, expected outputs,
+refusals, and promotion gates are in
+[Official Sloth MCP Integration Path](sloth-mcp-integration.md).
 
 **Intent preserved:** objective, evaluation window, calculation basis, and
 response context come from reviewed neutral intent. Release and portfolio
 aggregation preserve every target report instead of redefining or collapsing
-it. PromQL record names and instant-query syntax stay in the Prometheus reader;
+it. PromQL record names and instant-query syntax stay in provider readers and
+Sloth downstream evidence;
 the neutral status model contains only normalized values, identity, freshness,
 coverage, and findings.
 

@@ -606,8 +606,8 @@ module SloRulesEngine
             error_budget_ratio: recorded_binding(records.fetch(:error_budget_ratio)),
             error_budget_remaining_ratio: recorded_binding(records.fetch(:error_budget_remaining_ratio)),
             burn_rate: [
-              recorded_binding(records.fetch(:current_burn_rate_ratio)).merge(window: 'current'),
-              recorded_binding(records.fetch(:period_burn_rate_ratio)).merge(window: 'evaluation_window')
+              recorded_binding(records.fetch(:current_burn_rate_ratio)).merge(window: 'current', threshold: 1.0),
+              recorded_binding(records.fetch(:period_burn_rate_ratio)).merge(window: 'evaluation_window', threshold: 1.0)
             ],
             freshness: derived_binding("timestamp(#{evaluation.fetch(:selector)})", evaluation)
           }
@@ -787,6 +787,7 @@ module SloRulesEngine
             validate_reviewed_intent(findings, Support.fetch_value(slo, :reviewed_intent), path)
             validate_recording_rules(findings, Support.fetch_value(slo, :recording_rules), path)
             validate_status_bindings(findings, Support.fetch_value(slo, :status_bindings), path)
+            validate_slo_consistency(findings, slo, path)
           end
         end
 
@@ -880,6 +881,121 @@ module SloRulesEngine
               "#{path}.status_bindings.burn_rate"
             )
           end
+          Array(burn).each_with_index do |binding, index|
+            threshold = Support.fetch_value(binding, :threshold)
+            next if threshold.nil? || Float(threshold) == 1.0
+
+            findings << invalid_schema(
+              'Sloth status burn threshold must be the sustainable rate 1.0.',
+              "#{path}.status_bindings.burn_rate[#{index}].threshold"
+            )
+          rescue ArgumentError, TypeError
+            findings << invalid_schema(
+              'Sloth status burn threshold must be numeric.',
+              "#{path}.status_bindings.burn_rate[#{index}].threshold"
+            )
+          end
+        end
+
+        def validate_slo_consistency(findings, slo, path)
+          identity = Support.fetch_value(slo, :identity, {})
+          records = Support.fetch_value(slo, :recording_rules, {})
+          return unless identity.is_a?(Hash) && exact_keys?(records, RECORDING_RULE_ROLES)
+
+          expected_labels = {
+            sloth_id: Support.fetch_value(identity, :sloth_id).to_s,
+            sloth_service: Support.fetch_value(identity, :service).to_s,
+            sloth_slo: Support.fetch_value(identity, :slo).to_s
+          }
+          records.each do |role, record|
+            next unless record.is_a?(Hash)
+
+            labels = Support.fetch_value(record, :labels, {})
+            expected_labels.each do |label, expected|
+              next if Support.fetch_value(labels, label).to_s == expected
+
+              findings << invalid_schema(
+                'record identity labels must match the SLO evidence identity.',
+                "#{path}.recording_rules.#{role}.labels.#{label}"
+              )
+            end
+            expected_selector = selector_for_schema(
+              Support.fetch_value(record, :record).to_s,
+              labels
+            )
+            next if Support.fetch_value(record, :selector).to_s == expected_selector
+
+            findings << invalid_schema(
+              'record selector must be derived from its captured record name and identity labels.',
+              "#{path}.recording_rules.#{role}.selector"
+            )
+          end
+
+          intent = Support.fetch_value(slo, :reviewed_intent, {})
+          evaluation = Support.fetch_value(records, :evaluation_error_ratio, {})
+          evaluation_window = Support.fetch_value(
+            Support.fetch_value(evaluation, :labels, {}),
+            :sloth_window
+          ).to_s
+          unless evaluation_window == Support.fetch_value(intent, :evaluation_window).to_s
+            findings << invalid_schema(
+              'reviewed evaluation window must match the captured evaluation record.',
+              "#{path}.reviewed_intent.evaluation_window"
+            )
+          end
+
+          validate_binding_queries(findings, slo, path)
+        end
+
+        def validate_binding_queries(findings, slo, path)
+          records = Support.fetch_value(slo, :recording_rules, {})
+          bindings = Support.fetch_value(slo, :status_bindings, {})
+          return unless exact_keys?(bindings, STATUS_BINDING_ROLES)
+
+          evaluation = Support.fetch_value(records, :evaluation_error_ratio, {})
+          expected = {
+            success_ratio: "1 - (#{Support.fetch_value(evaluation, :selector)})",
+            objective_ratio: Support.fetch_value(Support.fetch_value(records, :objective_ratio, {}), :selector),
+            error_budget_ratio: Support.fetch_value(Support.fetch_value(records, :error_budget_ratio, {}), :selector),
+            error_budget_remaining_ratio: Support.fetch_value(
+              Support.fetch_value(records, :error_budget_remaining_ratio, {}),
+              :selector
+            ),
+            freshness: "timestamp(#{Support.fetch_value(evaluation, :selector)})"
+          }
+          expected.each do |role, query|
+            next if Support.fetch_value(Support.fetch_value(bindings, role, {}), :query).to_s == query.to_s
+
+            findings << invalid_schema(
+              'status query must match its captured recording-rule identity.',
+              "#{path}.status_bindings.#{role}.query"
+            )
+          end
+
+          expected_burn = {
+            'current' => Support.fetch_value(Support.fetch_value(records, :current_burn_rate_ratio, {}), :selector),
+            'evaluation_window' => Support.fetch_value(
+              Support.fetch_value(records, :period_burn_rate_ratio, {}),
+              :selector
+            )
+          }
+          actual_burn = Array(Support.fetch_value(bindings, :burn_rate)).to_h do |binding|
+            [Support.fetch_value(binding, :window).to_s, Support.fetch_value(binding, :query)]
+          end
+          return if actual_burn == expected_burn
+
+          findings << invalid_schema(
+            'burn-rate status queries must match the captured current and period records.',
+            "#{path}.status_bindings.burn_rate"
+          )
+        end
+
+        def selector_for_schema(record, labels)
+          selected = (IDENTITY_LABELS + ['sloth_window']).filter_map do |key|
+            value = Support.fetch_value(labels, key)
+            "#{key}=#{JSON.generate(value.to_s)}" unless value.nil?
+          end
+          selected.empty? ? record : "#{record}{#{selected.join(',')}}"
         end
 
         def validate_summary(findings, summary, slo_count)
@@ -920,6 +1036,11 @@ module SloRulesEngine
 
       class StatusEvaluator
         def evaluate(evidence_path)
+          _evidence, status = evaluate_with_evidence(evidence_path)
+          status
+        end
+
+        def evaluate_with_evidence(evidence_path)
           evidence = Support.json_file(
             evidence_path,
             code: 'unreadable_sloth_downstream_evidence',
@@ -957,8 +1078,9 @@ module SloRulesEngine
               actual_fingerprint: check[:actual_fingerprint]
             )
           end
+          validate_source_derivation!(evidence) if stale_findings.empty?
           fresh = stale_findings.empty?
-          {
+          status = {
             schema_version: STATUS_SCHEMA_VERSION,
             kind: STATUS_KIND,
             evidence_id: Support.fetch_value(evidence, :evidence_id),
@@ -969,9 +1091,45 @@ module SloRulesEngine
             source_checks: checks,
             findings: stale_findings
           }
+          [evidence, status]
         end
 
         private
+
+        def validate_source_derivation!(evidence)
+          source = Support.fetch_value(evidence, :source, {})
+          review = Support.fetch_value(evidence, :review, {})
+          rebuilt = Builder.new.build(
+            manifest_path: Support.fetch_value(Support.fetch_value(source, :manifest, {}), :path),
+            input_paths: Array(Support.fetch_value(source, :native_inputs)).map do |entry|
+              Support.fetch_value(entry, :path)
+            end,
+            generated_rules_path: Support.fetch_value(
+              Support.fetch_value(source, :generated_rules, {}),
+              :path
+            ),
+            reviewer: Support.fetch_value(review, :reviewer),
+            reviewed_at: Support.fetch_value(review, :reviewed_at)
+          )
+          return if Support.fingerprint(derivation_identity(evidence)) ==
+                    Support.fingerprint(derivation_identity(rebuilt))
+
+          raise ContractError, [Support.finding(
+            'sloth_evidence_source_derivation_mismatch',
+            'Sloth evidence mappings must be derived exactly from the linked current sources.'
+          )]
+        end
+
+        def derivation_identity(evidence)
+          identity = JSON.parse(JSON.generate(evidence))
+          identity.delete('evidence_id')
+          Array(identity['slos']).each do |slo|
+            Array(slo.dig('status_bindings', 'burn_rate')).each do |binding|
+              binding['threshold'] = 1.0 unless binding.key?('threshold')
+            end
+          end
+          identity
+        end
 
         def check_source(entry, kind, index: nil)
           path = Support.fetch_value(entry, :path)

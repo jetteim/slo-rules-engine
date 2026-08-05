@@ -702,7 +702,7 @@ module RulesCtl
         bin/rules-ctl diff --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl import --provider=<provider> [--output-dir=<dir>] [--manifest=<manifest.json>] <definitionfile...>
         bin/rules-ctl prune --provider=<provider> [--dry-run] [--confirm] [--output-dir=<dir>] [--journal-dir=<dir>] [--manifest=<manifest.json>] [--handoff-dir=<dir>] [--review-report=<file>] <definitionfile...>
-        bin/rules-ctl status (--provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] | --bundle=<bundle.json> [--target-base-url=<service/provider>=<url> ...] | --portfolio=<portfolio.json> [--target-base-url=<service/provider>=<url> ...]) [--max-age-seconds=<seconds>] [--output=<file>]
+        bin/rules-ctl status (--provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] | --provider=sloth --manifest=<manifest.json> --evidence=<sloth-evidence.json> --base-url=<url> | --bundle=<bundle.json> [--target-base-url=<service/provider>=<url> ...] | --portfolio=<portfolio.json> [--target-base-url=<service/provider>=<url> ...]) [--max-age-seconds=<seconds>] [--output=<file>]
         bin/rules-ctl sloth-evidence capture --manifest=<manifest.json> --input=<sloth.yaml> [--input=<sloth-N.yaml> ...] --generated-rules=<rules.yaml> --reviewer=<identity> --reviewed-at=<timestamp> --output=<evidence.json>
         bin/rules-ctl sloth-evidence status <evidence.json>
         bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]

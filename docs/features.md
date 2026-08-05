@@ -176,8 +176,16 @@ Sloth identity, explicit reviewer/timestamp attestation, and credential-free
 sources. It preserves the reviewed native total-event query for observations
 because characterized Sloth output has no dedicated observation record.
 `sloth-evidence status` rechecks every canonical source fingerprint. These
-commands make no provider call and do not yet enable the Sloth live reader or
-downstream bundle verification.
+commands make no provider call. Direct Sloth live status now consumes only a
+fresh exact-manifest evidence artifact and an explicit Prometheus runtime;
+downstream bundle verification remains separate.
+
+The official Sloth main branch also contains a stateless read-only Streamable
+HTTP MCP server. A planned version-gated provider adapter will first use its six
+tools for supplemental discovery/status cross-checks reconciled by exact
+`sloth_id`. It cannot replace the direct reader until observations, exact source
+record identity, and sample freshness reach contract parity. This is distinct
+from the engine-owned MCP server planned in AICLI-F6.
 
 ## Prometheus Stack Provider Generation
 
@@ -197,9 +205,10 @@ Selector-based SLOs calculate success ratios from scoped counter rates. Threshol
 
 ## Live SLO And Error-Budget Status
 
-`rules-ctl status` reads either one reviewed `prometheus_stack` manifest, one
-current reviewed release bundle, or one explicit live-status portfolio. It
-queries only generated recording-rule identifiers through the
+`rules-ctl status` reads one reviewed `prometheus_stack` manifest, one reviewed
+`sloth` manifest with fresh downstream evidence, one current reviewed release
+bundle, or one explicit live-status portfolio. It queries only generated
+recording-rule identifiers or evidence-declared Sloth bindings through the
 Prometheus-compatible instant-query API. The provider-neutral
 `slo-rules-engine/live-slo-status/v1` report normalizes objective attainment,
 remaining/consumed budget, burn-rate windows, observation count, source age,
@@ -212,12 +221,14 @@ The reader distinguishes `healthy`, `at_risk`, `exhausted`,
 `missing_telemetry`, and `unverifiable`. It treats those classifications as
 operational report data rather than CLI failures. Unreviewed or invalid
 manifests, stale bundles, invalid portfolios, and incomplete or unknown
-per-target runtime mappings fail before backend access. Mixed-provider
-aggregates retain Datadog and Sloth targets as explicit unsupported coverage;
+per-target runtime mappings fail before backend access. Sloth direct reads also
+reject invalid/stale evidence, manifest/service drift, or incomplete SLO
+coverage before client construction. Mixed-provider aggregates retain Datadog
+and Sloth targets as explicit unsupported coverage;
 an input with no readable target fails. Runtime URLs and raw backend error
-messages are not copied into reports. Datadog remains evidence-gated. Sloth's
-downstream identity contract now exists, while its reader remains the next
-provider-status implementation slice.
+messages are not copied into reports. Datadog remains evidence-gated. Aggregate
+Sloth status remains open until bundles/portfolios package evidence and runtime
+mappings.
 
 ## Planned Agent-Operable Interfaces
 

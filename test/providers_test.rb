@@ -23,6 +23,7 @@ class ProvidersTest < Minitest::Test
     assert_includes registry.fetch('sloth').capabilities, 'slo_evaluation'
     assert_includes registry.fetch('sloth').capabilities, 'apply_plan'
     assert_includes registry.fetch('prometheus_stack').capabilities, 'live_slo_status'
+    assert_includes registry.fetch('sloth').capabilities, 'live_slo_status'
   end
 
   def test_provider_registry_lists_automation_modes_and_state_actions

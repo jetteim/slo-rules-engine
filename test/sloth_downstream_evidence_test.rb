@@ -71,6 +71,7 @@ class SlothDownstreamEvidenceTest < Minitest::Test
       assert_equal 'derived_from_recording_rule', bindings.dig(:success_ratio, :kind)
       assert_includes bindings.dig(:success_ratio, :query), '1 - ('
       assert_equal 2, bindings.fetch(:burn_rate).length
+      assert_equal [1.0, 1.0], bindings.fetch(:burn_rate).map { |binding| binding.fetch(:threshold) }
       assert_includes bindings.dig(:freshness, :query), 'timestamp('
 
       serialized = JSON.generate(evidence)
@@ -188,6 +189,23 @@ class SlothDownstreamEvidenceTest < Minitest::Test
     with_sources do |sources|
       evidence = build_evidence(sources)
       evidence.fetch(:slos).fetch(0).fetch(:status_bindings).delete(:observations)
+      evidence.fetch(:source).fetch(:manifest)[:path] = File.join(sources.fetch(:dir), 'must-not-be-read.json')
+      evidence[:evidence_id] = SloRulesEngine::Sloth::DownstreamEvidence::Support.evidence_id(evidence)
+      evidence_path = File.join(sources.fetch(:dir), 'sloth-evidence.json')
+      File.write(evidence_path, JSON.pretty_generate(evidence))
+
+      error = assert_raises(SloRulesEngine::Sloth::DownstreamEvidence::ContractError) do
+        SloRulesEngine::Sloth::DownstreamEvidence::StatusEvaluator.new.evaluate(evidence_path)
+      end
+      assert_includes finding_codes(error), 'invalid_sloth_evidence_schema'
+      refute_includes finding_codes(error), 'unreadable_sloth_manifest'
+    end
+  end
+
+  def test_status_rejects_rehashed_query_drift_before_source_reads
+    with_sources do |sources|
+      evidence = build_evidence(sources)
+      evidence.fetch(:slos).fetch(0).fetch(:status_bindings).fetch(:success_ratio)[:query] = 'vector(1)'
       evidence.fetch(:source).fetch(:manifest)[:path] = File.join(sources.fetch(:dir), 'must-not-be-read.json')
       evidence[:evidence_id] = SloRulesEngine::Sloth::DownstreamEvidence::Support.evidence_id(evidence)
       evidence_path = File.join(sources.fetch(:dir), 'sloth-evidence.json')

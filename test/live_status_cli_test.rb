@@ -3,6 +3,7 @@
 require 'minitest/autorun'
 require 'fileutils'
 require 'tmpdir'
+require 'yaml'
 require_relative 'support/cli_helpers'
 require_relative 'support/release_bundle_fixtures'
 
@@ -195,7 +196,100 @@ class LiveStatusCliTest < Minitest::Test
     end
   end
 
+  def test_status_reads_one_sloth_manifest_only_with_fresh_reviewed_evidence
+    with_sloth_status_sources do |sources|
+      output_path = File.join(sources.fetch(:dir), 'status.json')
+      request_log_path = File.join(sources.fetch(:dir), 'requests.log')
+      fake_http = File.join(sources.fetch(:dir), 'fake_prometheus_status_http.rb')
+      FileUtils.cp(File.expand_path('support/fake_prometheus_status_http.rb', __dir__), fake_http)
+
+      stdout, stderr, status = rules_ctl(
+        'status',
+        '--provider=sloth',
+        "--manifest=#{sources.fetch(:manifest)}",
+        "--evidence=#{sources.fetch(:evidence)}",
+        '--base-url=http://sloth-status.example.test',
+        '--max-age-seconds=300',
+        "--output=#{output_path}",
+        env: {
+          'RUBYOPT' => "-r#{fake_http}",
+          'PROMETHEUS_REQUEST_LOG' => request_log_path
+        }
+      )
+
+      assert status.success?, stderr
+      assert_empty stderr
+      payload = JSON.parse(stdout)
+      assert_equal payload, JSON.parse(File.read(output_path))
+      assert_equal 'sloth', payload.fetch('provider')
+      assert_equal 'healthy', payload.fetch('statuses').fetch(0).fetch('state')
+      assert_equal 'public-api', payload.dig('statuses', 0, 'identity', 'sli_instance')
+      requests = File.readlines(request_log_path, chomp: true)
+      assert_equal 8, requests.length
+      assert requests.all? { |request| request.start_with?('sloth-status.example.test /api/v1/query?') }
+    end
+  end
+
+  def test_status_rejects_stale_sloth_evidence_before_backend_access
+    with_sloth_status_sources do |sources|
+      generated = YAML.safe_load(File.read(sources.fetch(:generated)), aliases: false)
+      generated.fetch('groups').fetch(0).fetch('rules').fetch(0)['expr'] = 'vector(0)'
+      File.write(sources.fetch(:generated), YAML.dump(generated))
+      request_log_path = File.join(sources.fetch(:dir), 'requests.log')
+      fake_http = File.join(sources.fetch(:dir), 'fake_prometheus_status_http.rb')
+      FileUtils.cp(File.expand_path('support/fake_prometheus_status_http.rb', __dir__), fake_http)
+
+      stdout, stderr, status = rules_ctl(
+        'status',
+        '--provider=sloth',
+        "--manifest=#{sources.fetch(:manifest)}",
+        "--evidence=#{sources.fetch(:evidence)}",
+        '--base-url=http://sloth-status.example.test',
+        env: {
+          'RUBYOPT' => "-r#{fake_http}",
+          'PROMETHEUS_REQUEST_LOG' => request_log_path
+        }
+      )
+
+      refute status.success?
+      assert_empty stderr
+      payload = JSON.parse(stdout)
+      assert_equal 'invalid_sloth_live_status_evidence', payload.dig('error', 'code')
+      assert_includes payload.fetch('findings').map { |finding| finding.fetch('code') },
+                      'stale_generated_rules'
+      refute File.exist?(request_log_path)
+    end
+  end
+
   private
+
+  def with_sloth_status_sources
+    Dir.mktmpdir do |dir|
+      manifest = reviewed_manifest('sloth')
+      manifest_path = File.join(dir, 'manifest.json')
+      input_path = File.join(dir, 'sloth.yaml')
+      generated_path = File.join(dir, 'generated-rules.yaml')
+      evidence_path = File.join(dir, 'sloth-evidence.json')
+      File.write(manifest_path, JSON.pretty_generate(manifest))
+      File.write(input_path, YAML.dump(manifest.dig('artifacts', 'sloth_specs', 0)))
+      FileUtils.cp(File.expand_path('fixtures/sloth/generated-rules.yaml', __dir__), generated_path)
+      evidence = SloRulesEngine::Sloth::DownstreamEvidence::Builder.new.build(
+        manifest_path: manifest_path,
+        input_paths: [input_path],
+        generated_rules_path: generated_path,
+        reviewer: 'platform-reviewer@example.test',
+        reviewed_at: REVIEWED_AT
+      )
+      File.write(evidence_path, JSON.pretty_generate(evidence))
+      yield(
+        dir: dir,
+        manifest: manifest_path,
+        input: input_path,
+        generated: generated_path,
+        evidence: evidence_path
+      )
+    end
+  end
 
   def write_live_status_portfolio(dir)
     manifests = %w[checkout-api search-api].map do |service|

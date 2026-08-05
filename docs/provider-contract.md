@@ -179,7 +179,9 @@ Expected telemetry behavior:
 
 Additional capability:
 
-- `live_slo_status` indicates that a provider has an implemented live-status reader; it is currently declared only by `prometheus_stack`
+- `live_slo_status` indicates that a provider has an implemented live-status
+  reader; it is declared by `prometheus_stack` and by `sloth` when direct reads
+  are linked to fresh reviewed downstream evidence
 
 ### `sloth`
 
@@ -212,14 +214,21 @@ Expected state behavior:
   objective/budget agreement, reviewer attestation, and credential-free inputs
 - downstream evidence status validates content identity before rereading every
   local source fingerprint; neither command makes a provider call
+- direct live status requires the exact reviewed manifest, fresh complete
+  downstream evidence, and an explicit Prometheus runtime before client
+  construction; it queries only evidence-declared bindings
+- the official Sloth main-branch MCP server is a planned optional read-only
+  provider adapter/cross-check, not a substitute for reviewed evidence or the
+  engine's later command-registry MCP surface
 
 Expected telemetry behavior:
 
 - reuse the Prometheus-compatible lookup and discovery baseline for onboarding and sanity checks
 - batch discovery support is inherited through the Prometheus-compatible discovery interface
-- direct live status remains deferred until the reader consumes fresh reviewed
-  downstream evidence; aggregate status continues to report Sloth as explicit
-  unsupported coverage
+- direct live status consumes fresh reviewed downstream evidence for one
+  manifest; aggregate status continues to report Sloth as explicit unsupported
+  coverage until release/portfolio artifacts package evidence and runtime
+  mappings
 
 ## Delivery Integrations
 

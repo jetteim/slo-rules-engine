@@ -91,8 +91,11 @@ Planning is observational. Confirmed mutation is fail-closed and journaled.
 
 ### Live Status
 
-`live_status.rb` and `live_status/aggregate.rb` read generated Prometheus record
-identities and normalize objective, budget, burn, freshness, and coverage.
+`live_status.rb`, `live_status/sloth_reader.rb`, and
+`live_status/aggregate.rb` read generated Prometheus record identities and
+normalize objective, budget, burn, freshness, and coverage. Prometheus Stack
+reads identifiers from its reviewed manifest. Sloth first validates an exact,
+fresh downstream-evidence artifact and then reads only its status bindings.
 Provider query syntax remains evidence in the reader. Live status never mutates
 provider state and never persists runtime endpoints.
 
@@ -106,9 +109,15 @@ persists a content-addressed reviewer attestation, and rechecks canonical
 source fingerprints without executing Sloth or contacting Prometheus.
 
 The artifact retains generated record selectors and the reviewed native total
-query as provider evidence. It does not add PromQL to the neutral model or
-change bundle/live-status behavior until those consumers explicitly accept the
-evidence schema.
+query as provider evidence. It does not add PromQL to the neutral model. The
+direct Sloth reader now explicitly accepts it; release-bundle verification and
+aggregate status do not yet package it.
+
+The official Sloth HTTP MCP server is a future provider-runtime adapter, not the
+planned engine MCP interface. It may supply read-only discovery/status
+cross-checks after version/tool/schema gating, but it cannot bypass downstream
+evidence or shared `status` handlers. The engine's AICLI-F6 MCP server remains a
+registry-generated command adapter with no independent provider logic.
 
 ## Primary Flows
 
@@ -141,8 +150,8 @@ neutral Ruby definition
 ### Reviewed Intent To Current Status
 
 ```text
-reviewed Prometheus Stack manifest
-  -> generated recording-rule identities
+reviewed Prometheus Stack manifest or reviewed Sloth manifest + fresh evidence
+  -> generated recording-rule identities / evidence status bindings
   -> GET-only instant queries
   -> normalized per-SLO report
   -> optional release/portfolio aggregate

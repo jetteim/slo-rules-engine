@@ -23,7 +23,8 @@ Use the toolkit to:
 - capture reviewed, content-addressed Sloth generated-rule identity without
   running Sloth or contacting Prometheus
 - read current Prometheus-compatible SLO attainment, remaining error budget,
-  burn rate, and telemetry freshness from one reviewed manifest
+  burn rate, and telemetry freshness from one reviewed Prometheus Stack or
+  evidence-linked Sloth manifest
 - validate Datadog credentials and dashboard reconciliation in an isolated
   sandbox before relying on live provider behavior
 
@@ -82,8 +83,9 @@ reviewed manifest and native input fingerprints to the saved generated
 Prometheus recording rules. The content-addressed artifact preserves exact
 objective, budget, burn, metadata, error-ratio, observation-query, and
 freshness bindings. `sloth-evidence status` rereads those local sources and
-fails when their semantic fingerprints drift. This standalone evidence does
-not yet make Sloth live status or bundle downstream verification complete.
+fails when their semantic fingerprints drift. Direct Sloth `status` consumes
+only this fresh evidence and an explicit Prometheus runtime; release-bundle
+downstream verification remains incomplete.
 
 ## Usage By Use Case
 
@@ -390,10 +392,21 @@ zero, while stale source fingerprints exit one with stable findings. Both
 commands are local: neither runs Sloth nor reads or mutates a provider. See
 [Sloth Downstream Evidence](docs/sloth-downstream-evidence.md).
 
+Read the linked Sloth records only after the evidence is fresh:
+
+```bash
+bin/rules-ctl status \
+  --provider=sloth \
+  --manifest=./managed/checkout-api/sloth/manifest.json \
+  --evidence=./work/sloth-evidence/checkout-api.json \
+  --base-url=http://localhost:9090 \
+  --output=./work/checkout-api-sloth-status.json
+```
+
 ### Inspect live SLO and error-budget status
 
 Read the generated recording-rule series for one reviewed Prometheus Stack
-manifest:
+manifest, or use the evidence-linked Sloth form shown above:
 
 ```bash
 bin/rules-ctl status \
@@ -428,7 +441,7 @@ whose targets name reviewed manifest paths, then pass one
 `--target-base-url=service/provider=URL` for every Prometheus Stack target.
 Both aggregate modes print `slo-rules-engine/live-slo-status-aggregate/v1`.
 Each readable target retains its complete per-manifest report; unsupported
-Datadog and Sloth targets remain visible as `unsupported` coverage rather than
+Datadog and Sloth aggregate targets remain visible as `unsupported` coverage rather than
 being omitted. Bundle schema, identity, embedded artifacts, review evidence,
 and current source fingerprints plus all runtime mappings are validated before
 the first backend read. Runtime URLs are never written into reports or bundles.
@@ -503,6 +516,9 @@ The initial delivery integration is `notification_router`, which generates conte
 - Prometheus Stack and Sloth apply manage deterministic files; downstream deployment remains external.
 - Sloth downstream evidence capture is local and credential-free; it requires
   complete reviewed record identity and does not run Sloth or query Prometheus.
+- Direct Sloth status requires the exact reviewed manifest, fresh downstream
+  evidence, complete SLO coverage, and an explicit Prometheus base URL before
+  constructing a provider client.
 - Exact file-backed apply rejects changed observed state and same-scope
   concurrency before executing the stored operation list.
 - Live status is read-only, requires reviewed manifest provenance, validates
@@ -519,6 +535,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Provider State Contract](docs/provider-state-contract.md)
 - [Live SLO Status Contract](docs/live-status-contract.md)
 - [Sloth Downstream Evidence](docs/sloth-downstream-evidence.md)
+- [Official Sloth MCP Integration Path](docs/sloth-mcp-integration.md)
 - [Datadog Public Contract Evidence](docs/datadog-contract-evidence.md)
 - [Datadog Sandbox Testing](docs/datadog-sandbox-testing.md)
 - [Provider Contract](docs/provider-contract.md)

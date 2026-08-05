@@ -148,6 +148,13 @@ class CliCommandRegistryTest < Minitest::Test
     assert_equal 'local_read', status.side_effect
     assert_includes status.safety_gates, 'evidence_freshness'
     assert_empty status.io.fetch(:provider_reads)
+
+    live_status = @registry.fetch('status')
+    assert_includes live_status.io.fetch(:local_reads), 'sloth_downstream_evidence'
+    assert_includes live_status.safety_gates, 'exact_manifest_evidence'
+    assert_includes live_status.human_usage, '--provider=sloth'
+    assert_equal './sloth-evidence.json',
+                 live_status.agent.fetch(:request_example).fetch(:arguments).fetch(:evidence_file)
   end
 
   def test_separate_catalog_pairs_human_commands_with_agent_json_requests

@@ -82,6 +82,10 @@ retain each target's evidence and make unsupported coverage explicit.
 - aggregate target/state rollups with retained partial query-failure evidence
 - content-addressed reviewed Sloth downstream identity evidence with local
   freshness checks and no backend access
+- one-manifest Sloth live status using only fresh exact-manifest downstream
+  evidence and an explicit Prometheus runtime
+- a planned, version-gated official Sloth MCP provider adapter for read-only
+  identity/status comparison before any transport-parity claim
 
 ### 6. Reviewed Workflow To Agent-Safe Automation
 
@@ -114,12 +118,12 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. add Sloth live status using the implemented fresh reviewed downstream
-   evidence contract and explicit Prometheus runtime configuration
-2. keep Datadog live status, contract testing, exact apply/resume, and live
+1. extend release-bundle Sloth downstream verification only after packaging one
+   current evidence artifact and explicit runtime per target
+2. prototype the official Sloth MCP provider adapter as a read-only comparison
+   report, retaining direct Prometheus evidence as the contract-complete path
+3. keep Datadog live status, contract testing, exact apply/resume, and live
    bundle verification postponed until isolated credentials are available
-3. extend release-bundle Sloth downstream verification only after the
-   evidence-backed live reader is proven
 4. resume AICLI-F2 from the implemented registry/catalog foundation when the
    provider-evidence checkpoint is complete
 

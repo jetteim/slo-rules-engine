@@ -50,7 +50,7 @@ Therefore the article's raw-payload guidance is adapted as follows:
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
 | Input Hardening | Manifest, bundle, credential-key, ownership, and managed-path validation are strong but distributed. There is no shared agent-input policy or adversarial fuzz suite. | Add strict request schemas, field-specific path/ID/URL rules, size/depth limits, and generated-input testing. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
-| Multiple Surfaces From One Contract | Human top-level and grouped-subcommand dispatch now resolve through one registry; the paired Agent JSON mappings are planned contracts only. There is no Agent CLI or MCP server. | Extend the same registry/catalog into Agent CLI validation, schema introspection, skills metadata, and a later MCP stdio adapter. |
+| Multiple Surfaces From One Contract | Human top-level and grouped-subcommand dispatch now resolve through one registry; the paired Agent JSON mappings are planned contracts only. There is no rules-engine Agent CLI or MCP server. Sloth's upstream main branch has a separate provider-runtime HTTP MCP server that this engine does not yet consume. | Extend the same registry/catalog into Agent CLI validation, schema introspection, skills metadata, and a later rules-engine MCP stdio adapter. Keep an optional Sloth MCP client behind shared provider/status handlers and parity gates. |
 | Validation-Only Safety And Response Sanitization | Mutation planning, confirmation, review gates, journals, and sanitized backend errors exist. Some current dry-run planning may read backend state, and there is no prompt-injection-aware response policy. | Add a distinct `validate_only` mode with no backend calls or writes, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
 
 ## Target Architecture
@@ -90,6 +90,14 @@ example and is not executable until AICLI-F2 provides strict schemas and the
 Agent CLI adapter.
 
 Adapters only parse or render. They do not reimplement review policy, provider translation, state planning, or mutation logic.
+
+Sloth's official Streamable HTTP MCP endpoint is a different boundary from the
+planned `rules-ctl` MCP stdio server. It is an optional provider runtime, not a
+command interface for this engine. If a future `status` handler accepts that
+runtime, Human CLI, Agent CLI, and engine MCP must select it through equivalent
+registry fields and must preserve exact downstream-evidence, version, tool
+allowlist, identity, freshness, and output-parity checks. See
+[Official Sloth MCP Integration Path](sloth-mcp-integration.md).
 
 ## Capability Map
 
@@ -264,7 +272,7 @@ Agent request schemas remain AICLI-F2 scope.
 
 **Value:** agents can call typed tools without shell escaping while keeping the same authorization and mutation boundaries.
 
-**Acceptance criteria:** MCP tools are generated from registry schemas, use allowlists, return the Agent CLI envelopes, load credentials only through declared headless paths, preserve side-effect metadata, and pass command parity tests without executing a shell.
+**Acceptance criteria:** MCP tools are generated from registry schemas, use allowlists, return the Agent CLI envelopes, load credentials only through declared headless paths, preserve side-effect metadata, and pass command parity tests without executing a shell. Provider-runtime MCP adapters, including Sloth's upstream HTTP MCP surface, remain behind shared handlers and cannot introduce MCP-only inputs, outputs, safety gaps, or provider-payload bypasses.
 
 **Architecture impact:** optional stdio protocol adapter over registry and handlers; no independent MCP business logic.
 

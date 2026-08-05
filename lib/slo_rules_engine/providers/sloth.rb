@@ -16,6 +16,7 @@ module SloRulesEngine
             parameterized_dashboards
             reality_check
             apply_plan
+            live_slo_status
           ],
           automation_mode: 'external_generator',
           state_actions: %w[plan apply diff import_existing prune]
@@ -108,6 +109,7 @@ module SloRulesEngine
             summary: "#{definition.service} #{sli.uid} error budget is burning",
             service: definition.service,
             sli: sli.uid,
+            sli_instance: instance.uid,
             slo: slo.uid,
             dashboard: slo.dashboard_path,
             playbook: instance.playbook_url,

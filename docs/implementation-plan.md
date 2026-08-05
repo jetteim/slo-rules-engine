@@ -214,8 +214,11 @@ This is the running plan for the long refactor.
   recording-rule and provider-status query identities without provider calls.
 - [x] Recheck saved Sloth downstream evidence identity and every local source
   fingerprint with stable stale findings before later consumers trust it.
-- [ ] Add the Sloth live-status reader using only fresh reviewed downstream
+- [x] Add the Sloth live-status reader using only fresh reviewed downstream
   evidence and explicit Prometheus runtime configuration.
+- [ ] Add a version-gated read-only adapter for the official Sloth HTTP MCP
+  server, initially as an exact-identity comparison report; do not promote it
+  to a status transport until neutral output parity is proven.
 - [ ] Extend release-bundle downstream verification to packaged current Sloth
   evidence after the reader and bundle artifact contract are proven.
 

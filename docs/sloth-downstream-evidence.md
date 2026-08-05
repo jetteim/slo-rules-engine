@@ -58,7 +58,10 @@ record. The evidence artifact therefore preserves the exact reviewed
 `sli.events.total_query` as the observation binding. It does not mislabel an
 error-ratio record as request volume. Success ratio and freshness queries are
 derived only from the captured evaluation error-ratio identity inside this
-provider-specific artifact; no PromQL enters the neutral DSL.
+provider-specific artifact; no PromQL enters the neutral DSL. Current and
+evaluation-period burn bindings carry a provider status threshold of `1.0`,
+meaning the error budget is being consumed faster than its sustainable rate;
+this does not replace Sloth's generated alert-window thresholds.
 
 ## Freshness Status
 
@@ -97,7 +100,9 @@ Capture writes nothing when any input is invalid. Stable finding codes include:
 Status uses `sloth_evidence_identity_mismatch`, `stale_sloth_manifest`,
 `stale_sloth_native_input`, and `stale_generated_rules`. Unsafe YAML aliases,
 malformed JSON/YAML, missing files, and unreadable files fail closed with
-source-specific findings.
+source-specific findings. A rehashed artifact whose identity, selectors, or
+status bindings are not derived exactly from the linked current sources fails
+`sloth_evidence_source_derivation_mismatch`.
 
 ## Safety Boundary
 
@@ -106,7 +111,12 @@ explicit `--output` artifact after every validation passes. They load no
 credentials, make no provider call, execute no shell command, do not run
 Sloth, and do not apply or reload Prometheus rules.
 
-This evidence closes the generated-rule identity prerequisite for a future
-Sloth live-status reader. Direct Sloth status and release-bundle downstream
-verification remain unsupported until those workflows explicitly consume this
-artifact and perform their own freshness preflight.
+Direct `status --provider=sloth` now consumes this artifact. It revalidates the
+content ID and every source fingerprint, requires an exact manifest/service/SLO
+coverage match, then queries only the saved bindings through an explicit
+Prometheus runtime. Release-bundle downstream verification remains unsupported
+until bundles package current evidence per target.
+
+Sloth's own main branch also contains a read-only HTTP MCP server. Its planned
+role, current status-parity gaps, setup, and promotion gates are documented in
+[Official Sloth MCP Integration Path](sloth-mcp-integration.md).
