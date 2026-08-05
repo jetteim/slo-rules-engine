@@ -8,14 +8,14 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Add one-manifest Sloth live status using only fresh reviewed downstream
-   evidence and explicit Prometheus runtime configuration
-2. Extend Sloth release-bundle downstream verification only after the
-   evidence-backed reader is proven
+1. Package current reviewed Sloth downstream evidence into release/portfolio
+   status and downstream-verification workflows
+2. Add the official Sloth MCP runtime only as a version-gated read-only
+   comparison adapter until status-output parity is proven
 3. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
 4. Resume AICLI-F2 structured Agent CLI and runtime introspection from the
-   completed registry/catalog foundation after the Sloth reader checkpoint
+   completed registry/catalog foundation after the Sloth evidence checkpoint
 5. Datadog exact-plan parity only after live recheck/idempotency semantics are
    verified
 
@@ -105,18 +105,21 @@ generation emits evaluation-window success/error ratios, allowed and remaining
 error-budget records, and burn-rate records calculated over their own policy
 windows. `status --provider=prometheus_stack --manifest=...` requires one
 reviewed manifest and performs GET-only instant queries against generated
-record names. The versioned report distinguishes `healthy`, `at_risk`,
+record names. `status --provider=sloth --manifest=... --evidence=...` with an
+explicit `--base-url=...` additionally requires fresh reviewed downstream
+evidence for the exact manifest and queries only persisted provider bindings.
+The versioned report distinguishes `healthy`, `at_risk`,
 `exhausted`, `missing_telemetry`, and `unverifiable`, preserves reviewed
 identity/context and provider evidence, detects reviewed/provider objective
 drift, sanitizes backend failures, and can save the same timestamped/freshness
 report printed to stdout. `status --bundle=...` and `status --portfolio=...`
 emit `slo-rules-engine/live-slo-status-aggregate/v1`, retain every readable
-target report, expose unsupported Datadog/Sloth targets as coverage gaps, and
+target report, expose unsupported Datadog/Sloth aggregate targets as coverage
+gaps, and
 require one runtime endpoint per readable target without persisting those URLs.
 Stale bundles, invalid portfolios, review gaps, target mismatches, and runtime
-mapping errors fail before the first backend read. Datadog and Sloth readers
-remain open, but Sloth now has the reviewed downstream identity prerequisite
-needed for its next reader slice.
+mapping errors fail before the first backend read. Datadog direct status and
+Sloth aggregate status remain open.
 
 Current Sloth downstream-evidence status:
 `sloth-evidence capture` reads one reviewed Sloth manifest, every native input,
@@ -130,8 +133,12 @@ record selectors plus the reviewed native observation query. `sloth-evidence
 status` validates schema and content identity before rereading any source path,
 then emits `slo-rules-engine/sloth-downstream-evidence-status/v1` with fresh or
 stale canonical fingerprints. Both commands make zero provider calls and do
-not run Sloth. Direct Sloth live status and release-bundle downstream
-verification still require explicit consumers of this artifact.
+not run Sloth. Status also reconstructs saved mappings from current sources so
+a rehashed altered artifact cannot become trusted provider input. Direct Sloth
+live status consumes this evidence; release-bundle downstream verification
+still requires packaging it per target. The official Sloth main-branch HTTP MCP
+server is documented as a future version-gated read-only comparison adapter,
+not as a parity-complete status source or engine MCP replacement.
 
 Current architecture status: `bin/rules-ctl` is a six-line bootstrap for
 `lib/slo_rules_engine/cli.rb`. The library facade composes nine focused command
@@ -208,6 +215,23 @@ Implemented and already pushed:
 
 Implemented by the latest feature slices:
 
+- Direct `status --provider=sloth` consumes fresh exact-manifest reviewed
+  downstream evidence and an explicit Prometheus runtime
+- Sloth live status emits the existing neutral five-state report with complete
+  reviewed identity/context, objective, budget, burn, freshness, provider
+  resource, and query evidence
+- Sloth status preflight validates evidence schema/content ID, reconstructs
+  mappings from current manifest/native/generated sources, checks source
+  fingerprints, exact manifest/service identity, and complete SLO coverage
+  before constructing the backend client
+- Sloth manifests retain `sli_instance` for complete neutral status identity,
+  and the provider now declares `live_slo_status`
+- Human CLI usage, planned Agent JSON mapping, registry metadata, README, use
+  cases, provider/status contracts, features, design, and roadmap include the
+  Sloth status form
+- `docs/sloth-mcp-integration.md` records the official Sloth main-branch
+  Streamable HTTP MCP surface, six read-only tools, release/version status,
+  setup, security/refusal rules, parity gaps, and comparison-first path
 - `sloth-evidence capture` now creates reviewed, content-addressed,
   credential-free generated-rule evidence without executing Sloth or reading a
   backend
@@ -450,7 +474,9 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: reviewed content-addressed Sloth downstream generated-rule
+- latest checkpoint: evidence-backed one-manifest Sloth live status and official
+  Sloth MCP integration path
+- previous checkpoint: reviewed content-addressed Sloth downstream generated-rule
   evidence plus local source freshness status
 - previous checkpoint: AICLI-F1 shared command registry and separate 37-command
   Human CLI to planned Agent JSON parity catalog
@@ -537,10 +563,13 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Add one-manifest Sloth live status that consumes only current reviewed
-   downstream evidence and explicit Prometheus runtime configuration
-2. Extend release-bundle and aggregate Sloth status/verification only after the
-   one-manifest reader is behavior-tested
+1. Package one current reviewed Sloth downstream-evidence artifact per release
+   or portfolio target, preflight all evidence/runtime mappings, and extend
+   aggregate status plus release-bundle downstream verification
+2. Implement the official Sloth MCP runtime as a version/tool/schema-gated
+   read-only comparison report reconciled by exact `sloth_id`; do not promote it
+   to a status transport while observations, exact record identity, and
+   equivalent freshness are absent
 3. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
 4. Extend exact approval/apply/resume to Datadog only after verified backend
@@ -562,29 +591,27 @@ Secondary gaps:
 
 Next recommended slice:
 
-- extend direct `status` with an explicit Sloth downstream-evidence input while
-  preserving the current Prometheus Stack syntax
-- validate evidence schema, content identity, source freshness, exact
-  manifest fingerprint, provider/service/SLO coverage, and runtime URL before
-  constructing the Prometheus client or making the first backend read
-- query only the observation and generated-record bindings persisted in the
-  reviewed evidence; normalize values into the existing
-  `slo-rules-engine/live-slo-status/v1` state and finding contract
-- keep PromQL and Sloth labels in provider evidence, not the neutral DSL; do
-  not run Sloth, reload Prometheus, or infer missing rules
-- add fake-HTTP tests for healthy, at-risk, exhausted, missing, stale,
-  ambiguous, failed-query, and preflight-refusal behavior, then update exact
-  use-case outputs and registry/catalog mappings
+- extend the release-bundle artifact contract to package exactly one current
+  `slo-rules-engine/sloth-downstream-evidence/v1` artifact for each Sloth target
+- validate bundle identity, evidence content/source derivation, exact
+  manifest/service/SLO coverage, and every Sloth runtime mapping before the
+  first backend client is constructed
+- reuse `LiveStatus::SlothReader` for aggregate target reports and replace
+  unsupported coverage only for packaged valid evidence
+- extend bundle downstream verification from `pending` only when packaged
+  evidence and live Prometheus status prove reviewed generated state; do not
+  execute Sloth or reload/apply Prometheus rules
+- keep the official Sloth MCP adapter as the following comparison-only slice
 
 Rationale:
 
-- Sloth generated-rule identity is now reviewed, content-addressed, complete,
-  and freshness-checkable without backend credentials
-- the evidence artifact already carries the exact provider queries needed by a
-  reader, including the reviewed native observation query
-- one-manifest status is the smallest consumer that proves these identities
-  against live Prometheus data before bundle/portfolio aggregation depends on
-  them
+- direct Sloth status now proves reviewed generated-rule identities against
+  live Prometheus data without broadening the neutral model
+- packaging is the remaining prerequisite for release/portfolio coverage and
+  downstream verification
+- the official Sloth MCP server is useful provider evidence, but the checked
+  upstream surface lacks fields required for a contract-complete neutral status,
+  so direct Prometheus bindings remain authoritative
 - Phase 9 still correctly closes at verified engine-owned files and does not
   claim downstream Sloth/Prometheus convergence
 - AICLI-F2 retains a complete foundation and can resume without losing parity
@@ -592,14 +619,15 @@ Rationale:
 
 ## Next Session Handoff
 
-Prepared on 2026-08-04 for a restart-and-`proceed` workflow.
+Prepared on 2026-08-05 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest verified checkpoint: `dff62e7 feat: capture reviewed Sloth downstream
-  evidence`
-- previous verified checkpoint: `ad31f2f docs: hand off CLI registry checkpoint`
+- latest verified checkpoint: `8fcc249 feat: add evidence-backed Sloth live
+  status`
+- previous verified checkpoint: `472d44c docs: hand off Sloth evidence
+  checkpoint`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff:
@@ -608,17 +636,17 @@ Current safe boundary:
 
 Verification evidence:
 
-- target: reviewed Sloth downstream generated-rule evidence, freshness status,
-  and 37-command Human/Agent catalog parity
+- target: evidence-backed one-manifest Sloth live status, hardened source
+  derivation, and official Sloth MCP integration roadmap
 - command: `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh`
-- recorded timestamp: `2026-08-04T18:12:05Z`
+- recorded date: `2026-08-05`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 451 tests, 5,461 assertions, 0 failures,
+- result: exit 0, `verification ok`, 454 tests, 5,504 assertions, 0 failures,
   0 errors, 0 skips
-- focused result: Sloth evidence contract passed with 6 tests and 74
-  assertions; Sloth evidence CLI passed with 3 tests and 34 assertions; command
-  registry passed with 6 tests and 2,221 assertions; all had zero failures and
-  errors
+- focused result: Sloth live status passed with 5 tests and 45 assertions;
+  Sloth evidence contract passed with 7 tests and 80 assertions; Sloth evidence
+  CLI passed with 3 tests and 34 assertions; live-status CLI passed with 8 tests
+  and 70 assertions; all had zero failures and errors
 - parity evidence: the registry and catalog contain the same 37 stable command
   IDs, every registered command has one current Human CLI usage and one
   versioned target Agent JSON request, and duplicate IDs/paths fail validation
@@ -627,32 +655,33 @@ Verification evidence:
   4.0.1. No runtime compatibility code was changed in this implementation slice.
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
-- live verification: not required. Tests use public-safe saved rule YAML and
-  local files. Capture/status load no credentials, make no provider call, and
-  do not execute Sloth. Datadog live testing remains postponed.
-- blast radius: two new local-only Sloth evidence commands and schemas, one
-  provider-specific evidence component, safe YAML fixture/contract tests,
-  registry/catalog parity, and usage/contracts. Existing generation, apply,
-  exact-plan, release, Prometheus status, neutral intent, and mutation behavior
-  are unchanged.
-- rollback path: revert `dff62e7 feat: capture reviewed Sloth downstream
-  evidence`
+- live verification: no real Prometheus or Sloth server was contacted. Tests
+  use public-safe saved rule YAML, local source files, client factories, and
+  fake Prometheus HTTP. Official Sloth MCP behavior was verified from upstream
+  source at main revision `8a3be4fab79defa4448d09d91b48422615980b05`,
+  not through a running server. Datadog live testing remains postponed.
+- blast radius: one direct Sloth status form, one provider reader, strengthened
+  downstream evidence validation, complete Sloth identity annotation, provider
+  capability metadata, fake HTTP/CLI tests, registry/catalog parity, and
+  usage/contracts. Existing Prometheus Stack status syntax and aggregate
+  unsupported behavior are preserved; no provider mutation was added.
+- rollback path: revert `8fcc249 feat: add evidence-backed Sloth live status`
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping; the atomic checkpoint and Phase 9 are complete.
-4. Use TDD to add one-manifest Sloth live status consuming an explicit fresh
-   downstream-evidence artifact and Prometheus runtime URL.
-5. Finish every evidence/manifest/runtime preflight before client construction
-   and use only persisted provider query bindings.
-6. Update usage with exact stdout/saved report, query count, provider reads,
-   zero-write boundary, classifications, and refusal expectations.
+4. Use TDD to package one current Sloth downstream-evidence artifact per release
+   or portfolio target and extend aggregate status through the existing reader.
+5. Finish every bundle/evidence/manifest/runtime preflight before client
+   construction and preserve only persisted provider query bindings.
+6. Extend bundle downstream verification only after aggregate evidence/runtime
+   contracts are proven; do not execute Sloth or reload Prometheus.
 7. Preserve the completed AICLI-F1 registry/catalog parity and update both the
    Human CLI usage and target Agent JSON mapping for every CLI change.
-8. Keep AICLI-F2 behind the evidence-backed Sloth reader checkpoint; Agent CLI
-   invocation is not implemented by the AICLI-F1 metadata alone.
+8. Keep the official Sloth MCP runtime as the following comparison-only slice;
+   do not combine it with bundle evidence packaging or claim MCP status parity.
 9. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
 10. Preserve release-bundle predecessor immutability, exact-plan, review,
@@ -667,6 +696,7 @@ ruby -Ilib test/agent_interface_roadmap_test.rb
 ruby -Ilib test/cli_command_registry_test.rb
 ruby -Ilib test/sloth_downstream_evidence_test.rb
 ruby -Ilib test/sloth_downstream_evidence_cli_test.rb
+ruby -Ilib test/sloth_live_status_test.rb
 ruby -Ilib test/prometheus_stack_provider_test.rb
 ruby -Ilib test/prometheus_stack_walkthrough_test.rb
 ruby -Ilib test/cli_architecture_test.rb
@@ -713,9 +743,14 @@ If a new session needs to resume quickly:
    and deferred AICLI-F2 execution contract
 6. Inspect `lib/slo_rules_engine/cli/command_registry.rb` and
    `test/cli_command_registry_test.rb` before changing any CLI surface
-7. If the user says `proceed`, implement one-manifest evidence-backed Sloth
-   live status with TDD and GET-only Prometheus queries
-8. Update both CLI sub-interface mappings and usage for every CLI change; do not
+7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
+   `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
+   `docs/sloth-mcp-integration.md`
+8. If the user says `proceed`, package current Sloth evidence into
+   release/portfolio status with TDD and reuse the GET-only reader
+9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
-9. Keep Datadog live testing postponed and preserve every exact-plan, review,
+10. Keep the official Sloth MCP adapter comparison-only and separate from the
+   bundle-evidence slice
+11. Keep Datadog live testing postponed and preserve every exact-plan, review,
    journal, live-status, and mutation gate
