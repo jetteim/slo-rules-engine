@@ -648,8 +648,8 @@ Prepared on 2026-08-05 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest verified implementation: opt-in evidence-backed Sloth downstream
-  release verification
+- latest pushed checkpoint: `1e8bf26 feat: verify Sloth downstream release
+  state`
 - previous pushed checkpoint: `0c82ab7 feat: aggregate evidence-backed Sloth
   status`
 - expected startup state: `git status --short --branch` should show clean
@@ -690,8 +690,8 @@ Verification evidence:
   target verification artifacts, fake HTTP/CLI tests, and usage/contracts.
   Existing engine-only verification remains compatible and pending for Sloth;
   no provider mutation was added.
-- rollback path: revert the evidence-backed Sloth aggregate and downstream
-  verification implementation checkpoints
+- rollback path: revert `1e8bf26 feat: verify Sloth downstream release state`
+  and `0c82ab7 feat: aggregate evidence-backed Sloth status`
 
 When the user types `proceed` in a fresh session:
 
