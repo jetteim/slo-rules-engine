@@ -51,6 +51,7 @@ The v1 artifact inventory supports:
 - reviewed Ruby definition
 - provider manifest
 - provider-level manifest-review report
+- optional current reviewed Sloth downstream-evidence artifact
 - optional dry-run provider change plan
 - generated target execution result
 - generated target verification result
@@ -60,8 +61,9 @@ source metadata, and embedded content. File-backed predecessors record an
 absolute source path. Bundle-native plans and execution results record generated
 lineage to the predecessor bundle and provider target instead of inventing a
 mutable source file. Provider targets reference the packaged manifest, review
-report, optional plan, applied execution result, and fresh target verification
-result by UID.
+report, optional Sloth downstream evidence, optional plan, applied execution
+result, and fresh target verification result by UID. A Sloth evidence reference
+must point to a `sloth_downstream_evidence` artifact for that target's provider.
 
 The bundle excludes credential ownership. Structured content containing credential-like keys such as `api_key`, `app_key`, `secret`, `password`, `token`, `authorization`, or `credentials` is rejected before it can be packaged.
 
@@ -238,8 +240,14 @@ bin/rules-ctl bundle create \
   --artifact-index ./artifact-index.json \
   --reviewer team/payments-sre \
   --reviewed-at 2026-07-26T09:30:00Z \
+  --sloth-evidence checkout-api/sloth=./sloth-evidence.json \
   --output ./release-bundle.json
 ```
+
+The repeatable `--sloth-evidence` option is optional. When supplied, creation
+validates the evidence schema and content ID, rereads and reconstructs every
+linked local source, and requires exact target manifest/service/SLO coverage
+before packaging. Runtime endpoints remain external to the bundle.
 
 Package a current dry-run provider plan:
 

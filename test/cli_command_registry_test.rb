@@ -155,6 +155,13 @@ class CliCommandRegistryTest < Minitest::Test
     assert_includes live_status.human_usage, '--provider=sloth'
     assert_equal './sloth-evidence.json',
                  live_status.agent.fetch(:request_example).fetch(:arguments).fetch(:evidence_file)
+
+    bundle_create = @registry.fetch('bundle.create')
+    assert_includes bundle_create.human_usage, '--sloth-evidence=checkout/sloth=./sloth-evidence.json'
+    assert_equal(
+      { 'checkout/sloth' => './sloth-evidence.json' },
+      bundle_create.agent.fetch(:request_example).fetch(:arguments).fetch(:sloth_evidence_files)
+    )
   end
 
   def test_separate_catalog_pairs_human_commands_with_agent_json_requests

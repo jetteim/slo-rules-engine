@@ -20,6 +20,7 @@ module SloRulesEngine
       change_plan
       execution_result
       target_verification
+      sloth_downstream_evidence
     ].freeze
 
     class SchemaError < StandardError
@@ -240,6 +241,21 @@ module SloRulesEngine
               reference_uid,
               artifact_uids,
               expected_kind: expected_kind,
+              expected_provider: provider
+            )
+          end
+          evidence_uid = fetch_value(target, :downstream_evidence_artifact_uid)
+          if evidence_uid
+            result.error(
+              "#{path}.downstream_evidence_artifact_uid",
+              'is only valid for Sloth targets'
+            ) unless provider == 'sloth'
+            validate_artifact_reference(
+              result,
+              "#{path}.downstream_evidence_artifact_uid",
+              evidence_uid,
+              artifact_uids,
+              expected_kind: 'sloth_downstream_evidence',
               expected_provider: provider
             )
           end

@@ -3,6 +3,8 @@
 module SloRulesEngine
   module LiveStatus
     class SlothReader < PrometheusReader
+      Preflight = Struct.new(:manifest, :evidence, :contexts, keyword_init: true)
+
       def initialize(
         client_factory: -> { SloRulesEngine::TelemetryLookup::Prometheus::Client.new },
         clock: -> { Time.now.utc },
@@ -13,6 +15,10 @@ module SloRulesEngine
       end
 
       def read(manifest, evidence_path:)
+        read_preflighted(preflight(manifest, evidence_path: evidence_path))
+      end
+
+      def preflight(manifest, evidence_path:)
         SloRulesEngine::ManifestSchemaValidator.validate!(manifest)
         provider = fetch_value(manifest, :provider).to_s
         unless provider == 'sloth'
@@ -31,6 +37,15 @@ module SloRulesEngine
         unless findings.empty?
           raise SloRulesEngine::Sloth::DownstreamEvidence::ContractError, findings
         end
+
+        Preflight.new(manifest: manifest, evidence: evidence, contexts: contexts)
+      end
+
+      def read_preflighted(preflight)
+        manifest = preflight.manifest
+        evidence = preflight.evidence
+        contexts = preflight.contexts
+        provider = fetch_value(manifest, :provider).to_s
 
         checked_at = @clock.call.utc
         @client = @client_factory.call

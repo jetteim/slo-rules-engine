@@ -705,7 +705,7 @@ module RulesCtl
         bin/rules-ctl status (--provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] | --provider=sloth --manifest=<manifest.json> --evidence=<sloth-evidence.json> --base-url=<url> | --bundle=<bundle.json> [--target-base-url=<service/provider>=<url> ...] | --portfolio=<portfolio.json> [--target-base-url=<service/provider>=<url> ...]) [--max-age-seconds=<seconds>] [--output=<file>]
         bin/rules-ctl sloth-evidence capture --manifest=<manifest.json> --input=<sloth.yaml> [--input=<sloth-N.yaml> ...] --generated-rules=<rules.yaml> --reviewer=<identity> --reviewed-at=<timestamp> --output=<evidence.json>
         bin/rules-ctl sloth-evidence status <evidence.json>
-        bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...]
+        bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...] [--sloth-evidence=<service/sloth>=<evidence.json> ...]
         bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
         bin/rules-ctl bundle apply <apply-ready-bundle.json> --confirm --approved-plan=<approved-plan.json> [--approved-plan=<approved-plan.json> ...] --journal-dir=<dir> --output=<applied-bundle.json>
         bin/rules-ctl bundle verify <applied-bundle.json> --output=<verified-bundle.json>

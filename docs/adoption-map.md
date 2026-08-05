@@ -84,6 +84,8 @@ retain each target's evidence and make unsupported coverage explicit.
   freshness checks and no backend access
 - one-manifest Sloth live status using only fresh exact-manifest downstream
   evidence and an explicit Prometheus runtime
+- release and portfolio Sloth aggregate status using one current exact evidence
+  artifact and explicit Prometheus-compatible runtime per readable target
 - a planned, version-gated official Sloth MCP provider adapter for read-only
   identity/status comparison before any transport-parity claim
 

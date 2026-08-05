@@ -6,7 +6,7 @@ require 'time'
 module SloRulesEngine
   module ReleaseBundle
     class Builder
-      def build(artifact_index_path, reviewer:, reviewed_at:, plans: {})
+      def build(artifact_index_path, reviewer:, reviewed_at:, plans: {}, sloth_evidence: {})
         @artifacts = {}
         @findings = []
         @index_path = File.expand_path(artifact_index_path)
@@ -24,6 +24,7 @@ module SloRulesEngine
         scopes = Array(fetch_value(@index, :scopes)).map { |scope| package_scope(scope) }
         targets = scopes.flat_map { |scope| scope.delete(:targets) }.compact
         attach_plans(targets, plans)
+        attach_sloth_evidence(targets, sloth_evidence)
         validate_manifest_reviews(targets)
 
         review = {
@@ -201,6 +202,62 @@ module SloRulesEngine
           fetch_value(plan, :mode) == 'dry_run' &&
           fetch_value(plan, :operations).is_a?(Array) &&
           fetch_value(plan, :summary).is_a?(Hash)
+      end
+
+      def attach_sloth_evidence(targets, evidence_paths)
+        evidence_paths = evidence_paths.to_h { |target, path| [target.to_s, path] }
+        evidence_paths.each_key do |target_uid|
+          next if targets.any? { |target| target.fetch(:uid) == target_uid }
+
+          add_finding(
+            'unknown_sloth_evidence_target',
+            "sloth_evidence[#{target_uid}]",
+            'Sloth downstream evidence target is not in the artifact index'
+          )
+        end
+
+        targets.each do |target|
+          target_uid = target.fetch(:uid)
+          path = evidence_paths[target_uid]
+          next unless path
+
+          unless target.fetch(:provider) == 'sloth'
+            add_finding(
+              'invalid_sloth_evidence_target',
+              "sloth_evidence[#{target_uid}]",
+              'Sloth downstream evidence can only be attached to a Sloth target'
+            )
+            next
+          end
+
+          manifest = artifact_content(target.fetch(:manifest_artifact_uid))
+          begin
+            SloRulesEngine::LiveStatus::SlothReader.new.preflight(
+              manifest,
+              evidence_path: path
+            )
+          rescue SloRulesEngine::Sloth::DownstreamEvidence::ContractError => error
+            @findings.concat(error.findings.map do |finding|
+              normalize_evidence_finding(finding, target_uid)
+            end)
+            next
+          end
+
+          uid = add_artifact(
+            uid: "sloth-evidence:#{target_uid}",
+            kind: 'sloth_downstream_evidence',
+            path: path,
+            scope: target.fetch(:scope),
+            provider: 'sloth'
+          )
+          target[:downstream_evidence_artifact_uid] = uid if uid
+        end
+      end
+
+      def normalize_evidence_finding(finding, target_uid)
+        finding.to_h.each_with_object({}) do |(key, value), normalized|
+          normalized[key.to_sym] = value
+        end.merge(target_uid: target_uid)
       end
 
       def validate_manifest_reviews(targets)

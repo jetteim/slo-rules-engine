@@ -216,11 +216,14 @@ This is the running plan for the long refactor.
   fingerprint with stable stale findings before later consumers trust it.
 - [x] Add the Sloth live-status reader using only fresh reviewed downstream
   evidence and explicit Prometheus runtime configuration.
+- [x] Package optional current Sloth evidence per release target, accept one
+  evidence reference per portfolio target, and include evidence-backed Sloth
+  targets in aggregate status only after complete zero-client preflight.
 - [ ] Add a version-gated read-only adapter for the official Sloth HTTP MCP
   server, initially as an exact-identity comparison report; do not promote it
   to a status transport until neutral output parity is proven.
 - [ ] Extend release-bundle downstream verification to packaged current Sloth
-  evidence after the reader and bundle artifact contract are proven.
+  evidence now that the reader and bundle artifact contract are proven.
 
 ## Phase 14: Agent-Operable Dual CLI And MCP
 

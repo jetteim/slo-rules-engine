@@ -24,7 +24,7 @@ Use the toolkit to:
   running Sloth or contacting Prometheus
 - read current Prometheus-compatible SLO attainment, remaining error budget,
   burn rate, and telemetry freshness from one reviewed Prometheus Stack or
-  evidence-linked Sloth manifest
+  evidence-linked Sloth manifest, release bundle, or portfolio
 - validate Datadog credentials and dashboard reconciliation in an isolated
   sandbox before relying on live provider behavior
 
@@ -84,8 +84,9 @@ Prometheus recording rules. The content-addressed artifact preserves exact
 objective, budget, burn, metadata, error-ratio, observation-query, and
 freshness bindings. `sloth-evidence status` rereads those local sources and
 fails when their semantic fingerprints drift. Direct Sloth `status` consumes
-only this fresh evidence and an explicit Prometheus runtime; release-bundle
-downstream verification remains incomplete.
+only this fresh evidence and an explicit Prometheus runtime. `bundle create`
+can package one current evidence artifact per Sloth target for aggregate status;
+release-bundle downstream verification remains incomplete.
 
 ## Usage By Use Case
 
@@ -433,18 +434,21 @@ Assess every readable target in a current reviewed release bundle:
 bin/rules-ctl status \
   --bundle=./work/release-bundle.json \
   --target-base-url=checkout-api/prometheus_stack=http://localhost:9090 \
+  --target-base-url=checkout-api/sloth=http://localhost:9090 \
   --output=./work/release-live-status.json
 ```
 
 Or define a credential-free `slo-rules-engine/live-status-portfolio/v1` file
-whose targets name reviewed manifest paths, then pass one
-`--target-base-url=service/provider=URL` for every Prometheus Stack target.
+whose targets name reviewed manifest paths and whose Sloth targets also name
+their current downstream-evidence paths, then pass one
+`--target-base-url=service/provider=URL` for every readable target.
 Both aggregate modes print `slo-rules-engine/live-slo-status-aggregate/v1`.
 Each readable target retains its complete per-manifest report; unsupported
-Datadog and Sloth aggregate targets remain visible as `unsupported` coverage rather than
-being omitted. Bundle schema, identity, embedded artifacts, review evidence,
-and current source fingerprints plus all runtime mappings are validated before
-the first backend read. Runtime URLs are never written into reports or bundles.
+Datadog targets and Sloth targets without evidence remain visible as
+`unsupported` coverage rather than being omitted. Bundle schema, identity,
+embedded artifacts, review evidence, Sloth evidence/source derivation, and
+current source fingerprints plus all runtime mappings are validated before the
+first backend read. Runtime URLs are never written into reports or bundles.
 
 ### Validate Datadog against an isolated sandbox
 
@@ -519,6 +523,9 @@ The initial delivery integration is `notification_router`, which generates conte
 - Direct Sloth status requires the exact reviewed manifest, fresh downstream
   evidence, complete SLO coverage, and an explicit Prometheus base URL before
   constructing a provider client.
+- Aggregate Sloth status additionally requires exactly one evidence reference
+  per readable release or portfolio target; targets without it remain explicit
+  coverage gaps.
 - Exact file-backed apply rejects changed observed state and same-scope
   concurrency before executing the stored operation list.
 - Live status is read-only, requires reviewed manifest provenance, validates

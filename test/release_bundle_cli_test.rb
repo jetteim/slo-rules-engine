@@ -48,6 +48,60 @@ class ReleaseBundleCliTest < Minitest::Test
     end
   end
 
+  def test_bundle_create_packages_current_sloth_evidence_for_the_exact_target
+    Dir.mktmpdir do |dir|
+      fixture = write_release_bundle_fixture(dir, provider: 'sloth')
+      evidence = write_sloth_downstream_evidence_fixture(dir, fixture.fetch(:manifest))
+      bundle_path = File.join(dir, 'release-bundle.json')
+
+      payload, stderr, result = command(
+        'bundle',
+        'create',
+        "--artifact-index=#{fixture.fetch(:artifact_index)}",
+        "--reviewer=#{REVIEWER}",
+        "--reviewed-at=#{REVIEWED_AT}",
+        "--sloth-evidence=#{fixture.fetch(:target)}=#{evidence.fetch(:evidence)}",
+        "--output=#{bundle_path}"
+      )
+
+      assert result.success?, stderr
+      target = payload.fetch('targets').fetch(0)
+      artifact = payload.fetch('artifacts').find do |entry|
+        entry.fetch('uid') == target.fetch('downstream_evidence_artifact_uid')
+      end
+      assert_equal 'sloth_downstream_evidence', artifact.fetch('kind')
+      assert_equal evidence.fetch(:evidence), artifact.dig('source', 'path')
+      assert_equal payload, JSON.parse(File.read(bundle_path))
+    end
+  end
+
+  def test_bundle_create_rejects_stale_sloth_evidence_without_writing_output
+    Dir.mktmpdir do |dir|
+      fixture = write_release_bundle_fixture(dir, provider: 'sloth')
+      evidence = write_sloth_downstream_evidence_fixture(dir, fixture.fetch(:manifest))
+      generated = YAML.safe_load(File.read(evidence.fetch(:generated)), aliases: false)
+      generated.fetch('groups').fetch(0).fetch('rules').fetch(0)['expr'] = 'vector(0)'
+      File.write(evidence.fetch(:generated), YAML.dump(generated))
+      bundle_path = File.join(dir, 'release-bundle.json')
+
+      payload, _stderr, result = command(
+        'bundle',
+        'create',
+        "--artifact-index=#{fixture.fetch(:artifact_index)}",
+        "--reviewer=#{REVIEWER}",
+        "--reviewed-at=#{REVIEWED_AT}",
+        "--sloth-evidence=#{fixture.fetch(:target)}=#{evidence.fetch(:evidence)}",
+        "--output=#{bundle_path}"
+      )
+
+      refute result.success?
+      assert_equal 'stale_bundle_inputs', payload.dig('error', 'code')
+      assert_includes payload.fetch('findings').map { |finding| finding.fetch('code') },
+                      'stale_generated_rules'
+      refute File.exist?(bundle_path)
+    end
+  end
+
   def test_bundle_status_fails_when_a_source_artifact_changes
     Dir.mktmpdir do |dir|
       fixture = write_release_bundle_fixture(dir)

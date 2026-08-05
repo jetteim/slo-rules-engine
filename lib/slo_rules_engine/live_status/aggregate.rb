@@ -10,8 +10,6 @@ module SloRulesEngine
     AGGREGATE_KIND = 'LiveSLOStatusAggregateReport'
     PORTFOLIO_SCHEMA_VERSION = 'slo-rules-engine/live-status-portfolio/v1'
     PORTFOLIO_KIND = 'LiveStatusPortfolio'
-    LIVE_STATUS_PROVIDERS = %w[prometheus_stack].freeze
-
     class AggregateError < StandardError
       attr_reader :code, :findings
 
@@ -108,7 +106,9 @@ module SloRulesEngine
             )
           end
 
-          resolved_target(uid, manifest)
+          evidence_artifact = artifacts[fetch_value(target, :downstream_evidence_artifact_uid).to_s]
+          evidence_path = fetch_value(fetch_value(evidence_artifact, :source), :path)
+          resolved_target(uid, manifest, evidence_path: evidence_path)
         end
         validate_targets!(targets, code: 'invalid_live_status_bundle')
 
@@ -139,6 +139,7 @@ module SloRulesEngine
         end
 
         manifest_sources = []
+        evidence_sources = []
         targets = entries.map.with_index do |entry, index|
           unless entry.is_a?(Hash)
             raise AggregateError.new(
@@ -161,17 +162,30 @@ module SloRulesEngine
             path: manifest_path,
             fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(manifest)
           }
-          resolved_target(uid, manifest)
+          evidence_reference = fetch_value(entry, :evidence).to_s
+          evidence_path = nil
+          unless evidence_reference.empty?
+            evidence_path = expand_reference(evidence_reference, expanded_path)
+            evidence = parse_json(evidence_path, code: 'invalid_live_status_portfolio')
+            evidence_sources << {
+              uid: uid,
+              path: evidence_path,
+              fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(evidence)
+            }
+          end
+          resolved_target(uid, manifest, evidence_path: evidence_path)
         end
         validate_targets!(targets, code: 'invalid_live_status_portfolio')
 
+        source = {
+          path: expanded_path,
+          fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(portfolio),
+          manifests: manifest_sources.sort_by { |entry| entry.fetch(:uid) }
+        }
+        source[:evidence] = evidence_sources.sort_by { |entry| entry.fetch(:uid) } unless evidence_sources.empty?
         ResolvedInput.new(
           scope: 'portfolio',
-          source: {
-            path: expanded_path,
-            fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(portfolio),
-            manifests: manifest_sources.sort_by { |source| source.fetch(:uid) }
-          },
+          source: source,
           targets: targets.sort_by { |target| target.fetch(:uid) }
         )
       rescue JSON::ParserError, Errno::ENOENT, Errno::EACCES => error
@@ -218,7 +232,7 @@ module SloRulesEngine
         path.expand_path(File.dirname(portfolio_path)).to_s
       end
 
-      def resolved_target(uid, manifest)
+      def resolved_target(uid, manifest, evidence_path: nil)
         provider = fetch_value(manifest, :provider).to_s
         service = fetch_value(manifest, :service).to_s
         expected_uid = "#{service}/#{provider}"
@@ -228,13 +242,21 @@ module SloRulesEngine
             "live-status target #{uid.inspect} must match manifest identity #{expected_uid.inspect}"
           )
         end
+        if evidence_path && provider != 'sloth'
+          raise AggregateError.new(
+            'invalid_live_status_target',
+            "live-status evidence is only valid for Sloth targets, not #{uid.inspect}"
+          )
+        end
 
-        {
+        target = {
           uid: uid,
           service: service,
           provider: provider,
           manifest: manifest
         }
+        target[:evidence_path] = evidence_path if evidence_path
+        target
       end
 
       def validate_targets!(targets, code:)
@@ -291,14 +313,17 @@ module SloRulesEngine
         ) unless max_age_seconds.positive?
 
         runtimes = validate_runtimes!(input.targets, target_base_urls)
+        sloth_preflights = preflight_sloth_targets!(input.targets)
         checked_at = @clock.call.utc
         targets = input.targets.sort_by { |target| target.fetch(:uid) }.map do |target|
           if supported?(target)
-            report = PrometheusReader.new(
-              client: @client_factory.call(runtimes.fetch(target.fetch(:uid))),
-              clock: -> { checked_at },
-              max_age_seconds: max_age_seconds
-            ).read(target.fetch(:manifest))
+            report = read_target(
+              target,
+              base_url: runtimes.fetch(target.fetch(:uid)),
+              checked_at: checked_at,
+              max_age_seconds: max_age_seconds,
+              sloth_preflight: sloth_preflights[target.fetch(:uid)]
+            )
             {
               uid: target.fetch(:uid),
               service: target.fetch(:service),
@@ -339,7 +364,7 @@ module SloRulesEngine
         if supported.empty?
           raise AggregateError.new(
             'no_supported_live_status_targets',
-            'aggregate live status has no Prometheus Stack targets to read'
+            'aggregate live status has no evidence-backed Prometheus-compatible targets to read'
           )
         end
         unsupported_mappings = runtimes.keys & (known_uids - supported.map { |target| target.fetch(:uid) })
@@ -353,7 +378,7 @@ module SloRulesEngine
         unless missing.empty?
           raise AggregateError.new(
             'missing_live_status_runtime',
-            "missing Prometheus base URL for targets: #{missing.sort.join(', ')}"
+            "missing Prometheus-compatible base URL for targets: #{missing.sort.join(', ')}"
           )
         end
 
@@ -372,14 +397,52 @@ module SloRulesEngine
 
         raise AggregateError.new(
           'invalid_live_status_runtime',
-          'Prometheus base URLs must use HTTP(S), include a host, and exclude credentials, query, and fragment'
+          'Prometheus-compatible base URLs must use HTTP(S), include a host, and exclude credentials, query, and fragment'
         )
       rescue URI::InvalidURIError
-        raise AggregateError.new('invalid_live_status_runtime', 'Prometheus base URL is invalid')
+        raise AggregateError.new('invalid_live_status_runtime', 'Prometheus-compatible base URL is invalid')
       end
 
       def supported?(target)
-        LIVE_STATUS_PROVIDERS.include?(target.fetch(:provider))
+        provider = target.fetch(:provider)
+        return true if provider == 'prometheus_stack'
+
+        provider == 'sloth' && !target[:evidence_path].to_s.empty?
+      end
+
+      def preflight_sloth_targets!(targets)
+        targets.select { |target| target.fetch(:provider) == 'sloth' && supported?(target) }
+          .each_with_object({}) do |target, preflights|
+            begin
+              preflights[target.fetch(:uid)] = SlothReader.new.preflight(
+                target.fetch(:manifest),
+                evidence_path: target.fetch(:evidence_path)
+              )
+            rescue SloRulesEngine::Sloth::DownstreamEvidence::ContractError => error
+              findings = error.findings.map { |finding| finding.merge(target_uid: target.fetch(:uid)) }
+              raise AggregateError.new(
+                'invalid_sloth_live_status_evidence',
+                'aggregate Sloth live status requires fresh downstream evidence for every exact reviewed manifest',
+                findings: findings
+              )
+            end
+          end
+      end
+
+      def read_target(target, base_url:, checked_at:, max_age_seconds:, sloth_preflight:)
+        if target.fetch(:provider) == 'sloth'
+          SlothReader.new(
+            client_factory: -> { @client_factory.call(base_url) },
+            clock: -> { checked_at },
+            max_age_seconds: max_age_seconds
+          ).read_preflighted(sloth_preflight)
+        else
+          PrometheusReader.new(
+            client: @client_factory.call(base_url),
+            clock: -> { checked_at },
+            max_age_seconds: max_age_seconds
+          ).read(target.fetch(:manifest))
+        end
       end
 
       def unsupported_target(target)
@@ -390,12 +453,26 @@ module SloRulesEngine
           outcome: 'unsupported',
           findings: [
             {
-              code: 'unsupported_live_status_provider',
-              message: "live status is not implemented for provider #{target.fetch(:provider).inspect}",
+              code: unsupported_finding_code(target),
+              message: unsupported_message(target),
               severity: 'info'
             }
           ]
         }
+      end
+
+      def unsupported_finding_code(target)
+        target.fetch(:provider) == 'sloth' ?
+          'missing_sloth_live_status_evidence' :
+          'unsupported_live_status_provider'
+      end
+
+      def unsupported_message(target)
+        if target.fetch(:provider) == 'sloth'
+          'aggregate Sloth live status requires one packaged current downstream-evidence artifact'
+        else
+          "live status is not implemented for provider #{target.fetch(:provider).inspect}"
+        end
       end
     end
   end

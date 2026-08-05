@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require 'json'
+require 'yaml'
 require_relative '../../lib/slo_rules_engine'
 require_relative 'onboarding_fixtures'
 
@@ -87,6 +88,33 @@ module ReleaseBundleFixtures
       target: "checkout-api/#{provider}",
       targets: providers.map { |provider_key| "checkout-api/#{provider_key}" }
     }.compact
+  end
+
+  def write_sloth_downstream_evidence_fixture(dir, manifest_path)
+    evidence_dir = File.join(dir, 'sloth-downstream')
+    input_path = File.join(evidence_dir, 'sloth.yaml')
+    generated_path = File.join(evidence_dir, 'generated-rules.yaml')
+    evidence_path = File.join(evidence_dir, 'evidence.json')
+    FileUtils.mkdir_p(evidence_dir)
+    manifest = JSON.parse(File.read(manifest_path))
+    File.write(input_path, YAML.dump(manifest.dig('artifacts', 'sloth_specs', 0)))
+    FileUtils.cp(
+      File.expand_path('../fixtures/sloth/generated-rules.yaml', __dir__),
+      generated_path
+    )
+    evidence = SloRulesEngine::Sloth::DownstreamEvidence::Builder.new.build(
+      manifest_path: manifest_path,
+      input_paths: [input_path],
+      generated_rules_path: generated_path,
+      reviewer: 'platform-reviewer@example.test',
+      reviewed_at: '2026-08-05T11:00:00Z'
+    )
+    File.write(evidence_path, JSON.pretty_generate(evidence))
+    {
+      evidence: evidence_path,
+      input: input_path,
+      generated: generated_path
+    }
   end
 
   private

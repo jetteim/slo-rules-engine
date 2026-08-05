@@ -95,6 +95,52 @@ class LiveStatusCliTest < Minitest::Test
     end
   end
 
+  def test_status_aggregates_packaged_sloth_evidence_with_prometheus_stack
+    Dir.mktmpdir do |dir|
+      fixture = write_release_bundle_fixture(
+        dir,
+        providers: %w[prometheus_stack sloth]
+      )
+      evidence = write_sloth_downstream_evidence_fixture(
+        dir,
+        fixture.fetch(:manifests).fetch('sloth')
+      )
+      bundle = SloRulesEngine::ReleaseBundle::Builder.new.build(
+        fixture.fetch(:artifact_index),
+        reviewer: 'team/payments-sre',
+        reviewed_at: REVIEWED_AT,
+        sloth_evidence: { 'checkout-api/sloth' => evidence.fetch(:evidence) }
+      )
+      bundle_path = File.join(dir, 'release-bundle.json')
+      request_log_path = File.join(dir, 'requests.log')
+      File.write(bundle_path, JSON.pretty_generate(bundle))
+      fake_http = File.join(dir, 'fake_prometheus_status_http.rb')
+      FileUtils.cp(File.expand_path('support/fake_prometheus_status_http.rb', __dir__), fake_http)
+
+      stdout, stderr, status = rules_ctl(
+        'status',
+        "--bundle=#{bundle_path}",
+        '--target-base-url=checkout-api/prometheus_stack=http://prometheus.example.test',
+        '--target-base-url=checkout-api/sloth=http://sloth-prometheus.example.test',
+        env: {
+          'RUBYOPT' => "-r#{fake_http}",
+          'PROMETHEUS_REQUEST_LOG' => request_log_path
+        }
+      )
+
+      assert status.success?, stderr
+      assert_empty stderr
+      payload = JSON.parse(stdout)
+      assert_equal 2, payload.dig('summary', 'reported_targets')
+      assert_equal 0, payload.dig('summary', 'unsupported_targets')
+      assert_equal true, payload.dig('summary', 'coverage_complete')
+      assert_equal %w[prometheus_stack sloth], payload.fetch('targets').map { |target| target.fetch('provider') }
+      assert payload.fetch('targets').all? { |target| target.fetch('outcome') == 'reported' }
+      assert_equal 16, File.readlines(request_log_path).length
+      refute_includes stdout, 'example.test'
+    end
+  end
+
   def test_status_portfolio_preserves_one_failed_target_as_unverifiable
     Dir.mktmpdir do |dir|
       portfolio_path = write_live_status_portfolio(dir)

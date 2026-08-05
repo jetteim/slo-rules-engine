@@ -20,6 +20,7 @@ module SloRulesEngine
         reviewed_at = nil
         output_path = nil
         plans = {}
+        sloth_evidence = {}
         parser = OptionParser.new do |opts|
           opts.on('--artifact-index=FILE', 'Saved onboarding artifact index to package') do |value|
             artifact_index_path = value
@@ -32,6 +33,13 @@ module SloRulesEngine
             abort_usage("duplicate --plan target #{target.inspect}") if plans.key?(target)
 
             plans[target] = path
+          end
+          opts.on('--sloth-evidence=TARGET=FILE', 'Current downstream evidence for one Sloth target; repeatable') do |value|
+            target, path = value.split('=', 2)
+            abort_usage('invalid --sloth-evidence; expected service/sloth=FILE') if target.to_s.empty? || path.to_s.empty?
+            abort_usage("duplicate --sloth-evidence target #{target.inspect}") if sloth_evidence.key?(target)
+
+            sloth_evidence[target] = path
           end
           opts.on('--output=FILE', 'Write the release bundle to FILE') { |value| output_path = value }
         end
@@ -46,7 +54,8 @@ module SloRulesEngine
           artifact_index_path,
           reviewer: reviewer,
           reviewed_at: reviewed_at,
-          plans: plans
+          plans: plans,
+          sloth_evidence: sloth_evidence
         )
         status = SloRulesEngine::ReleaseBundle::StatusEvaluator.new.evaluate(release_bundle)
         unless status[:valid]

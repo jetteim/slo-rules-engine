@@ -268,6 +268,7 @@ bin/rules-ctl bundle create \
   --artifact-index=./work/artifact-index.json \
   --reviewer=team/payments-sre \
   --reviewed-at=2026-07-26T09:30:00Z \
+  --sloth-evidence=checkout-api/sloth=./work/sloth-evidence/checkout-api.json \
   --output=./work/review-ready.json
 
 bin/rules-ctl bundle plan ./work/review-ready.json \
@@ -280,7 +281,7 @@ bin/rules-ctl bundle plan ./work/review-ready.json \
 **What to expect:**
 
 - The artifact index is written to the requested file and stdout with per-scope artifact links, next actions, review validity, and freshness findings.
-- `bundle create` writes and prints a content-addressed `review_ready` bundle with reviewer identity, explicit review time, source artifacts, provider targets, and no credentials.
+- `bundle create` writes and prints a content-addressed `review_ready` bundle with reviewer identity, explicit review time, source artifacts, provider targets, and no credentials. Each repeatable `--sloth-evidence=service/sloth=file` packages one already-captured, current, exact-manifest downstream evidence artifact; stale, mismatched, unknown-target, or non-Sloth mappings prevent output.
 - `bundle plan` leaves the predecessor unchanged and writes/prints a new `apply_ready` bundle with a new bundle ID and predecessor lineage.
 - Each provider plan is embedded as a `change_plan` artifact in `apply-ready.json`; separate plan files are not written.
 - The bundle summary includes provider-level target, plan, operation, destructive, action, target, and risk counts.
@@ -985,14 +986,17 @@ Assess every readable target in one current reviewed release:
 bin/rules-ctl status \
   --bundle=./work/release-bundle.json \
   --target-base-url=checkout-api/prometheus_stack=http://checkout-prometheus.example.test \
+  --target-base-url=checkout-api/sloth=http://checkout-prometheus.example.test \
   --target-base-url=search-api/prometheus_stack=http://search-prometheus.example.test \
   --max-age-seconds=300 \
   --output=./work/status/release.json
 ```
 
-The release bundle may also contain Datadog or Sloth targets. Do not provide
-runtime mappings for those targets; the aggregate report retains them as
-unsupported coverage.
+The release bundle may also contain Datadog targets or Sloth targets without a
+packaged `sloth_downstream_evidence` artifact. Do not provide runtime mappings
+for those targets; the aggregate report retains them as unsupported coverage.
+An evidence-backed Sloth target is readable and requires its own explicit
+Prometheus-compatible runtime mapping.
 
 For a cross-service portfolio independent of release packaging, create a
 credential-free input:
@@ -1009,6 +1013,11 @@ credential-free input:
     {
       "uid": "search-api/prometheus_stack",
       "manifest": "../generated/search-api/prometheus_stack/manifest.json"
+    },
+    {
+      "uid": "checkout-api/sloth",
+      "manifest": "../generated/checkout-api/sloth/manifest.json",
+      "evidence": "../sloth-evidence/checkout-api.json"
     }
   ]
 }
@@ -1020,6 +1029,7 @@ Then run:
 bin/rules-ctl status \
   --portfolio=./work/status/portfolio.json \
   --target-base-url=checkout-api/prometheus_stack=http://checkout-prometheus.example.test \
+  --target-base-url=checkout-api/sloth=http://checkout-prometheus.example.test \
   --target-base-url=search-api/prometheus_stack=http://search-prometheus.example.test \
   --output=./work/status/portfolio-report.json
 ```
@@ -1065,24 +1075,29 @@ bin/rules-ctl status \
 - Bundle mode validates bundle schema, content identity, packaged
   fingerprints, review state, and current source files before the first
   backend read. Portfolio mode validates its schema, credential-free content,
-  every manifest, review provenance, unique UID, and exact
-  `service/provider` identity before the first read.
+  every manifest, evidence reference, review provenance, unique UID, and exact
+  `service/provider` identity before the first read. Both modes preflight every
+  Sloth evidence schema/content ID, local source fingerprint and derivation,
+  exact manifest/service/SLO coverage, and every runtime mapping before any
+  target client is constructed.
 - Missing, unknown, duplicate, unsupported-target, credential-bearing, or
   invalid runtime mappings fail before any client is created. Direct Datadog
   use fails `unsupported_live_status_provider`. Direct Sloth use fails
   `invalid_sloth_live_status_evidence` before backend access when evidence is
   missing, invalid, stale, linked to another manifest/service, or incomplete.
-  A mixed aggregate retains Datadog and Sloth targets as
-  `outcome: unsupported`, sets `coverage_complete: false`, and makes no read
-  for them. An all-unsupported aggregate fails
+  A mixed aggregate retains Datadog targets and Sloth targets without evidence
+  as `outcome: unsupported`, sets `coverage_complete: false`, and makes no read
+  for them. Missing Sloth evidence uses
+  `missing_sloth_live_status_evidence`; an all-unsupported aggregate fails
   `no_supported_live_status_targets`.
 - Query failure findings retain the provider expression and error class, but
   not the raw backend error message. The report never stores credentials.
 - No mode performs provider writes, configuration reloads, Kubernetes applies,
   Grafana changes, Alertmanager changes, or notification delivery.
-- Datadog direct reads remain postponed. Sloth direct reads are available for
-  exactly one manifest; release/portfolio Sloth status remains postponed until
-  bundles can package current evidence and preflight evidence/runtime mappings.
+- Datadog direct reads remain postponed. Sloth reads are available for one
+  manifest and for release/portfolio targets carrying one current exact
+  downstream-evidence artifact. Bundle downstream verification remains a
+  separate read-only transition.
 
 **Official Sloth MCP path:** current Sloth `main` can expose a stateless,
 read-only Streamable HTTP MCP endpoint from `sloth server --mcp-enabled`. The
