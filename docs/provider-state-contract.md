@@ -316,7 +316,11 @@ Import:
 - observed snapshot: managed manifest and every expected native Sloth input
 - findings: missing manifest or external-generator input files
 
-The engine does not execute the Sloth CLI or claim downstream generated Prometheus state as observed Sloth state.
+The provider-state transition does not execute the Sloth CLI or claim
+downstream generated Prometheus state as its observed Sloth state. A later
+read-only `bundle verify` transition may separately attach current reviewed
+downstream evidence and a runtime, then record the complete neutral live-status
+report without rewriting the provider-state result.
 
 Confirmed Sloth apply/prune uses the same managed-file journal/result contract
 as Prometheus Stack. Apply records the external generator as an intentionally
@@ -346,14 +350,15 @@ skipped handoff rather than claiming downstream execution.
 - Datadog verification covers supported managed payload/identity semantics and
   delete absence. File-backed verification covers only engine-owned managed
   paths. Neither claims notification delivery, Kubernetes, Grafana,
-  Alertmanager receiver, Sloth, or downstream Prometheus convergence.
+  Alertmanager receiver, Sloth execution, or downstream Prometheus mutation.
+  Evidence-backed release verification can separately prove that reviewed
+  Sloth-generated state is readable and complete through GET-only queries.
 
 ## Not Yet Implemented
 
 - Datadog or non-resumable operation retry after partial failure
-- downstream Sloth generation and Prometheus-state verification
+- automatic downstream Sloth execution, rule reload, or provider mutation
 - automatic compensating rollback plans
 - Datadog approved-plan execution and live backend recheck
-- multi-target bundle apply
 
 Those features must build on this contract rather than overloading the current dry-run plan.

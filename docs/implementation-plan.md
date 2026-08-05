@@ -222,8 +222,9 @@ This is the running plan for the long refactor.
 - [ ] Add a version-gated read-only adapter for the official Sloth HTTP MCP
   server, initially as an exact-identity comparison report; do not promote it
   to a status transport until neutral output parity is proven.
-- [ ] Extend release-bundle downstream verification to packaged current Sloth
-  evidence now that the reader and bundle artifact contract are proven.
+- [x] Extend release-bundle downstream verification to packaged current Sloth
+  evidence and explicit read-only Prometheus-compatible runtimes without
+  executing Sloth or reloading provider state.
 
 ## Phase 14: Agent-Operable Dual CLI And MCP
 

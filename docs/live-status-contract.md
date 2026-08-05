@@ -68,10 +68,11 @@ Top-level fields:
 - target envelopes sorted by `service/provider`
 - optional saved report path
 
-A readable Prometheus Stack target has `outcome: reported` and contains its
-complete `slo-rules-engine/live-slo-status/v1` report unchanged. A Datadog or
-Sloth target has `outcome: unsupported` and a stable
-`unsupported_live_status_provider` finding; it is not silently omitted.
+A readable Prometheus Stack or evidence-backed Sloth target has
+`outcome: reported` and contains its complete
+`slo-rules-engine/live-slo-status/v1` report unchanged. A Datadog target remains
+unsupported. A Sloth target without evidence is retained with
+`missing_sloth_live_status_evidence`; neither target is silently omitted.
 `coverage_complete` is false when any target is unsupported.
 `evidence_complete` is false when coverage is incomplete, no SLO is available,
 or any SLO is `missing_telemetry` or `unverifiable`.
@@ -81,9 +82,9 @@ A provider query failure remains inside that target's report as
 zero because the aggregate was produced. Invalid or stale source input and
 runtime preflight failures exit nonzero before any backend read.
 
-Direct Sloth status is intentionally ahead of aggregate Sloth support. Release
-bundles and portfolios do not yet package/map one current downstream-evidence
-artifact per Sloth target, so those target envelopes remain `unsupported`.
+Release bundles package Sloth evidence through a target artifact reference;
+portfolios map it through an `evidence` path. Both require exact current
+manifest/service/SLO coverage before the target becomes readable.
 
 ## Aggregate Inputs And Runtime
 
@@ -108,15 +109,21 @@ Portfolio mode accepts a credential-free file:
     {
       "uid": "search-api/prometheus_stack",
       "manifest": "generated/search-api/prometheus_stack/manifest.json"
+    },
+    {
+      "uid": "checkout-api/sloth",
+      "manifest": "generated/checkout-api/sloth/manifest.json",
+      "evidence": "sloth-evidence/checkout-api.json"
     }
   ]
 }
 ```
 
-Relative manifest paths resolve from the portfolio file. The resolver validates
-every manifest schema, review provenance, unique UID, and exact
-`service/provider` identity before reading a backend. The aggregate source
-records the loaded portfolio and manifest fingerprints.
+Relative manifest and evidence paths resolve from the portfolio file. The
+resolver validates every manifest schema, review provenance, unique UID, exact
+`service/provider` identity, and Sloth evidence/source derivation before reading
+a backend. The aggregate source records the loaded portfolio, manifest, and
+evidence fingerprints.
 
 Runtime endpoints are supplied separately with one
 `--target-base-url=service/provider=URL` per readable target. All mappings are
@@ -196,11 +203,27 @@ The current Sloth burn bindings use `1.0` as the provider's sustainable-budget
 burn threshold for status classification. This is not a rewrite of the
 reviewed alert-window policy and does not mutate Sloth alert rules.
 
+## Release Verification Boundary
+
+`bundle verify` may take one evidence path and one explicit Prometheus-compatible
+runtime URL for each Sloth target. It validates every bundle, evidence, source,
+manifest, service, SLO, and runtime mapping before constructing a client, then
+uses the same Sloth reader and persisted query bindings as direct and aggregate
+status.
+
+Without a requested downstream runtime, verified engine-owned Sloth files keep
+the external status `pending`. With a requested runtime, every reviewed SLO must
+produce a complete readable report. `healthy`, `at_risk`, and `exhausted` prove
+that the reviewed generated state is readable and let external verification
+succeed; `missing_telemetry` and `unverifiable` fail the transition and write no
+successor bundle. The successor retains the full neutral status report and
+evidence identity, never the runtime URL. Verification performs GET-only
+Prometheus queries and does not execute Sloth, reload rules, or mutate provider
+state.
+
 ## Current Limits
 
 - no Datadog reader until safe live evidence work resumes
-- no aggregate Sloth reader until release/portfolio inputs package current
-  downstream evidence and preflight its runtime mapping
 - no official Sloth MCP runtime adapter yet; the upstream main-branch server is
   documented as a version-gated, read-only comparison path, and its current
   output lacks observations, exact record identity, and equivalent freshness

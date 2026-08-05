@@ -386,7 +386,7 @@ bin/rules-ctl journal status \
 - `journal status` prints effective state, entry counts, resume eligibility, and findings such as `partial_failure`, `resume_blocked`, or `resume_state_recheck_required`.
 - Confirmed apply/prune for every provider creates a separate live-mode journal automatically through `--journal-dir`; operators do not manually transition that journal.
 
-**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing. The approved-plan workflow below adds exact file-backed execution, completed replay, and explicit resume. There is no manual journal transition command, automatic retry, Datadog exact execution, automatic rollback, or downstream Sloth verification.
+**Safety boundary:** standalone `journal create` and `journal status` never execute operations. Confirmed live commands update and verify their own journal while executing. The approved-plan workflow below adds exact file-backed execution, completed replay, and explicit resume. There is no manual journal transition command, automatic retry, Datadog exact execution, or automatic rollback. Downstream Sloth verification is a separate opt-in read-only bundle transition.
 
 ## Use Case 9: Approve And Execute An Exact File-Backed Plan
 
@@ -536,6 +536,9 @@ bin/rules-ctl bundle apply ./work/apply-ready.json \
 bin/rules-ctl bundle status ./work/applied.json
 
 bin/rules-ctl bundle verify ./work/applied.json \
+  --sloth-evidence=checkout-api/sloth=./work/sloth-evidence/checkout-api.json \
+  --target-base-url=checkout-api/sloth=http://localhost:9090 \
+  --max-age-seconds=300 \
   --output=./work/verified.json
 
 bin/rules-ctl bundle status ./work/verified.json
@@ -588,39 +591,52 @@ bin/rules-ctl bundle status ./work/verified.json
   exact journal-entry coverage, and managed runtime containment. Any invalid
   input returns `invalid_bundle_verification_inputs` before a managed-file read.
 - Verification reads each approved engine-owned JSON/YAML file in stable target
-  and journal-entry order. It performs no file, journal, Sloth, Prometheus,
-  Kubernetes, Grafana, Alertmanager, notification, or backend write.
+  and journal-entry order. When current Sloth evidence and a runtime are
+  supplied, it also performs the same eight GET-only Prometheus instant queries
+  used by direct status. It performs no file, journal, Sloth, Kubernetes,
+  Grafana, Alertmanager, notification, or backend write.
 - Success writes and prints an immutable content-addressed `verified` successor.
   Each target references a `target_verification` artifact containing
   `slo-rules-engine/bundle-target-verification/v1`, its approved runtime/plan/
   journal identity, fresh expected and actual fingerprints, resource evidence,
   and `engine_owned_status: succeeded`. Summary output includes verification
   counts by status.
-- Prometheus Stack verification is fully `succeeded`. Sloth target status is
-  release-qualified as `succeeded` for engine ownership while its nested
-  aggregate remains `status: pending` and `external_status: pending` with
-  `confirm_external_generator_completion` and
-  `refresh_downstream_provider_state` requirements. The tool does not claim
-  downstream generated-rule or Prometheus convergence.
+- Prometheus Stack verification is fully `succeeded`. Without an explicit
+  Sloth runtime, Sloth remains `status: pending` and
+  `external_status: pending` with `confirm_external_generator_completion` and
+  `refresh_downstream_provider_state` requirements. With an explicit runtime,
+  current exact evidence, and complete unambiguous live bindings, the verified
+  successor packages that evidence plus the full neutral live-status report and
+  sets `external_status: succeeded`. The runtime URL is never persisted.
+- `healthy`, `at_risk`, and `exhausted` all prove that reviewed downstream
+  generated state is readable; the latter two remain visible in the embedded
+  status report. `missing_telemetry` or `unverifiable` returns
+  `bundle_target_verification_failed` and writes no successor.
 - A missing, unreadable, or changed engine-owned file returns
   `bundle_target_verification_failed`, its target UID, and stable managed-file
   findings. `verified.json` is not written.
 - Datadog and mixed live/file bundles return
   `unsupported_bundle_verify_target` before journal or managed-file reads.
-  An incompatible existing output returns `release_bundle_output_conflict`
-  before managed reads and is never overwritten.
+  Stale/mismatched evidence, incomplete target/runtime mapping, and unsafe base
+  URLs also fail before managed reads or client construction. An incompatible
+  existing output returns `release_bundle_output_conflict` before managed reads
+  and is never overwritten.
 - Verification keeps `applied.json`, journals, and managed-file modification
-  times unchanged. Repeating it with the same compatible output rechecks state
-  using the original evidence timestamp and returns identical successor bytes.
+  times unchanged. Engine-only replay with the same compatible output rechecks
+  state using the original evidence timestamp and returns identical successor
+  bytes. A later live downstream snapshot should use a new output path because
+  status values and sample timestamps are immutable evidence.
 
 **Safety boundary:** bundle apply never replans an alternative operation list.
 It accepts only file-backed exact plans from the same source bundle, performs
 all approval/output compatibility checks before the first target, stops at the
 first incomplete target, and never retries a partial plan implicitly. Bundle
-verification consumes only the applied evidence and current engine-owned file
-state; it does not turn pending external work into success. Neither transition
-supports live API targets, automatic rollback, Sloth execution, Kubernetes
-apply, Grafana loading, or Alertmanager delivery.
+verification consumes only the applied evidence, current engine-owned file
+state, explicitly supplied Sloth evidence, and read-only live query results. It
+turns pending external work into success only when every reviewed binding is
+readable and current; it never treats SLO health as configuration convergence.
+Neither transition supports live API mutation targets, automatic rollback,
+Sloth execution, Kubernetes apply, Grafana loading, or Alertmanager delivery.
 
 ## Use Case 11: Apply Reviewed State
 
@@ -917,8 +933,9 @@ bin/rules-ctl sloth-evidence status \
   rehashed document whose mappings are not exactly rebuilt from the linked
   sources fails `sloth_evidence_source_derivation_mismatch`.
 - This artifact closes the reviewed generated-rule identity prerequisite and
-  is now required by direct Sloth `status`. Evidence capture/status still make
-  no Prometheus call; release-bundle downstream verification remains separate.
+  is required by direct Sloth `status`, aggregate Sloth status, and opt-in
+  downstream `bundle verify`. Evidence capture/status themselves still make no
+  Prometheus call.
 
 **Safety boundary:** PromQL names and queries remain provider evidence. The
 neutral SLO objective and response policy are unchanged, and reviewer

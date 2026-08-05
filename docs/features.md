@@ -224,11 +224,11 @@ manifests, stale bundles, invalid portfolios, and incomplete or unknown
 per-target runtime mappings fail before backend access. Sloth direct reads also
 reject invalid/stale evidence, manifest/service drift, or incomplete SLO
 coverage before client construction. Mixed-provider aggregates retain Datadog
-and Sloth targets as explicit unsupported coverage;
-an input with no readable target fails. Runtime URLs and raw backend error
-messages are not copied into reports. Datadog remains evidence-gated. Aggregate
-Sloth status remains open until bundles/portfolios package evidence and runtime
-mappings.
+targets and Sloth targets without evidence as explicit unsupported coverage;
+evidence-backed Sloth targets use the same neutral report and require explicit
+runtime mappings. An input with no readable target fails. Runtime URLs and raw
+backend error messages are not copied into reports. Datadog remains
+evidence-gated.
 
 ## Planned Agent-Operable Interfaces
 

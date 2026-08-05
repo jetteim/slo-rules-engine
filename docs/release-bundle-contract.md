@@ -185,13 +185,17 @@ read it rechecks:
   fingerprints
 - exact journal-entry agreement with the packaged change plan and containment
   of every managed path under the approved service/provider runtime
+- every supplied Sloth evidence/runtime mapping, current evidence schema and
+  source derivation, exact target manifest/service/SLO coverage, and safe
+  credential-free Prometheus-compatible base URL
 
 The command then checks targets in stable UID order and journal entries in
 recorded position order. `ManagedFileVerifier` parses each engine-owned JSON or
 YAML file and compares a fresh presence/content fingerprint with desired state
-from the approved operation. It never updates the journal, rewrites a managed
-file, invokes Sloth, contacts Prometheus, reloads configuration, or mutates any
-backend.
+from the approved operation. When a Sloth target has an explicit runtime, the
+command also executes only the eight persisted evidence bindings through
+read-only Prometheus instant queries. It never updates the journal, rewrites a
+managed file, invokes Sloth, reloads configuration, or mutates any backend.
 
 Success creates a new content-addressed `verified` bundle with a `verify`
 transition to the immutable `applied` predecessor. Each target references one
@@ -201,11 +205,17 @@ generated `target_verification` artifact whose
 - target, approved-plan, runtime, provider-plan, and terminal journal identity
 - one fresh expected/actual result for every engine-owned managed file
 - aggregate `status`, `engine_owned_status`, and `external_status`
-- pending Sloth external-generator requirements without claiming downstream
-  generator or Prometheus convergence
+- pending Sloth external-generator requirements when no runtime is requested,
+  or the packaged evidence identity and full neutral live-status report when
+  downstream provider state is proven
 
 A target qualifies when `engine_owned_status` is `succeeded`; its overall
-verification may remain `pending` only for recorded external Sloth work.
+verification may remain `pending` only for recorded external Sloth work. With
+current evidence and an explicit runtime, `missing_telemetry` or `unverifiable`
+SLO state returns `bundle_target_verification_failed`; `healthy`, `at_risk`,
+and `exhausted` all prove readable generated state and set
+`external_status: succeeded` without redefining operational health as
+configuration convergence.
 Missing, unreadable, or changed engine-owned files return
 `bundle_target_verification_failed` and no verified successor is written.
 Datadog or mixed live/file bundles return
@@ -213,8 +223,10 @@ Datadog or mixed live/file bundles return
 Invalid journal, lineage, runtime, plan, or execution evidence returns
 `invalid_bundle_verification_inputs` before managed-file reads.
 
-An existing compatible verified output is rechecked using its original
-verification timestamp, so converged replay returns identical bundle bytes.
+An existing compatible engine-only verified output is rechecked using its
+original verification timestamp, so converged replay returns identical bundle
+bytes. A later live downstream snapshot should use a new output path because
+status values and sample timestamps are immutable evidence.
 An incompatible output returns `release_bundle_output_conflict` before managed
 state is inspected and is never overwritten.
 
@@ -318,6 +330,17 @@ Verify the applied release against current engine-owned managed files:
 ```bash
 bin/rules-ctl bundle verify ./applied-bundle.json \
   --output ./verified-bundle.json
+```
+
+After external Sloth generation, also package current evidence and verify its
+live generated state without persisting the runtime URL:
+
+```bash
+bin/rules-ctl bundle verify ./applied-bundle.json \
+  --sloth-evidence checkout-api/sloth=./sloth-evidence.json \
+  --target-base-url checkout-api/sloth=http://localhost:9090 \
+  --max-age-seconds 300 \
+  --output ./verified-downstream-bundle.json
 ```
 
 Creation, planning, bundle execution, and bundle verification are fail-closed. Stale, invalid,

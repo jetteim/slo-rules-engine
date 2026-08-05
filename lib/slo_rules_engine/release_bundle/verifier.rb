@@ -2,6 +2,7 @@
 
 require 'json'
 require 'time'
+require 'uri'
 
 module SloRulesEngine
   module ReleaseBundle
@@ -26,23 +27,44 @@ module SloRulesEngine
         status_evaluator: StatusEvaluator.new,
         verifier: ProviderState::ManagedFileVerifier.new,
         journal_reader: nil,
+        live_status_client_factory: lambda do |base_url|
+          SloRulesEngine::TelemetryLookup::Prometheus::Client.new(base_url: base_url)
+        end,
         clock: -> { Time.now.utc }
       )
         @status_evaluator = status_evaluator
         @verifier = verifier
         @journal_reader = journal_reader || method(:read_journal)
+        @live_status_client_factory = live_status_client_factory
         @clock = clock
       end
 
-      def verify(bundle, checked_at: nil)
+      def verify(
+        bundle,
+        checked_at: nil,
+        sloth_evidence: {},
+        target_base_urls: {},
+        max_age_seconds: 300
+      )
         validate_predecessor!(bundle)
         targets = Array(ProviderState::Value.fetch(bundle, :targets))
         validate_target_modes!(targets)
         contexts = preflight_targets!(bundle, targets)
+        downstream = preflight_sloth_downstream!(
+          bundle,
+          targets,
+          evidence_paths: sloth_evidence,
+          target_base_urls: target_base_urls,
+          max_age_seconds: max_age_seconds
+        )
+        contexts.each do |context|
+          target_uid = ProviderState::Value.fetch(context.fetch(:target), :uid).to_s
+          context[:downstream] = downstream[target_uid] if downstream.key?(target_uid)
+        end
         timestamp = normalize_timestamp(checked_at || @clock.call)
         verifications = contexts.map { |context| verify_target!(context, timestamp) }
 
-        build_successor(bundle, verifications)
+        build_successor(bundle, verifications, downstream)
       end
 
       private
@@ -364,23 +386,170 @@ module SloRulesEngine
         end
       end
 
+      def preflight_sloth_downstream!(
+        bundle,
+        targets,
+        evidence_paths:,
+        target_base_urls:,
+        max_age_seconds:
+      )
+        max_age_seconds = Integer(max_age_seconds)
+        unless max_age_seconds.positive?
+          raise VerifyError.new(
+            'invalid_sloth_bundle_verification_runtime',
+            'max_age_seconds must be positive'
+          )
+        end
+
+        target_by_uid = targets.to_h do |target|
+          [ProviderState::Value.fetch(target, :uid).to_s, target]
+        end
+        artifacts = Array(ProviderState::Value.fetch(bundle, :artifacts)).to_h do |artifact|
+          [ProviderState::Value.fetch(artifact, :uid).to_s, artifact]
+        end
+        supplied = evidence_paths.to_h { |target_uid, path| [target_uid.to_s, path] }
+        runtimes = target_base_urls.to_h { |target_uid, base_url| [target_uid.to_s, base_url] }
+        validate_downstream_mapping_targets!(target_by_uid, supplied, runtimes)
+
+        evidence_by_target = target_by_uid.each_with_object({}) do |(target_uid, target), resolved|
+          next unless ProviderState::Value.fetch(target, :provider) == 'sloth'
+
+          existing = artifacts[
+            ProviderState::Value.fetch(target, :downstream_evidence_artifact_uid).to_s
+          ]
+          path = supplied[target_uid] || ProviderState::Value.fetch(
+            ProviderState::Value.fetch(existing, :source),
+            :path
+          )
+          resolved[target_uid] = File.expand_path(path) unless path.to_s.empty?
+        end
+        missing_runtimes = supplied.keys - runtimes.keys
+        unless missing_runtimes.empty?
+          raise VerifyError.new(
+            'missing_sloth_bundle_verification_runtime',
+            "missing Prometheus-compatible base URL for Sloth targets: #{missing_runtimes.join(', ')}"
+          )
+        end
+        missing_evidence = runtimes.keys - evidence_by_target.keys
+        unless missing_evidence.empty?
+          raise VerifyError.new(
+            'invalid_sloth_bundle_verification_runtime',
+            "runtime mappings do not identify evidence-backed Sloth targets: #{missing_evidence.sort.join(', ')}"
+          )
+        end
+        runtimes.each_value { |base_url| validate_downstream_base_url!(base_url) }
+
+        active_uids = runtimes.keys.sort
+        active_uids.each_with_object({}) do |target_uid, preflights|
+          target = target_by_uid.fetch(target_uid)
+          manifest_artifact = artifacts.fetch(
+            ProviderState::Value.fetch(target, :manifest_artifact_uid).to_s
+          )
+          manifest = ProviderState::Value.fetch(manifest_artifact, :content)
+          path = evidence_by_target.fetch(target_uid)
+          begin
+            preflight = SloRulesEngine::LiveStatus::SlothReader.new.preflight(
+              manifest,
+              evidence_path: path
+            )
+          rescue SloRulesEngine::Sloth::DownstreamEvidence::ContractError => error
+            findings = error.findings.map do |finding|
+              normalize_finding(finding, target_uid: target_uid)
+            end
+            raise VerifyError.new(
+              'invalid_sloth_bundle_verification_evidence',
+              'bundle verification requires current Sloth evidence for the exact reviewed target manifest',
+              findings: findings,
+              target_uid: target_uid
+            )
+          end
+          preflights[target_uid] = {
+            target: target,
+            preflight: preflight,
+            base_url: runtimes.fetch(target_uid),
+            max_age_seconds: max_age_seconds,
+            artifact: downstream_evidence_artifact(target, path, preflight.evidence)
+          }
+        end
+      rescue ArgumentError, TypeError => error
+        raise VerifyError.new('invalid_sloth_bundle_verification_runtime', error.message)
+      end
+
+      def validate_downstream_mapping_targets!(target_by_uid, evidence_paths, runtimes)
+        (evidence_paths.keys + runtimes.keys).uniq.sort.each do |target_uid|
+          target = target_by_uid[target_uid]
+          unless target
+            raise VerifyError.new(
+              'invalid_sloth_bundle_verification_target',
+              "Sloth verification mapping target is not in the applied bundle: #{target_uid}"
+            )
+          end
+          next if ProviderState::Value.fetch(target, :provider) == 'sloth'
+
+          raise VerifyError.new(
+            'invalid_sloth_bundle_verification_target',
+            "Sloth verification mappings are only valid for Sloth targets: #{target_uid}"
+          )
+        end
+      end
+
+      def validate_downstream_base_url!(base_url)
+        uri = URI.parse(base_url.to_s)
+        valid = %w[http https].include?(uri.scheme) &&
+          !uri.host.to_s.empty? &&
+          uri.userinfo.nil? &&
+          uri.query.nil? &&
+          uri.fragment.nil?
+        return if valid
+
+        raise VerifyError.new(
+          'invalid_sloth_bundle_verification_runtime',
+          'Prometheus-compatible base URLs must use HTTP(S), include a host, and exclude credentials, query, and fragment'
+        )
+      rescue URI::InvalidURIError
+        raise VerifyError.new(
+          'invalid_sloth_bundle_verification_runtime',
+          'Prometheus-compatible base URL is invalid'
+        )
+      end
+
+      def downstream_evidence_artifact(target, path, evidence)
+        target_uid = ProviderState::Value.fetch(target, :uid).to_s
+        {
+          uid: "sloth-evidence:#{target_uid}",
+          kind: 'sloth_downstream_evidence',
+          scope: ProviderState::Value.fetch(target, :scope),
+          provider: 'sloth',
+          content_type: 'application/json',
+          fingerprint: Fingerprint.content(evidence),
+          source: {
+            type: 'file',
+            path: path
+          },
+          content: ProviderState::Value.copy(evidence)
+        }
+      end
+
       def verify_target!(context, checked_at)
         target = context.fetch(:target)
         target_uid = ProviderState::Value.fetch(target, :uid).to_s
         resources = Array(ProviderState::Value.fetch(context.fetch(:journal), :entries)).map do |entry|
           if external_entry?(entry)
-            pending_external_resource(entry)
+            context[:downstream] ?
+              verify_external_resource(entry, context.fetch(:downstream), checked_at) :
+              pending_external_resource(entry)
           else
             verify_engine_resource(entry, checked_at)
           end
         end
         failed = resources.reject do |resource|
-          external_resource?(resource) || ProviderState::Value.fetch(resource, :status) == 'succeeded'
+          status = ProviderState::Value.fetch(resource, :status)
+          status == 'succeeded' || (external_resource?(resource) && status == 'pending')
         end
         unless failed.empty?
           raise VerifyError.new(
             'bundle_target_verification_failed',
-            "managed files for bundle target #{target_uid.inspect} do not converge",
+            "bundle target #{target_uid.inspect} does not converge",
             target_uid: target_uid,
             findings: failed.flat_map do |resource|
               Array(ProviderState::Value.fetch(resource, :findings)).map do |finding|
@@ -450,6 +619,57 @@ module SloRulesEngine
         }
       end
 
+      def verify_external_resource(entry, downstream, checked_at)
+        report = SloRulesEngine::LiveStatus::SlothReader.new(
+          client_factory: lambda {
+            @live_status_client_factory.call(downstream.fetch(:base_url))
+          },
+          clock: -> { Time.iso8601(checked_at) },
+          max_age_seconds: downstream.fetch(:max_age_seconds)
+        ).read_preflighted(downstream.fetch(:preflight)).to_h
+        incomplete = Array(ProviderState::Value.fetch(report, :statuses)).select do |status|
+          %w[missing_telemetry unverifiable].include?(
+            ProviderState::Value.fetch(status, :state).to_s
+          )
+        end
+        findings = if incomplete.empty?
+                     []
+                   else
+                     status_findings = incomplete.flat_map do |status|
+                       Array(ProviderState::Value.fetch(status, :findings)).map do |finding|
+                         normalize_finding(finding)
+                       end
+                     end
+                     [
+                       {
+                         code: 'sloth_downstream_live_status_incomplete',
+                         severity: 'error',
+                         message: 'Sloth downstream verification requires complete unambiguous live telemetry for every reviewed SLO',
+                         states: incomplete.map do |status|
+                           ProviderState::Value.fetch(status, :state)
+                         end.uniq.sort
+                       }
+                     ] + status_findings
+                   end
+        verification = ProviderState::Value.fetch(entry, :verification)
+        evidence = downstream.fetch(:preflight).evidence
+        {
+          entry_id: ProviderState::Value.fetch(entry, :entry_id),
+          target: ProviderState::Value.fetch(entry, :target),
+          name: ProviderState::Value.fetch(entry, :name),
+          source: ProviderState::Value.fetch(entry, :source),
+          ownership: 'external',
+          status: findings.empty? ? 'succeeded' : 'failed',
+          requirements: ProviderState::Value.copy(
+            Array(ProviderState::Value.fetch(verification, :requirements))
+          ),
+          evidence_id: ProviderState::Value.fetch(evidence, :evidence_id),
+          evidence_fingerprint: Fingerprint.content(evidence),
+          live_status_report: report,
+          findings: findings
+        }
+      end
+
       def verification_rollup(resources, checked_at)
         engine = resources.reject { |resource| external_resource?(resource) }
         external = resources.select { |resource| external_resource?(resource) }
@@ -493,10 +713,21 @@ module SloRulesEngine
         ProviderState::Value.fetch(resource, :ownership) == 'external'
       end
 
-      def build_successor(bundle, verifications)
+      def build_successor(bundle, verifications, downstream)
         verified = JSON.parse(JSON.generate(bundle), symbolize_names: true)
         artifacts = Array(ProviderState::Value.fetch(verified, :artifacts))
         targets = Array(ProviderState::Value.fetch(verified, :targets))
+        downstream.each do |target_uid, context|
+          target = targets.find do |entry|
+            ProviderState::Value.fetch(entry, :uid).to_s == target_uid
+          end
+          artifact = context.fetch(:artifact)
+          artifacts.reject! do |entry|
+            ProviderState::Value.fetch(entry, :uid).to_s == artifact.fetch(:uid)
+          end
+          artifacts << ProviderState::Value.copy(artifact)
+          target[:downstream_evidence_artifact_uid] = artifact.fetch(:uid)
+        end
         verifications.each do |verification|
           target_uid = ProviderState::Value.fetch(verification, :target_uid).to_s
           target = targets.find do |entry|

@@ -44,7 +44,7 @@ not exist yet.
 | --- | --- | --- | --- |
 | `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources, durable operation journal, and a `ProviderStateResult` with backend identity and canonical payload/absence verification |
 | `prometheus_stack` | Reviewed manifest containing evaluation-window SLI/SLO/remaining-budget recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and a `ProviderStateResult` with post-write/delete convergence evidence |
-| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned manifest/input files, durable journal/result, and a skipped external handoff that remains pending and operator-owned |
+| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned files and durable journal/result; optional reviewed evidence plus read-only Prometheus status can also verify downstream generated state |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
 
@@ -74,8 +74,10 @@ checks. It validates packaged plan, execution, runtime, and full journal
 fingerprints before reading managed state, then records one
 `target_verification` artifact per target under
 `slo-rules-engine/bundle-target-verification/v1`. Prometheus Stack and Sloth
-engine-owned files must converge; Sloth downstream generator/Prometheus evidence
-remains explicitly pending. Datadog and mixed live/file bundles are rejected
+engine-owned files must converge. Sloth downstream state remains pending unless
+the command receives current exact evidence plus an explicit read-only
+Prometheus-compatible runtime; complete live bindings then produce
+`external_status: succeeded`. Datadog and mixed live/file bundles are rejected
 before target reads.
 
 After an operator runs Sloth externally, `sloth-evidence capture` can bind the
@@ -85,8 +87,9 @@ objective, budget, burn, metadata, error-ratio, observation-query, and
 freshness bindings. `sloth-evidence status` rereads those local sources and
 fails when their semantic fingerprints drift. Direct Sloth `status` consumes
 only this fresh evidence and an explicit Prometheus runtime. `bundle create`
-can package one current evidence artifact per Sloth target for aggregate status;
-release-bundle downstream verification remains incomplete.
+can package one current evidence artifact per Sloth target for aggregate status,
+and `bundle verify` can attach the same evidence while proving downstream state
+through read-only live status.
 
 ## Usage By Use Case
 
@@ -239,6 +242,9 @@ bin/rules-ctl bundle apply ./work/apply-ready.json \
   --output=./work/applied.json
 
 bin/rules-ctl bundle verify ./work/applied.json \
+  --sloth-evidence=checkout-api/sloth=./work/sloth-evidence/checkout-api.json \
+  --target-base-url=checkout-api/sloth=http://localhost:9090 \
+  --max-age-seconds=300 \
   --output=./work/verified.json
 ```
 
@@ -253,8 +259,11 @@ Verification rereads the approved engine-owned JSON/YAML files without changing
 their modification times, journals, or predecessor bundle. Success writes and
 prints `verified.json`, whose targets reference generated
 `target_verification` artifacts containing fresh expected/actual fingerprints,
-`engine_owned_status: succeeded`, and `external_status: pending` for Sloth.
-The summary includes verification counts by status.
+`engine_owned_status: succeeded`, and either `external_status: pending` when no
+Sloth runtime is requested or `external_status: succeeded` when current exact
+evidence and all persisted live bindings are complete. The full neutral status
+report and evidence identity are saved; the runtime URL is not. The summary
+includes verification counts by status.
 
 Missing, duplicate, unknown, or bundle-mismatched approvals; stale bundle
 sources; live-API targets; and incompatible existing output files fail before
@@ -269,8 +278,9 @@ Missing, unreadable, or changed managed files fail
 journal, lineage, runtime, plan, or execution evidence fails preflight before
 managed reads. Live or mixed targets fail `unsupported_bundle_verify_target`.
 An incompatible `verified.json` fails before reads and is never overwritten;
-repeating a converged verification against a compatible output returns
-identical bytes.
+repeating an engine-only converged verification against a compatible output
+returns identical bytes. Use a new output path for a later live downstream
+snapshot because status values and sample timestamps are immutable evidence.
 
 ### Persist an operation journal
 

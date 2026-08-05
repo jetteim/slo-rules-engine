@@ -71,6 +71,47 @@ class ReleaseBundleVerifyCliTest < Minitest::Test
     end
   end
 
+  def test_bundle_verify_packages_sloth_evidence_and_live_downstream_status
+    Dir.mktmpdir do |dir|
+      applied_path, _applied, managed_dir, fixture = write_applied_input(dir)
+      evidence = write_sloth_downstream_evidence_fixture(
+        dir,
+        fixture.fetch(:manifests).fetch('sloth')
+      )
+      output_path = File.join(dir, 'verified-downstream.json')
+      request_log_path = File.join(dir, 'requests.log')
+      fake_http = File.join(dir, 'fake_prometheus_status_http.rb')
+      FileUtils.cp(File.expand_path('support/fake_prometheus_status_http.rb', __dir__), fake_http)
+      managed_mtimes = managed_files(managed_dir).to_h { |path| [path, File.mtime(path)] }
+
+      verified, stderr, status = command_json(
+        'bundle',
+        'verify',
+        applied_path,
+        "--sloth-evidence=checkout-api/sloth=#{evidence.fetch(:evidence)}",
+        '--target-base-url=checkout-api/sloth=http://sloth-prometheus.example.test',
+        '--max-age-seconds=300',
+        "--output=#{output_path}",
+        env: {
+          'RUBYOPT' => "-r#{fake_http}",
+          'PROMETHEUS_REQUEST_LOG' => request_log_path
+        }
+      )
+
+      assert status.success?, stderr
+      assert_equal verified, JSON.parse(File.read(output_path))
+      sloth_target = verified.fetch('targets').find { |target| target.fetch('provider') == 'sloth' }
+      sloth_verification = verified.fetch('artifacts').find do |artifact|
+        artifact.fetch('uid') == sloth_target.fetch('verification_artifact_uid')
+      end.fetch('content')
+      assert_equal 'succeeded', sloth_verification.dig('verification', 'external_status')
+      assert_equal 'healthy', sloth_verification.dig('verification', 'resources', -1, 'live_status_report', 'statuses', 0, 'state')
+      assert_equal 8, File.readlines(request_log_path).length
+      assert_equal managed_mtimes, managed_files(managed_dir).to_h { |path| [path, File.mtime(path)] }
+      refute_includes JSON.generate(verified), 'sloth-prometheus.example.test'
+    end
+  end
+
   def test_bundle_verify_rejects_an_incompatible_output_before_managed_file_reads
     Dir.mktmpdir do |dir|
       applied_path, _applied, managed_dir = write_applied_input(dir)
@@ -144,15 +185,15 @@ class ReleaseBundleVerifyCliTest < Minitest::Test
     ).apply(apply_ready, approved_plans: documents)
     path = File.join(dir, 'applied.json')
     File.write(path, JSON.pretty_generate(applied))
-    [path, applied, managed_dir]
+    [path, applied, managed_dir, fixture]
   end
 
   def managed_files(root)
     Dir.glob(File.join(root, '**', '*')).select { |path| File.file?(path) }.sort
   end
 
-  def command_json(*argv)
-    stdout, stderr, status = Open3.capture3('ruby', File.join(ROOT, 'bin', 'rules-ctl'), *argv)
+  def command_json(*argv, env: {})
+    stdout, stderr, status = Open3.capture3(env, 'ruby', File.join(ROOT, 'bin', 'rules-ctl'), *argv)
     [JSON.parse(stdout), stderr, status]
   end
 end

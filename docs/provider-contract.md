@@ -225,10 +225,12 @@ Expected telemetry behavior:
 
 - reuse the Prometheus-compatible lookup and discovery baseline for onboarding and sanity checks
 - batch discovery support is inherited through the Prometheus-compatible discovery interface
-- direct live status consumes fresh reviewed downstream evidence for one
-  manifest; aggregate status continues to report Sloth as explicit unsupported
-  coverage until release/portfolio artifacts package evidence and runtime
-  mappings
+- direct and aggregate live status consume fresh reviewed downstream evidence;
+  release targets use packaged evidence references and portfolios use explicit
+  evidence paths plus runtime mappings
+- opt-in `bundle verify` packages current evidence and records the full neutral
+  live-status report when every downstream binding is readable; it never runs
+  Sloth or reloads Prometheus
 
 ## Delivery Integrations
 

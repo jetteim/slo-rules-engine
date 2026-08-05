@@ -162,6 +162,12 @@ class CliCommandRegistryTest < Minitest::Test
       { 'checkout/sloth' => './sloth-evidence.json' },
       bundle_create.agent.fetch(:request_example).fetch(:arguments).fetch(:sloth_evidence_files)
     )
+
+    bundle_verify = @registry.fetch('bundle.verify')
+    assert_includes bundle_verify.human_usage, '--sloth-evidence=checkout/sloth=./sloth-evidence.json'
+    verify_arguments = bundle_verify.agent.fetch(:request_example).fetch(:arguments)
+    assert_equal({ 'checkout/sloth' => './sloth-evidence.json' }, verify_arguments.fetch(:sloth_evidence_files))
+    assert_equal({ 'checkout/sloth' => 'http://localhost:9090' }, verify_arguments.fetch(:target_base_urls))
   end
 
   def test_separate_catalog_pairs_human_commands_with_agent_json_requests

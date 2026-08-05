@@ -114,8 +114,10 @@ Sloth, and do not apply or reload Prometheus rules.
 Direct `status --provider=sloth` now consumes this artifact. It revalidates the
 content ID and every source fingerprint, requires an exact manifest/service/SLO
 coverage match, then queries only the saved bindings through an explicit
-Prometheus runtime. Release-bundle downstream verification remains unsupported
-until bundles package current evidence per target.
+Prometheus runtime. Release and portfolio aggregate status use one current
+evidence reference per Sloth target. Opt-in `bundle verify` can attach the same
+artifact and persist a full read-only live-status report, promoting external
+state from `pending` only when every binding is readable and unambiguous.
 
 Sloth's own main branch also contains a read-only HTTP MCP server. Its planned
 role, current status-parity gaps, setup, and promotion gates are documented in

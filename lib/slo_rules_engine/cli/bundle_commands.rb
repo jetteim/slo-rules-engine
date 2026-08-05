@@ -246,7 +246,27 @@ module SloRulesEngine
       def bundle_verify(argv)
         input_path = argv.shift
         output_path = nil
+        sloth_evidence = {}
+        target_base_urls = {}
+        max_age_seconds = 300
         parser = OptionParser.new do |opts|
+          opts.on('--sloth-evidence=TARGET=FILE', 'Current downstream evidence for one Sloth target; repeatable') do |value|
+            target, path = value.split('=', 2)
+            abort_usage('invalid --sloth-evidence; expected service/sloth=FILE') if target.to_s.empty? || path.to_s.empty?
+            abort_usage("duplicate --sloth-evidence target #{target.inspect}") if sloth_evidence.key?(target)
+
+            sloth_evidence[target] = path
+          end
+          opts.on('--target-base-url=TARGET=URL', 'Prometheus-compatible API for one evidence-backed Sloth target') do |value|
+            target, url = value.split('=', 2)
+            abort_usage('invalid --target-base-url; expected service/sloth=URL') if target.to_s.empty? || url.to_s.empty?
+            abort_usage("duplicate --target-base-url target #{target.inspect}") if target_base_urls.key?(target)
+
+            target_base_urls[target] = url
+          end
+          opts.on('--max-age-seconds=N', Integer, 'Maximum accepted downstream status sample age') do |value|
+            max_age_seconds = value
+          end
           opts.on('--output=FILE', 'Write the immutable verified release bundle') do |value|
             output_path = value
           end
@@ -254,6 +274,7 @@ module SloRulesEngine
         parser.parse!(argv)
         abort_usage('missing applied release bundle path') if input_path.to_s.empty?
         abort_usage('bundle verify requires --output') if output_path.to_s.empty?
+        abort_usage('--max-age-seconds must be positive') unless max_age_seconds.positive?
         abort_usage('unexpected arguments') unless argv.empty?
         if File.expand_path(input_path) == File.expand_path(output_path)
           render_bundle_error(
@@ -275,7 +296,10 @@ module SloRulesEngine
         end.min
         verified = SloRulesEngine::ReleaseBundle::Verifier.new.verify(
           release_bundle,
-          checked_at: checked_at
+          checked_at: checked_at,
+          sloth_evidence: sloth_evidence,
+          target_base_urls: target_base_urls,
+          max_age_seconds: max_age_seconds
         )
         store.write(output_path, verified)
         puts JSON.pretty_generate(verified)
