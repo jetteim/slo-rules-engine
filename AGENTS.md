@@ -8,14 +8,14 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Add the official Sloth MCP runtime only as a version-gated read-only
-   comparison adapter until status-output parity is proven
+1. Resume AICLI-F2 structured Agent CLI and runtime introspection from the
+   complete 38-command registry/catalog foundation
 2. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
-3. Resume AICLI-F2 structured Agent CLI and runtime introspection from the
-   completed registry/catalog foundation after the Sloth evidence checkpoint
-4. Datadog exact-plan parity only after live recheck/idempotency semantics are
+3. Datadog exact-plan parity only after live recheck/idempotency semantics are
    verified
+4. Revalidate the Sloth MCP comparison against a tagged binary only after an
+   official release contains the upstream MCP server
 
 The release-bundle create/plan/apply boundary, provider-neutral state/journal
 contracts, file-backed apply-exact-plan workflow, and one-manifest
@@ -123,8 +123,9 @@ target report, expose unsupported Datadog and Sloth-without-evidence targets as
 coverage gaps, and require one runtime endpoint per readable target without
 persisting those URLs.
 Stale bundles, invalid portfolios, review gaps, target mismatches, and runtime
-mapping errors fail before the first backend read. Datadog direct status and
-official Sloth MCP comparison remain open.
+mapping errors fail before the first backend read. Datadog direct status remains
+open. The official Sloth MCP adapter is implemented as comparison-only provider
+evidence and cannot promote neutral status.
 
 Current Sloth downstream-evidence status:
 `sloth-evidence capture` reads one reviewed Sloth manifest, every native input,
@@ -144,12 +145,16 @@ live status, release/portfolio aggregation, and opt-in release-bundle
 downstream verification consume this evidence. `bundle create
 --sloth-evidence=TARGET=FILE` packages it by target, portfolio entries may
 reference it, and `bundle verify` accepts explicit target evidence/runtime
-mappings without persisting runtime URLs. The official Sloth main-branch HTTP MCP
-server is documented as a future version-gated read-only comparison adapter,
-not as a parity-complete status source or engine MCP replacement.
+mappings without persisting runtime URLs. `sloth-mcp compare` now preflights the
+same exact reviewed evidence and consumes the official Sloth main-branch HTTP
+MCP server through a version/tool/schema-gated six-tool read-only allowlist. It
+emits a bounded content-addressed comparison report without endpoints or raw
+provider text. Because upstream omits observations, exact record identity, and
+equivalent freshness, the report declares itself non-authoritative and cannot
+replace neutral status or the later engine MCP interface.
 
 Current architecture status: `bin/rules-ctl` is a six-line bootstrap for
-`lib/slo_rules_engine/cli.rb`. The library facade composes nine focused command
+`lib/slo_rules_engine/cli.rb`. The library facade composes ten focused command
 families, dispatches through the versioned command registry, and retains shared
 manifest/state orchestration. The current component, flow, dependency,
 contract, NFR, use-case, and test maps live in
@@ -157,7 +162,7 @@ contract, NFR, use-case, and test maps live in
 `docs/housekeeping/atomic-coherence-simplification.md`.
 
 Current agent-interface status: AICLI-F1 is implemented. A validated immutable
-registry covers all 37 current commands and drives Human top-level and grouped
+registry covers all 38 current commands and drives Human top-level and grouped
 subcommand dispatch. The separate
 `slo-rules-engine/cli-command-catalog/v1` entity pairs each executable Human CLI
 example with a planned versioned Agent JSON request. Missing/duplicate metadata
@@ -251,7 +256,21 @@ Implemented by the latest feature slices:
   Sloth status form
 - `docs/sloth-mcp-integration.md` records the official Sloth main-branch
   Streamable HTTP MCP surface, six read-only tools, release/version status,
-  setup, security/refusal rules, parity gaps, and comparison-first path
+  setup, implemented comparison output, security/refusal rules, and parity gaps
+- `sloth-mcp compare` requires current exact-manifest downstream evidence before
+  client construction, then pins protocol `2025-11-25`, runtime version, server
+  identity, exact six-tool inventory, read-only annotations, and input/output
+  schema shapes before domain reads
+- Sloth MCP comparison bounds endpoint hosts, time ranges, pagination, series
+  points, response bytes, and deadlines; it reconciles exact `sloth_id` coverage
+  and compares objective, period, list/detail, and budget evidence
+- `slo-rules-engine/sloth-mcp-comparison/v1` links exact source fingerprints,
+  retains bounded provider evidence and stable drift findings, omits endpoint
+  and provider-controlled free text, and declares
+  `authoritative_status_transport: false`
+- The Human `sloth-mcp compare` command and planned Agent JSON request are
+  registered together; matched output exits zero, saved semantic drift exits
+  one, and contract/evidence failures write no report
 - `sloth-evidence capture` now creates reviewed, content-addressed,
   credential-free generated-rule evidence without executing Sloth or reading a
   backend
@@ -265,11 +284,11 @@ Implemented by the latest feature slices:
 - `sloth-evidence status` validates artifact schema and content identity before
   trusting source paths, then reports fresh/stale source checks with stable
   findings and no provider I/O
-- The shared Human/Agent command registry/catalog now contains 37 commands,
-  including matching Human CLI and planned Agent JSON mappings for both Sloth
-  evidence commands
+- The shared Human/Agent command registry/catalog now contains 38 commands,
+  including matching Human CLI and planned Agent JSON mappings for Sloth
+  evidence capture/status and MCP comparison
 - AICLI-F1 now provides immutable `CommandDefinition` values, a validated
-  37-command `CommandRegistry`, and a separate versioned `CommandCatalog` that
+  38-command `CommandRegistry`, and a separate versioned `CommandCatalog` that
   pairs current Human CLI examples with planned Agent CLI JSON requests
 - Human top-level and grouped subcommand dispatch now resolve through the
   registry, so an unregistered Human command is unreachable; existing command
@@ -495,7 +514,9 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: opt-in evidence-backed Sloth downstream release
+- latest checkpoint: official Sloth MCP read-only comparison with exact evidence,
+  capability/schema, identity, bounded-output, and Human/Agent parity gates
+- previous checkpoint: opt-in evidence-backed Sloth downstream release
   verification with complete readable-state evidence
 - previous checkpoint: release/portfolio packaging and aggregate status for
   current exact Sloth downstream evidence
@@ -503,7 +524,7 @@ Implemented by the latest feature slices:
   Sloth MCP integration path
 - previous checkpoint: reviewed content-addressed Sloth downstream generated-rule
   evidence plus local source freshness status
-- previous checkpoint: AICLI-F1 shared command registry and separate 37-command
+- previous checkpoint: AICLI-F1 shared command registry and separate 38-command
   Human CLI to planned Agent JSON parity catalog
 - previous checkpoint: article-derived Agent Interface Roadmap with complete
   current-command parity inventory, requirements, feature packets,
@@ -588,16 +609,16 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Implement the official Sloth MCP runtime as a version/tool/schema-gated
-   read-only comparison report reconciled by exact `sloth_id`; do not promote it
-   to a status transport while observations, exact record identity, and
-   equivalent freshness are absent
+1. Implement AICLI-F2 offline catalog/describe and the first strict structured
+   Agent CLI invocation slice from the completed 38-command registry/catalog
+   foundation
 2. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
 3. Extend exact approval/apply/resume to Datadog only after verified backend
    recheck and idempotency semantics exist
-4. Implement AICLI-F2 offline catalog/describe and the first strict structured
-   Agent CLI invocation slice from the completed registry/catalog foundation
+4. Revalidate Sloth MCP against a tagged official binary and real Prometheus
+   data only after a release contains the MCP surface; do not promote status
+   while observations, exact record identity, and equivalent freshness are absent
 5. Add automatic rollback execution only after a reviewed compensating-plan
    contract exists; current exact failures provide manual guidance
 
@@ -613,45 +634,37 @@ Secondary gaps:
 
 Next recommended slice:
 
-- add a provider-specific, read-only Sloth MCP comparison artifact linked to
-  the reviewed manifest fingerprint and downstream-evidence ID
-- initialize the official Streamable HTTP MCP endpoint, require the pinned
-  six-tool read-only inventory and result schemas, and version-gate the running
-  Sloth capability before domain reads
-- traverse `list_slos` with bounded pagination, reconcile exact `sloth_id`
-  coverage, and reject missing, duplicate, grouped, unexpected, or drifting
-  objective/period identities
-- keep the current Prometheus-compatible evidence reader authoritative; the MCP
-  adapter must not classify neutral live status or replace observations,
-  exact-record, and freshness evidence
-- cover initialization, tool discovery, pagination, version/schema gates,
-  malformed/oversized results, timeouts, endpoint redaction, and zero mutation
-  with fake Streamable HTTP MCP tests before any controlled live test
+- resume AICLI-F2 with offline `agent catalog` and `agent describe` generated
+  from the implemented registry/catalog
+- add the first strict raw JSON/file/stdin Agent CLI invocation without changing
+  the Human command, result, refusal, or side-effect contract
+- retain `sloth-mcp.compare` in the same parity and schema inventory as every
+  other provider-read command
 
 Rationale:
 
-- direct, aggregate, and release-verification Sloth status now prove reviewed
-  generated-rule identities against live Prometheus data without broadening
-  the neutral model
-- the official Sloth MCP server is useful provider evidence, but the checked
-  upstream surface lacks fields required for a contract-complete neutral status,
-  so direct Prometheus bindings remain authoritative
-- a separate comparison report can detect provider identity/objective/period
-  drift without weakening source freshness, exact-record, or mutation gates
-- AICLI-F2 retains a complete foundation and can resume without losing parity
+- the supported Sloth boundary is complete through generation, file-state
+  planning/exact execution, downstream evidence, direct and aggregate neutral
+  status, release verification, and official MCP comparison
+- the MCP comparison detects provider identity/objective/period/budget drift
+  without weakening source freshness, exact-record, status, or mutation gates
+- remaining Sloth work is externally gated on a tagged MCP release and additional
+  upstream status evidence, not an unfinished engine feature
+- AICLI-F2 now has a complete 38-command foundation and can resume without losing
+  parity
 - Datadog work remains correctly evidence-gated and postponed
 
 ## Next Session Handoff
 
-Prepared on 2026-08-05 for a restart-and-`proceed` workflow.
+Prepared on 2026-08-10 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `1e8bf26 feat: verify Sloth downstream release
-  state`
-- previous pushed checkpoint: `0c82ab7 feat: aggregate evidence-backed Sloth
-  status`
+- latest pushed checkpoint: `d71c0d3 feat: expose Sloth MCP comparison
+  workflow`
+- previous pushed checkpoint: `23933b7 feat: compare reviewed Sloth state
+  through MCP`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff:
@@ -660,19 +673,20 @@ Current safe boundary:
 
 Verification evidence:
 
-- target: evidence-backed Sloth downstream release verification, complete
-  preflight, immutable output evidence, and Human/Agent CLI parity
+- target: official Sloth MCP read-only comparison with exact reviewed evidence,
+  pinned runtime/tool/schema contracts, bounded output, and Human/Agent CLI
+  parity
 - command: `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh`
-- recorded date: `2026-08-05`
+- recorded date: `2026-08-10`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 467 tests, 5,604 assertions, 0 failures,
+- result: exit 0, `verification ok`, 482 tests, 5,843 assertions, 0 failures,
   0 errors, 0 skips
-- focused result: release-bundle verification passed with 10 tests and 79
-  assertions; release-bundle verification CLI passed with 5 tests and 28
-  assertions; release-bundle creation passed with 11 tests and 109 assertions;
-  aggregate status passed with 9 tests and 60 assertions; registry parity
-  passed with 6 tests and 2,235 assertions; all had zero failures and errors
-- parity evidence: the registry and catalog contain the same 37 stable command
+- focused result: Sloth MCP comparison passed with 8 tests and 85 assertions;
+  MCP client/transport passed with 4 tests and 49 assertions; Human CLI passed
+  with 3 tests and 14 assertions; registry parity passed with 6 tests and 2,311
+  assertions; use-case and Agent roadmap checks passed with 7 tests and 494
+  assertions; all had zero failures, errors, and skips
+- parity evidence: the registry and catalog contain the same 38 stable command
   IDs, every registered command has one current Human CLI usage and one
   versioned target Agent JSON request, and duplicate IDs/paths fail validation
 - runtime note: macOS system Ruby 2.6.10 lacks `Array#filter_map`, already used
@@ -680,39 +694,39 @@ Verification evidence:
   4.0.1. No runtime compatibility code was changed in this implementation slice.
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
-- live verification: no real Prometheus or Sloth server was contacted. Tests
-  use public-safe saved rule YAML, local source files, client factories, and
-  fake Prometheus HTTP. Official Sloth MCP behavior was verified from upstream
-  source at main revision `8a3be4fab79defa4448d09d91b48422615980b05`,
-  not through a running server. Datadog live testing remains postponed.
-- blast radius: release-bundle verification, two optional Human CLI mappings
-  with matching planned Agent JSON arguments, evidence/runtime preflight,
-  target verification artifacts, fake HTTP/CLI tests, and usage/contracts.
-  Existing engine-only verification remains compatible and pending for Sloth;
-  no provider mutation was added.
-- rollback path: revert `1e8bf26 feat: verify Sloth downstream release state`
-  and `0c82ab7 feat: aggregate evidence-backed Sloth status`
+- upstream verification: a controlled checkout at Sloth main revision
+  `8a3be4fab79defa4448d09d91b48422615980b05` instantiated the official handler;
+  `go test ./internal/http/mcp -run TestSchemaDump -v` used the official Go MCP
+  SDK client to complete initialization and `tools/list`, exited 0, and exposed
+  the six schemas pinned by the engine
+- live verification: no tagged Sloth binary contains MCP, so a full comparison
+  against a released server and real Prometheus data could not be run. Latest
+  observed release `v0.16.0` is intentionally rejected. Datadog live testing
+  remains postponed.
+- blast radius: one provider-read Human command and planned Agent mapping,
+  evidence/runtime preflight, read-only MCP transport, comparison artifacts,
+  bounded fake-client/transport/CLI tests, and usage/contracts. No provider
+  mutation, status promotion, Sloth execution, or Prometheus reload was added.
+- rollback path: revert `d71c0d3 feat: expose Sloth MCP comparison workflow`
+  and `23933b7 feat: compare reviewed Sloth state through MCP`
 
 When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Do not resume housekeeping; the atomic checkpoint and Phase 9 are complete.
-4. Use TDD to add a provider-specific Sloth MCP comparison report linked to the
-   exact reviewed manifest fingerprint and downstream-evidence ID.
-5. Require MCP initialization, the pinned read-only tool inventory, version and
-   result-schema gates, bounded pagination, and exact `sloth_id` reconciliation
-   before accepting comparison evidence.
-6. Do not promote MCP to a neutral status transport or weaken the authoritative
-   Prometheus-compatible evidence reader.
-7. Preserve the completed AICLI-F1 registry/catalog parity and update both the
+4. Treat the supported Sloth engine boundary as complete; do not invent more
+   provider work while the tagged MCP release and status-parity fields are absent.
+5. Resume AICLI-F2 offline catalog/describe and the first strict structured Agent
+   CLI slice from the complete 38-command registry/catalog foundation.
+6. Preserve the completed AICLI-F1 registry/catalog parity and update both the
    Human CLI usage and target Agent JSON mapping for every CLI change.
-8. Keep the official Sloth MCP runtime comparison-only and do not claim status
+7. Keep the official Sloth MCP runtime comparison-only and do not claim status
    parity while observations, exact record identity, and equivalent freshness
    are absent.
-9. Keep Datadog live testing postponed unless the user explicitly reopens it
+8. Keep Datadog live testing postponed unless the user explicitly reopens it
    with isolated credentials/evidence.
-10. Preserve release-bundle predecessor immutability, exact-plan, review,
+9. Preserve release-bundle predecessor immutability, exact-plan, review,
    journal, live-status, and mutation gates exactly.
 
 ## Verification Commands
@@ -722,6 +736,9 @@ Use these before claiming a checkpoint:
 ```bash
 ruby -Ilib test/agent_interface_roadmap_test.rb
 ruby -Ilib test/cli_command_registry_test.rb
+ruby -Ilib test/sloth_mcp_client_test.rb
+ruby -Ilib test/sloth_mcp_comparison_test.rb
+ruby -Ilib test/sloth_mcp_cli_test.rb
 ruby -Ilib test/sloth_downstream_evidence_test.rb
 ruby -Ilib test/sloth_downstream_evidence_cli_test.rb
 ruby -Ilib test/sloth_live_status_test.rb
@@ -774,9 +791,8 @@ If a new session needs to resume quickly:
 7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
-8. If the user says `proceed`, implement the Sloth MCP comparison adapter with
-   TDD, exact evidence identity, pinned read-only tool/schema gates, bounded
-   responses, and no status-transport promotion
+8. If the user says `proceed`, resume AICLI-F2; the supported Sloth comparison
+   boundary is implemented and a tagged-runtime parity test is externally gated
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
 10. Keep the official Sloth MCP adapter comparison-only; the current
