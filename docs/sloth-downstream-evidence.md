@@ -119,6 +119,7 @@ evidence reference per Sloth target. Opt-in `bundle verify` can attach the same
 artifact and persist a full read-only live-status report, promoting external
 state from `pending` only when every binding is readable and unambiguous.
 
-Sloth's own main branch also contains a read-only HTTP MCP server. Its planned
-role, current status-parity gaps, setup, and promotion gates are documented in
-[Official Sloth MCP Integration Path](sloth-mcp-integration.md).
+Sloth's own main branch also contains a read-only HTTP MCP server. The
+implemented comparison adapter consumes this evidence before contacting it;
+its current status-parity gaps, setup, output, and promotion gates are
+documented in [Official Sloth MCP Comparison](sloth-mcp-integration.md).

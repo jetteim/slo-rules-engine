@@ -219,7 +219,7 @@ This is the running plan for the long refactor.
 - [x] Package optional current Sloth evidence per release target, accept one
   evidence reference per portfolio target, and include evidence-backed Sloth
   targets in aggregate status only after complete zero-client preflight.
-- [ ] Add a version-gated read-only adapter for the official Sloth HTTP MCP
+- [x] Add a version-gated read-only adapter for the official Sloth HTTP MCP
   server, initially as an exact-identity comparison report; do not promote it
   to a status transport until neutral output parity is proven.
 - [x] Extend release-bundle downstream verification to packaged current Sloth
@@ -233,7 +233,7 @@ and article revalidation live in
 [`docs/agent-interface-roadmap.md`](agent-interface-roadmap.md).
 
 - [x] **AICLI-F1:** define the versioned single command registry, register all
-  37 current Human CLI commands with schema references, side effects, safety
+  38 current Human CLI commands with schema references, side effects, safety
   gates, provider I/O, and output metadata, route Human dispatch through the
   registry, and publish a separate Human-command to Agent-JSON catalog without
   changing command behavior.

@@ -1116,16 +1116,9 @@ bin/rules-ctl status \
   downstream-evidence artifact. Bundle downstream verification remains a
   separate read-only transition.
 
-**Official Sloth MCP path:** current Sloth `main` can expose a stateless,
-read-only Streamable HTTP MCP endpoint from `sloth server --mcp-enabled`. The
-engine does not consume it yet. The planned provider adapter will version-gate
-the upstream surface, allowlist its six read-only tools, reconcile exact
-`sloth_id` values against reviewed downstream evidence, and first emit a
-supplemental comparison report. MCP-only status cannot claim parity yet because
-the upstream tools do not expose total observations, exact source record
-selectors, or contract-equivalent sample freshness. Setup, expected outputs,
-refusals, and promotion gates are in
-[Official Sloth MCP Integration Path](sloth-mcp-integration.md).
+The separate official Sloth MCP comparison workflow is Use Case 18. It can
+cross-check the same reviewed identities, objective, period, budget, burn, and
+availability without redefining this neutral status contract.
 
 **Intent preserved:** objective, evaluation window, calculation basis, and
 response context come from reviewed neutral intent. Release and portfolio
@@ -1135,7 +1128,75 @@ Sloth downstream evidence;
 the neutral status model contains only normalized values, identity, freshness,
 coverage, and findings.
 
-## Use Case 18: Operate The Reviewed Workflow From An AI Agent
+## Use Case 18: Cross-Check Reviewed Sloth State Through Official MCP
+
+**Task:** detect whether one running Sloth instance disagrees with the exact
+reviewed manifest and generated-rule evidence before an operator trusts its
+provider view.
+
+Start a main-branch Sloth server with the MCP endpoint bound to loopback, then
+run:
+
+```bash
+bin/rules-ctl sloth-mcp compare \
+  --manifest=./managed/checkout-api/sloth/manifest.json \
+  --evidence=./work/sloth-evidence/checkout-api.json \
+  --endpoint=http://127.0.0.1:8080/mcp \
+  --allow-host=127.0.0.1 \
+  --expected-version=dev \
+  --from=2026-08-01T00:00:00Z \
+  --to=2026-08-05T00:00:00Z \
+  --output=./work/sloth-mcp/checkout-api.json
+```
+
+The current capability matrix intentionally accepts only version `dev` from
+the exact tested upstream main revision. Tagged release `v0.16.0` predates the
+MCP server and is rejected. The endpoint, host allowlist, runtime version,
+range, and output are explicit; there is no environment endpoint fallback.
+
+**What to expect:**
+
+- Stdout and `--output` contain the same
+  `slo-rules-engine/sloth-mcp-comparison/v1` `SlothMcpComparison`. Its source
+  links the exact reviewed manifest fingerprint, downstream evidence ID, and
+  evidence fingerprint.
+- The report records protocol `2025-11-25`, the accepted Sloth capability, the
+  exact six-tool inventory, a deterministic tool-schema fingerprint, request
+  bounds, per-SLO reviewed/provider evidence, stable findings, and a
+  `sloth-mcp-comparison-<sha256>` ID. It never records the endpoint.
+- The engine initializes MCP and validates server identity, exact tested
+  version, every pinned input/output schema, and `readOnlyHint: true` before the
+  first domain call. It uses `context`, bounded `list_services` and `list_slos`,
+  `get_slo`, `get_slo_burned_budget_range`, and
+  `get_slo_sli_availability_range`; it cannot invoke an unknown tool.
+- Service and SLO coverage must exactly match reviewed evidence by `sloth_id`.
+  Missing, duplicate, grouped, unexpected, malformed, stale, or mismatched
+  identities fail closed. Cursor pages, time range, response bytes, compressed
+  series points, and deadlines are bounded.
+- Exact identity/objective/period/list-detail/budget agreement produces
+  `status: matched` and exits zero. Semantic disagreement produces a saved
+  `status: drift` report with findings such as
+  `sloth_mcp_objective_mismatch` and exits one.
+- Contract, identity, transport, or evidence failures print a sanitized JSON
+  error, exit one, and leave the requested output absent. Provider descriptions,
+  alert names, raw bodies, raw backend errors, endpoint URLs, and credentials
+  are not copied into output.
+- Provider reads are limited to the six official read-only tools. The command
+  performs zero provider writes, does not run Sloth generation, and does not
+  reload Prometheus.
+- The report always contains `authoritative_status_transport: false`. The
+  upstream tools lack total observations, exact source record selectors, and
+  equivalent sample freshness, so this output cannot replace
+  `slo-rules-engine/live-slo-status/v1` or promote release verification.
+
+**Intent preserved:** the neutral objective, evaluation window, calculation
+basis, and response policy remain authoritative. MCP contributes supplemental
+provider evidence only; exact reviewed downstream evidence and the direct
+Prometheus-compatible status reader remain required. Full setup, contract,
+security, and promotion gates are in
+[Official Sloth MCP Comparison](sloth-mcp-integration.md).
+
+## Use Case 19: Operate The Reviewed Workflow From An AI Agent
 
 **Delivery status:** planned. AICLI-F1 has implemented the internal registry and
 the separate Human-to-Agent command catalog, but the Agent commands and strict
@@ -1183,7 +1244,7 @@ Current catalog mapping entity:
 }
 ```
 
-The implemented catalog contains this mapping shape for all 37 commands. It is
+The implemented catalog contains this mapping shape for all 38 commands. It is
 an internal versioned parity entity, not current CLI stdout. `agent catalog`
 will expose a bounded form in AICLI-F2.
 

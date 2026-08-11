@@ -37,7 +37,7 @@ freshness, error rendering, and usage behavior.
 The [Agent Interface Roadmap](agent-interface-roadmap.md) introduced one
 versioned command registry between interface adapters and current handlers.
 AICLI-F1 now implements `CommandDefinition`, `CommandRegistry`, and the separate
-`CommandCatalog` parity entity. The registry validates 37 immutable command
+`CommandCatalog` parity entity. The registry validates 38 immutable command
 definitions and drives current Human top-level and grouped-subcommand dispatch.
 The catalog pairs each executable Human command example with a planned
 versioned Agent JSON request.
@@ -113,11 +113,14 @@ query as provider evidence. It does not add PromQL to the neutral model. The
 direct Sloth reader now explicitly accepts it; release-bundle verification and
 aggregate status do not yet package it.
 
-The official Sloth HTTP MCP server is a future provider-runtime adapter, not the
-planned engine MCP interface. It may supply read-only discovery/status
-cross-checks after version/tool/schema gating, but it cannot bypass downstream
-evidence or shared `status` handlers. The engine's AICLI-F6 MCP server remains a
-registry-generated command adapter with no independent provider logic.
+`sloth/mcp.rb`, `sloth/mcp/client.rb`, and `sloth/mcp/comparison.rb` own the
+implemented provider-runtime comparison adapter for Sloth's official HTTP MCP
+server. They preflight exact downstream evidence, pin protocol/version/tool
+schemas, bound provider reads, reconcile exact identities, and emit a
+non-authoritative comparison artifact without persisting the runtime endpoint.
+This boundary is not the planned engine MCP interface and cannot bypass
+downstream evidence or promote neutral status. The engine's AICLI-F6 MCP server
+remains a registry-generated command adapter with no independent provider logic.
 
 ## Primary Flows
 

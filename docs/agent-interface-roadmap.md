@@ -9,7 +9,7 @@
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
 **Delivery status:** AICLI-F1 is implemented. The Human CLI now dispatches
-through a validated 37-command registry, and a separate versioned command
+through a validated 38-command registry, and a separate versioned command
 catalog pairs each current Human CLI example with its planned Agent CLI JSON
 request. The Agent CLI, runtime catalog/describe commands, strict request
 schemas, agent skill, response sanitizer, and MCP adapter remain planned.
@@ -46,11 +46,11 @@ Therefore the article's raw-payload guidance is adapted as follows:
 | Article capability | Current baseline | Roadmap gap and decision |
 | --- | --- | --- |
 | Raw Structured Requests Alongside Convenience Flags | Commands already consume JSON manifests, telemetry envelopes, bundles, journals, and plans, but orchestration still depends on positional arguments and bespoke flags. | Add one strict Agent CLI request object per command while retaining existing Human CLI syntax. |
-| Runtime Schema Introspection | A validated internal command registry and separate Human-to-Agent command catalog now cover all 37 commands, but neither is exposed through a supported CLI command and strict request/result/error schemas remain planned. | Add offline `agent catalog` and `agent describe` from the implemented registry/catalog foundation. |
+| Runtime Schema Introspection | A validated internal command registry and separate Human-to-Agent command catalog now cover all 38 commands, but neither is exposed through a supported CLI command and strict request/result/error schemas remain planned. | Add offline `agent catalog` and `agent describe` from the implemented registry/catalog foundation. |
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
 | Input Hardening | Manifest, bundle, credential-key, ownership, and managed-path validation are strong but distributed. There is no shared agent-input policy or adversarial fuzz suite. | Add strict request schemas, field-specific path/ID/URL rules, size/depth limits, and generated-input testing. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
-| Multiple Surfaces From One Contract | Human top-level and grouped-subcommand dispatch now resolve through one registry; the paired Agent JSON mappings are planned contracts only. There is no rules-engine Agent CLI or MCP server. Sloth's upstream main branch has a separate provider-runtime HTTP MCP server that this engine does not yet consume. | Extend the same registry/catalog into Agent CLI validation, schema introspection, skills metadata, and a later rules-engine MCP stdio adapter. Keep an optional Sloth MCP client behind shared provider/status handlers and parity gates. |
+| Multiple Surfaces From One Contract | Human top-level and grouped-subcommand dispatch now resolve through one registry; the paired Agent JSON mappings are planned contracts only. There is no rules-engine Agent CLI or MCP server. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry/catalog into Agent CLI validation, schema introspection, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
 | Validation-Only Safety And Response Sanitization | Mutation planning, confirmation, review gates, journals, and sanitized backend errors exist. Some current dry-run planning may read backend state, and there is no prompt-injection-aware response policy. | Add a distinct `validate_only` mode with no backend calls or writes, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
 
 ## Target Architecture
@@ -93,11 +93,12 @@ Adapters only parse or render. They do not reimplement review policy, provider t
 
 Sloth's official Streamable HTTP MCP endpoint is a different boundary from the
 planned `rules-ctl` MCP stdio server. It is an optional provider runtime, not a
-command interface for this engine. If a future `status` handler accepts that
-runtime, Human CLI, Agent CLI, and engine MCP must select it through equivalent
-registry fields and must preserve exact downstream-evidence, version, tool
-allowlist, identity, freshness, and output-parity checks. See
-[Official Sloth MCP Integration Path](sloth-mcp-integration.md).
+command interface for this engine. The implemented `sloth-mcp compare` Human
+command and planned Agent JSON mapping select it through the shared registry and
+preserve exact downstream-evidence, version, tool allowlist, identity,
+freshness, bounded-output, and no-status-promotion checks. Any future `status`
+transport must additionally prove neutral output parity. See
+[Official Sloth MCP Comparison](sloth-mcp-integration.md).
 
 ## Capability Map
 
@@ -154,6 +155,7 @@ interface syntax into domain handlers:
 | `prune` | Yes | Validate, plan, and confirmed execution remain distinct | Yes, mutation metadata mandatory |
 | `status` | Yes | Manifest, bundle, and portfolio forms | Yes |
 | `sloth-evidence capture/status` | Yes | Full parity with local-only side effects and reviewer/freshness gates | Yes |
+| `sloth-mcp compare` | Yes | Read-only exact-evidence comparison with bounded runtime and no status promotion | Yes |
 | `bundle create/plan/apply/verify/status` | Yes | Full lifecycle parity | Yes |
 | `journal create/status` | Yes | Full parity | Yes |
 | `plan approve/status/apply/resume` | Yes | Full parity with review and confirmation | Yes |
@@ -228,7 +230,7 @@ interface syntax into domain handlers:
 **Acceptance criteria:** every current command has an ID, versions, Human CLI mapping, request/result/error schema references, side effects, safety gates, provider I/O, output controls, and parity test; missing metadata blocks registry validation.
 
 **Evidence:** `CommandRegistry` validates completeness, uniqueness, immutability,
-root-adapter consistency, and required metadata for 37 commands. Human top-level
+root-adapter consistency, and required metadata for 38 commands. Human top-level
 and grouped-subcommand dispatch resolve through it. `CommandCatalog` is a
 separate versioned entity pairing current Human commands with planned Agent JSON
 requests. Existing CLI characterization remains unchanged. Strict executable

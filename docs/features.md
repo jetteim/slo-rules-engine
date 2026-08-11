@@ -230,6 +230,17 @@ runtime mappings. An input with no readable target fails. Runtime URLs and raw
 backend error messages are not copied into reports. Datadog remains
 evidence-gated.
 
+`rules-ctl sloth-mcp compare` adds a provider-specific read-only cross-check for
+the official Sloth main-branch MCP server. It requires current exact-manifest
+downstream evidence, a runtime host allowlist, the tested protocol/version, the
+pinned six-tool read-only inventory and schemas, bounded pagination/responses,
+and exact `sloth_id` coverage. It saves
+`slo-rules-engine/sloth-mcp-comparison/v1` with objective, period, burn, budget,
+availability, identity, capability, and drift evidence but no endpoint or raw
+provider text. The artifact explicitly is not an authoritative neutral status
+transport because upstream lacks observations, exact record identity, and
+equivalent sample freshness.
+
 ## Planned Agent-Operable Interfaces
 
 The [Agent Interface Roadmap](agent-interface-roadmap.md) defines a planned
@@ -238,7 +249,7 @@ MCP surfaces are not implemented yet.
 
 Implemented foundation:
 
-- **Validated command registry:** all 37 current command IDs declare Human and
+- **Validated command registry:** all 38 current command IDs declare Human and
   planned Agent mappings, contract references, side effects, local/provider
   I/O, credential categories, safety gates, output controls, and MCP
   eligibility. Missing or duplicate metadata fails closed.

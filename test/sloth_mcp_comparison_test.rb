@@ -180,6 +180,56 @@ class SlothMcpComparisonTest < Minitest::Test
     end
   end
 
+  def test_rejects_missing_duplicate_grouped_and_unexpected_sloth_identities
+    with_sources do |sources|
+      variants = {
+        'missing_sloth_mcp_identity' => [],
+        'duplicate_sloth_mcp_identity' => [sloth_mcp_slo, sloth_mcp_slo],
+        'grouped_sloth_mcp_identity' => [sloth_mcp_slo.merge('is_grouped' => true)],
+        'unexpected_sloth_mcp_identity' => [
+          sloth_mcp_slo.merge('sloth_id' => 'checkout-api-unreviewed-slo')
+        ]
+      }
+
+      variants.each do |finding_code, slos|
+        outputs = sloth_mcp_outputs
+        outputs['list_slos'] = {
+          'slos' => slos,
+          'pagination' => { 'has_next' => false, 'has_previous' => false }
+        }
+        client = FakeSlothMcpClient.new(tools: sloth_mcp_tools, outputs: outputs)
+
+        error = assert_raises(SloRulesEngine::Sloth::Mcp::ContractError) do
+          comparison(client).compare(**comparison_arguments(sources))
+        end
+
+        assert_equal 'invalid_sloth_mcp_identity', error.code
+        assert_includes error.findings.map { |finding| finding.fetch(:code) }, finding_code
+        refute_includes client.calls.map(&:first), 'get_slo'
+      end
+    end
+  end
+
+  def test_rejects_malformed_or_over_limit_compressed_series
+    with_sources do |sources|
+      outputs = sloth_mcp_outputs
+      outputs.fetch('get_slo_burned_budget_range')['real_series'] = '1,2,3'
+      client = FakeSlothMcpClient.new(tools: sloth_mcp_tools, outputs: outputs)
+      error = assert_raises(SloRulesEngine::Sloth::Mcp::ContractError) do
+        comparison(client).compare(**comparison_arguments(sources).merge(max_series_points: 2))
+      end
+      assert_equal 'invalid_sloth_mcp_series', error.code
+
+      outputs = sloth_mcp_outputs
+      outputs.fetch('get_slo_sli_availability_range')['availability_series'] = '99,not-a-number'
+      client = FakeSlothMcpClient.new(tools: sloth_mcp_tools, outputs: outputs)
+      error = assert_raises(SloRulesEngine::Sloth::Mcp::ContractError) do
+        comparison(client).compare(**comparison_arguments(sources))
+      end
+      assert_equal 'invalid_sloth_mcp_series', error.code
+    end
+  end
+
   private
 
   def with_sources

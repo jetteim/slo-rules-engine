@@ -217,9 +217,10 @@ Expected state behavior:
 - direct live status requires the exact reviewed manifest, fresh complete
   downstream evidence, and an explicit Prometheus runtime before client
   construction; it queries only evidence-declared bindings
-- the official Sloth main-branch MCP server is a planned optional read-only
-  provider adapter/cross-check, not a substitute for reviewed evidence or the
-  engine's later command-registry MCP surface
+- the official Sloth main-branch MCP server has an optional version/tool/schema-
+  gated read-only comparison adapter; its report is not a substitute for
+  reviewed evidence, neutral status, or the engine's later command-registry MCP
+  surface
 
 Expected telemetry behavior:
 

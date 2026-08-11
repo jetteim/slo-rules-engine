@@ -774,4 +774,4 @@ git push origin main
 - [ ] Add explicit reviewed-manifest input plus `diff`, `import`, and `prune` commands.
 - [ ] Enforce provider capability metadata such as `apply_plan` against the documented provider contract.
 - [ ] Expand calculation-basis findings across every SLI instance and SLO, not only the first.
-- [ ] Record Sloth external-generator handoff details in apply plans instead of file write alone.
+- [x] Record Sloth external-generator handoff details in apply plans instead of file write alone.

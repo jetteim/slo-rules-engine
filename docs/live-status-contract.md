@@ -224,9 +224,9 @@ state.
 ## Current Limits
 
 - no Datadog reader until safe live evidence work resumes
-- no official Sloth MCP runtime adapter yet; the upstream main-branch server is
-  documented as a version-gated, read-only comparison path, and its current
-  output lacks observations, exact record identity, and equivalent freshness
+- the official Sloth MCP runtime is comparison-only; its output lacks
+  observations, exact record identity, and equivalent freshness, so it cannot
+  produce or replace this neutral status contract
 - no automatic endpoint discovery or one-URL assumption across aggregate
   targets
 - freshness is evaluated from the success-ratio record; every provider sample

@@ -544,7 +544,7 @@ module SloRulesEngine
               number
             end
           end
-        rescue ArgumentError, TypeError
+        rescue ContractError, ArgumentError, TypeError
           contract_error!('invalid_sloth_mcp_series', 'Sloth MCP compressed series is malformed.')
         end
 

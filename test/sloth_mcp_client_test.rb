@@ -53,6 +53,43 @@ class SlothMcpClientTest < Minitest::Test
     end
   end
 
+  class FakeHttpResponse
+    attr_reader :code
+
+    def initialize(code:, chunks:)
+      @code = code.to_s
+      @chunks = chunks
+    end
+
+    def read_body
+      @chunks.each { |chunk| yield chunk }
+    end
+  end
+
+  class FakeHttp
+    attr_accessor :use_ssl, :open_timeout, :read_timeout, :write_timeout
+    attr_reader :last_request
+
+    def initialize(response)
+      @response = response
+    end
+
+    def use_ssl=(value)
+      @use_ssl = value
+    end
+
+    def request(value)
+      @last_request = value
+      yield @response
+    end
+  end
+
+  class FailingHttp < FakeHttp
+    def request(_value)
+      raise Timeout::Error
+    end
+  end
+
   def test_initializes_lists_tools_and_calls_only_structured_results
     transport = FakeTransport.new(tools: sloth_mcp_tools)
     client = SloRulesEngine::Sloth::Mcp::Client.new(config: runtime_config, transport: transport)
@@ -71,7 +108,6 @@ class SlothMcpClientTest < Minitest::Test
       assert_equal 10, request.fetch(:timeout_seconds)
       assert_equal 1_048_576, request.fetch(:max_response_bytes)
     end
-
 
     error = assert_raises(SloRulesEngine::Sloth::Mcp::ContractError) do
       client.call_tool('mutate_slo')
@@ -124,6 +160,63 @@ class SlothMcpClientTest < Minitest::Test
     assert_equal 'invalid_sloth_mcp_range', error.code
   end
 
+  def test_request_transport_sets_streamable_http_contract_and_enforces_stream_limit
+    response = FakeHttpResponse.new(code: 200, chunks: ['{"result":', '{}', '}'])
+    http = FakeHttp.new(response)
+    transport = SloRulesEngine::Sloth::Mcp::RequestTransport.new
+
+    result = stub_net_http(http) do
+      transport.post(
+        URI('https://mcp.example.test/mcp'),
+        { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+        protocol_version: MCP_PROTOCOL_VERSION,
+        timeout_seconds: 7,
+        max_response_bytes: 100
+      )
+    end
+
+    assert_equal 200, result.status
+    assert_equal '{"result":{}}', result.body
+    assert_equal true, http.use_ssl
+    assert_equal 7, http.open_timeout
+    assert_equal 7, http.read_timeout
+    assert_equal 7, http.write_timeout
+    assert_equal '/mcp', http.last_request.path
+    assert_equal 'application/json', http.last_request['Content-Type']
+    assert_equal 'application/json, text/event-stream', http.last_request['Accept']
+    assert_equal MCP_PROTOCOL_VERSION, http.last_request['MCP-Protocol-Version']
+    assert_equal 'tools/list', JSON.parse(http.last_request.body).fetch('method')
+
+    oversized = FakeHttp.new(FakeHttpResponse.new(code: 200, chunks: ['12345', '67890']))
+    error = assert_raises(SloRulesEngine::Sloth::Mcp::ContractError) do
+      stub_net_http(oversized) do
+        transport.post(
+          URI('http://mcp.example.test/mcp'),
+          {},
+          protocol_version: nil,
+          timeout_seconds: 1,
+          max_response_bytes: 8
+        )
+      end
+    end
+    assert_equal 'sloth_mcp_response_too_large', error.code
+
+    timed_out = FailingHttp.new(response)
+    error = assert_raises(SloRulesEngine::Sloth::Mcp::ContractError) do
+      stub_net_http(timed_out) do
+        transport.post(
+          URI('https://mcp.example.test/mcp'),
+          {},
+          protocol_version: MCP_PROTOCOL_VERSION,
+          timeout_seconds: 1,
+          max_response_bytes: 100
+        )
+      end
+    end
+    assert_equal 'sloth_mcp_transport_failed', error.code
+    assert_equal 'Timeout::Error', error.findings.fetch(0).fetch(:error_class)
+  end
+
   private
 
   def runtime_config(**overrides)
@@ -136,5 +229,13 @@ class SlothMcpClientTest < Minitest::Test
         to: '2026-08-05T00:00:00Z'
       }.merge(overrides)
     )
+  end
+
+  def stub_net_http(http)
+    original = Net::HTTP.method(:new)
+    Net::HTTP.define_singleton_method(:new) { |_host, _port| http }
+    yield
+  ensure
+    Net::HTTP.define_singleton_method(:new) { |*arguments| original.call(*arguments) }
   end
 end

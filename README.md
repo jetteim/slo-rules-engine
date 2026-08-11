@@ -22,6 +22,8 @@ Use the toolkit to:
 - run telemetry reality checks before treating an SLO as operationally ready
 - capture reviewed, content-addressed Sloth generated-rule identity without
   running Sloth or contacting Prometheus
+- cross-check exact reviewed Sloth identities, objectives, periods, budget,
+  burn, and availability against the official read-only Sloth MCP runtime
 - read current Prometheus-compatible SLO attainment, remaining error budget,
   burn rate, and telemetry freshness from one reviewed Prometheus Stack or
   evidence-linked Sloth manifest, release bundle, or portfolio
@@ -30,7 +32,7 @@ Use the toolkit to:
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
-Phase 14 foundation is implemented as a validated 37-command catalog and
+Phase 14 foundation is implemented as a validated 38-command catalog and
 registry. It pairs each current Human CLI example with a planned Agent CLI JSON
 request and now owns Human command dispatch. The
 [Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the remaining
@@ -44,7 +46,7 @@ not exist yet.
 | --- | --- | --- | --- |
 | `datadog` | Reviewed manifest containing SLOs, burn-rate monitors, missing-telemetry monitors, dashboards, and route context | Versioned desired/observed state plus API-oriented `create`, `update`, `recreate`, or `noop` operations with ownership evidence and provider risk | Datadog resources, durable operation journal, and a `ProviderStateResult` with backend identity and canonical payload/absence verification |
 | `prometheus_stack` | Reviewed manifest containing evaluation-window SLI/SLO/remaining-budget recording rules, burn-rate and telemetry-gap alerts, Grafana dashboards, and Alertmanager route intent | Versioned desired/observed state plus `write` or `noop` operations for the manifest and every native bundle file | Managed JSON/YAML files, durable operation journal, and a `ProviderStateResult` with post-write/delete convergence evidence |
-| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned files and durable journal/result; optional reviewed evidence plus read-only Prometheus status can also verify downstream generated state |
+| `sloth` | Reviewed manifest containing Sloth `prometheus/v1` SLO specs | Versioned desired/observed state plus `write` or `noop` operations for the manifest and native Sloth input, and an external-generator handoff | Verified engine-owned files and durable journal/result; optional reviewed evidence plus read-only Prometheus status can verify downstream generated state, and an official MCP runtime can produce a supplemental comparison report |
 
 All providers also emit a saved provider-level manifest-review report when `generate --output-dir` is used.
 
@@ -403,6 +405,31 @@ zero, while stale source fingerprints exit one with stable findings. Both
 commands are local: neither runs Sloth nor reads or mutates a provider. See
 [Sloth Downstream Evidence](docs/sloth-downstream-evidence.md).
 
+Cross-check the same reviewed target against Sloth's official main-branch MCP
+runtime after the evidence remains fresh:
+
+```bash
+bin/rules-ctl sloth-mcp compare \
+  --manifest=./managed/checkout-api/sloth/manifest.json \
+  --evidence=./work/sloth-evidence/checkout-api.json \
+  --endpoint=http://127.0.0.1:8080/mcp \
+  --allow-host=127.0.0.1 \
+  --expected-version=dev \
+  --from=2026-08-01T00:00:00Z \
+  --to=2026-08-05T00:00:00Z \
+  --output=./work/sloth-mcp/checkout-api.json
+```
+
+The command prints and saves the same
+`slo-rules-engine/sloth-mcp-comparison/v1` report. `matched` exits zero;
+objective, period, list/detail, or budget drift is saved and exits one. Contract
+or evidence failures write no report. The endpoint and raw provider text are
+never persisted, all six tools must match the pinned read-only schema, and the
+report declares `authoritative_status_transport: false`. Continue to use the
+evidence-backed `status --provider=sloth` command for the neutral five-state SLO
+and error-budget report. See
+[Official Sloth MCP Comparison](docs/sloth-mcp-integration.md).
+
 Read the linked Sloth records only after the evidence is fresh:
 
 ```bash
@@ -552,7 +579,7 @@ The initial delivery integration is `notification_router`, which generates conte
 - [Provider State Contract](docs/provider-state-contract.md)
 - [Live SLO Status Contract](docs/live-status-contract.md)
 - [Sloth Downstream Evidence](docs/sloth-downstream-evidence.md)
-- [Official Sloth MCP Integration Path](docs/sloth-mcp-integration.md)
+- [Official Sloth MCP Comparison](docs/sloth-mcp-integration.md)
 - [Datadog Public Contract Evidence](docs/datadog-contract-evidence.md)
 - [Datadog Sandbox Testing](docs/datadog-sandbox-testing.md)
 - [Provider Contract](docs/provider-contract.md)

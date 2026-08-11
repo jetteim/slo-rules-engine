@@ -91,9 +91,13 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, '--provider=sloth'
     assert_includes document, '--evidence=./work/sloth-evidence/checkout-api.json'
     assert_includes document, 'invalid_sloth_live_status_evidence'
-    assert_includes document, 'Official Sloth MCP Integration Path'
+    assert_includes document, 'Official Sloth MCP Comparison'
+    assert_includes document, 'bin/rules-ctl sloth-mcp compare'
+    assert_includes document, 'slo-rules-engine/sloth-mcp-comparison/v1'
+    assert_includes document, 'authoritative_status_transport: false'
+    assert_includes document, 'zero provider writes'
     assert_includes readme, 'Sloth Downstream Evidence'
-    assert_includes readme, 'Official Sloth MCP Integration Path'
+    assert_includes readme, 'Official Sloth MCP Comparison'
   end
 
   private

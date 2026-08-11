@@ -12,6 +12,7 @@ require_relative 'cli/plan_commands'
 require_relative 'cli/report_commands'
 require_relative 'cli/status_commands'
 require_relative 'cli/sloth_evidence_commands'
+require_relative 'cli/sloth_mcp_commands'
 require_relative 'cli/telemetry_commands'
 
 module RulesCtl
@@ -23,6 +24,7 @@ module RulesCtl
   extend SloRulesEngine::CLI::ReportCommands
   extend SloRulesEngine::CLI::StatusCommands
   extend SloRulesEngine::CLI::SlothEvidenceCommands
+  extend SloRulesEngine::CLI::SlothMcpCommands
   extend SloRulesEngine::CLI::TelemetryCommands
 
   module_function
@@ -705,6 +707,7 @@ module RulesCtl
         bin/rules-ctl status (--provider=prometheus_stack --manifest=<manifest.json> [--base-url=<url>] | --provider=sloth --manifest=<manifest.json> --evidence=<sloth-evidence.json> --base-url=<url> | --bundle=<bundle.json> [--target-base-url=<service/provider>=<url> ...] | --portfolio=<portfolio.json> [--target-base-url=<service/provider>=<url> ...]) [--max-age-seconds=<seconds>] [--output=<file>]
         bin/rules-ctl sloth-evidence capture --manifest=<manifest.json> --input=<sloth.yaml> [--input=<sloth-N.yaml> ...] --generated-rules=<rules.yaml> --reviewer=<identity> --reviewed-at=<timestamp> --output=<evidence.json>
         bin/rules-ctl sloth-evidence status <evidence.json>
+        bin/rules-ctl sloth-mcp compare --manifest=<manifest.json> --evidence=<sloth-evidence.json> --endpoint=<url> --allow-host=<host> --expected-version=<version> --from=<timestamp> --to=<timestamp> --output=<comparison.json> [--page-size=<n>] [--max-pages=<n>] [--max-series-points=<n>] [--timeout-seconds=<n>] [--max-response-bytes=<n>]
         bin/rules-ctl bundle create --artifact-index=<index.json> --reviewer=<identity> --reviewed-at=<timestamp> --output=<bundle.json> [--plan=<service/provider>=<plan.json> ...] [--sloth-evidence=<service/sloth>=<evidence.json> ...]
         bin/rules-ctl bundle plan <review-ready-bundle.json> [--target-output=<service/provider>=<dir> ...] [--target-backend=<service/provider>=environment ...] --output=<apply-ready-bundle.json>
         bin/rules-ctl bundle apply <apply-ready-bundle.json> --confirm --approved-plan=<approved-plan.json> [--approved-plan=<approved-plan.json> ...] --journal-dir=<dir> --output=<applied-bundle.json>

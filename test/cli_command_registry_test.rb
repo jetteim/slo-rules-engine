@@ -16,6 +16,7 @@ class CliCommandRegistryTest < Minitest::Test
     status
     sloth-evidence.capture
     sloth-evidence.status
+    sloth-mcp.compare
     bundle.create
     bundle.plan
     bundle.apply
@@ -148,6 +149,20 @@ class CliCommandRegistryTest < Minitest::Test
     assert_equal 'local_read', status.side_effect
     assert_includes status.safety_gates, 'evidence_freshness'
     assert_empty status.io.fetch(:provider_reads)
+
+    comparison = @registry.fetch('sloth-mcp.compare')
+    assert_equal 'provider_read', comparison.side_effect
+    assert_equal %w[sloth_mcp_read_only_tools], comparison.io.fetch(:provider_reads)
+    assert_empty comparison.io.fetch(:provider_writes)
+    assert_empty comparison.io.fetch(:credentials)
+    assert_includes comparison.io.fetch(:local_reads), 'sloth_downstream_evidence'
+    assert_includes comparison.io.fetch(:local_writes), 'sloth_mcp_comparison'
+    assert_includes comparison.safety_gates, 'read_only_tool_allowlist'
+    assert_includes comparison.safety_gates, 'no_status_promotion'
+    assert_includes comparison.human_usage, 'sloth-mcp compare'
+    comparison_arguments = comparison.agent.fetch(:request_example).fetch(:arguments)
+    assert_equal './sloth-evidence.json', comparison_arguments.fetch(:evidence_file)
+    assert_equal ['localhost'], comparison_arguments.fetch(:allowed_hosts)
 
     live_status = @registry.fetch('status')
     assert_includes live_status.io.fetch(:local_reads), 'sloth_downstream_evidence'

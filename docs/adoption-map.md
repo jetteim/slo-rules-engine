@@ -86,8 +86,8 @@ retain each target's evidence and make unsupported coverage explicit.
   evidence and an explicit Prometheus runtime
 - release and portfolio Sloth aggregate status using one current exact evidence
   artifact and explicit Prometheus-compatible runtime per readable target
-- a planned, version-gated official Sloth MCP provider adapter for read-only
-  identity/status comparison before any transport-parity claim
+- an implemented, version-gated official Sloth MCP provider adapter for
+  read-only exact-identity/status comparison before any transport-parity claim
 
 ### 6. Reviewed Workflow To Agent-Safe Automation
 
@@ -101,7 +101,7 @@ gates; MCP later projects the same registry.
 
 **Needed capability increments:**
 
-- implemented single versioned command registry and separate 37-command
+- implemented single versioned command registry and separate 38-command
   Human-to-Agent JSON parity catalog
 - strict raw command-request JSON plus offline catalog/schema introspection
 - shared adversarial input validation and zero-I/O `validate_only`
@@ -120,12 +120,12 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. prototype the official Sloth MCP provider adapter as a read-only comparison
-   report, retaining direct Prometheus evidence as the contract-complete path
+1. resume AICLI-F2 from the implemented 38-command registry/catalog foundation
 2. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
-3. resume AICLI-F2 from the implemented registry/catalog foundation when the
-   provider-evidence checkpoint is complete
+3. revalidate the Sloth MCP comparison against a tagged binary only after an
+   official release includes MCP; retain direct Prometheus evidence as the
+   contract-complete path
 
 ## Housekeeping Backlog
 
