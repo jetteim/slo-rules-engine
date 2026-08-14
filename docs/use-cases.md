@@ -1198,22 +1198,24 @@ security, and promotion gates are in
 
 ## Use Case 19: Operate The Reviewed Workflow From An AI Agent
 
-**Delivery status:** planned. AICLI-F1 has implemented the internal registry and
-the separate Human-to-Agent command catalog, but the Agent commands and strict
-schemas in this use case are not available in the current binary.
+**Delivery status:** partially implemented. AICLI-F1 provides the shared
+registry/catalog, and the first AICLI-F2 slice provides offline `agent catalog`
+and `agent describe` with strict resolved request schemas. Structured `agent
+invoke`, result envelopes, projections, validation-only, skills, and MCP remain
+planned.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
 guessing flags, receiving unbounded output, or bypassing safety gates.
 
-Target discovery:
+Implemented discovery:
 
 ```bash
 bin/rules-ctl agent catalog --format=json
 bin/rules-ctl agent describe bundle.verify --format=json
 ```
 
-Target structured invocation:
+Planned structured invocation:
 
 ```bash
 bin/rules-ctl agent invoke bundle.verify \
@@ -1244,9 +1246,18 @@ Current catalog mapping entity:
 }
 ```
 
-The implemented catalog contains this mapping shape for all 38 commands. It is
-an internal versioned parity entity, not current CLI stdout. `agent catalog`
-will expose a bounded form in AICLI-F2.
+The internal parity catalog contains this mapping shape for all 40 commands.
+`agent catalog` exposes a bounded runtime view of the same canonical entries;
+the default limit is 20, the maximum is 100, and `page.next_cursor` continues a
+truncated result deterministically.
+
+`agent describe bundle.verify --format=json` returns one
+`slo-rules-engine/agent-command-description/v1` object. Its `command` contains
+the Human usage, Agent request example, request/result/error contract
+references, fully resolved strict request schema, side-effect class, local and
+provider reads/writes, credential categories, safety gates, output policy, and
+MCP eligibility. It reads no definition, manifest, environment credential, or
+backend state.
 
 The request file carries the complete versioned rules-engine command request,
 including the applied bundle path, verified output path, workspace root, and
@@ -1257,13 +1268,23 @@ not carry provider credentials or arbitrary provider mutation payloads.
 
 - Current Human commands behave as before. Registry lookup adds no stdout,
   files, provider reads, provider writes, credential loading, or new exit codes.
-- Developers can inspect the immutable `CommandCatalog` through the Ruby
-  library. Each entry pairs `human_cli` with `agent_cli_json`; parity tests fail
-  if an executable Human root or grouped subcommand is absent from the registry.
 - `agent catalog` prints a bounded versioned JSON command inventory. `agent
-  describe` prints request/result/error schemas, side-effect class, provider
+  describe` prints request/result/error contract references, the strict
+  resolved request schema, side-effect class, provider
   reads/writes, required review/approval/confirmation evidence, credential
-  references, field masks, limits, streaming support, and stable refusal codes.
+  categories, output controls, and MCP metadata.
+- Every described request envelope and its `arguments` object use
+  `additionalProperties: false`; required fields, scalar/collection types,
+  formats, enums, and bounds are available before constructing a request.
+- An unknown command, invalid cursor, invalid limit, unsupported format, or
+  malformed introspection argument prints one
+  `slo-rules-engine/agent-command-error/v1` JSON object to stdout, writes no
+  prose to stderr, and exits one.
+- Catalog/describe output is deterministic, contains no timestamp or runtime
+  secret values, and performs no filesystem or provider I/O.
+
+**What to expect after the remaining Agent slices:**
+
 - `agent invoke` prints one versioned
   `slo-rules-engine/agent-command-result/v1` JSON envelope on success or one
   versioned JSON error envelope on failure. It never replaces result data with
@@ -1298,8 +1319,8 @@ not carry provider credentials or arbitrary provider mutation payloads.
 Raw structured requests express rules-engine commands; neutral reliability
 intent, review evidence, provider validation, freshness, ownership, exact-plan,
 confirmation, journal, and verification requirements remain unchanged. Until
-the AICLI-F2 Agent CLI is implemented, agents must use the documented current
-Human CLI and must not assume the target commands above exist.
+`agent invoke` is implemented, agents may use catalog/describe for discovery
+but must execute engineering tasks through the documented Human CLI.
 
 ## CLI Execution Boundary
 

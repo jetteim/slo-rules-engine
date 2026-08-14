@@ -17,6 +17,8 @@ class CliCommandRegistryTest < Minitest::Test
     sloth-evidence.capture
     sloth-evidence.status
     sloth-mcp.compare
+    agent.catalog
+    agent.describe
     bundle.create
     bundle.plan
     bundle.apply
@@ -62,12 +64,15 @@ class CliCommandRegistryTest < Minitest::Test
       assert_kind_of Symbol, definition.adapter
       assert_kind_of Symbol, definition.handler
       assert_equal definition.id, definition.agent.fetch(:command_id)
-      assert_equal 'planned', definition.agent.fetch(:status)
+      expected_agent_status = definition.id.start_with?('agent.') ? 'implemented' : 'planned'
+      assert_equal expected_agent_status, definition.agent.fetch(:status)
       request_example = definition.agent.fetch(:request_example)
       assert_equal 'slo-rules-engine/agent-command-request/v1', request_example.fetch(:schema_version)
       assert_equal definition.id, request_example.fetch(:command_id)
       assert_equal definition.version, request_example.fetch(:command_version)
       assert_kind_of Hash, request_example.fetch(:arguments)
+      assert_kind_of Hash, definition.request_schema
+      assert_equal false, definition.request_schema.fetch(:additionalProperties)
       assert_equal 'planned', definition.mcp.fetch(:status)
       assert_includes [true, false], definition.mcp.fetch(:eligible)
       assert_equal %i[request result error], definition.schemas.keys
@@ -105,6 +110,8 @@ class CliCommandRegistryTest < Minitest::Test
     assert_equal :bundle, @registry.fetch('bundle.create').adapter
     assert_equal :providers_list, @registry.fetch('providers.list').handler
     assert_equal :providers, @registry.fetch('providers.list').adapter
+    assert_equal :agent_catalog, @registry.fetch('agent.catalog').handler
+    assert_equal :agent, @registry.fetch('agent.catalog').adapter
 
     @registry.definitions.each do |definition|
       assert_respond_to RulesCtl, definition.adapter, definition.id
@@ -228,6 +235,7 @@ class CliCommandRegistryTest < Minitest::Test
         handler: :broken,
         agent: {},
         schemas: {},
+        request_schema: {},
         side_effect: 'none',
         io: {},
         safety_gates: [],

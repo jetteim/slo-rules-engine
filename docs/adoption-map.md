@@ -101,9 +101,9 @@ gates; MCP later projects the same registry.
 
 **Needed capability increments:**
 
-- implemented single versioned command registry and separate 38-command
-  Human-to-Agent JSON parity catalog
-- strict raw command-request JSON plus offline catalog/schema introspection
+- implemented single versioned 40-command registry, separate Human-to-Agent
+  JSON parity catalog, and offline bounded catalog/schema introspection
+- strict raw command-request JSON invocation and result/error envelopes
 - shared adversarial input validation and zero-I/O `validate_only`
 - field masks, limits/cursors, NDJSON, explicit truncation, and response
   sanitization
@@ -120,7 +120,8 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. resume AICLI-F2 from the implemented 38-command registry/catalog foundation
+1. resume AICLI-F2 structured invocation from the implemented 40-command
+   registry/catalog/introspection foundation
 2. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
 3. revalidate the Sloth MCP comparison against a tagged binary only after an

@@ -29,16 +29,18 @@ Use the toolkit to:
   evidence-linked Sloth manifest, release bundle, or portfolio
 - validate Datadog credentials and dashboard reconciliation in an isolated
   sandbox before relying on live provider behavior
+- inspect the current Human/Agent command contract and strict request schema
+  offline before an agent constructs a request
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
-Phase 14 foundation is implemented as a validated 38-command catalog and
-registry. It pairs each current Human CLI example with a planned Agent CLI JSON
-request and now owns Human command dispatch. The
+Phase 14 now has a validated 40-command catalog and registry. It pairs each
+Human CLI example with an Agent CLI JSON request, owns Human command dispatch,
+and exposes bounded offline `agent catalog` plus exact `agent describe`
+introspection with a strict resolved request schema for every command. The
 [Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the remaining
-strict Agent CLI, runtime schema discovery, bounded and sanitized output,
-versioned agent skill, and later MCP projection. Those agent-facing commands do
-not exist yet.
+structured invocation, result envelopes, input hardening, bounded and sanitized
+output, versioned agent skill, and later MCP projection.
 
 ## Provider Outputs
 

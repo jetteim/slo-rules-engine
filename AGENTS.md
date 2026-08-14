@@ -8,8 +8,8 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Resume AICLI-F2 structured Agent CLI and runtime introspection from the
-   complete 38-command registry/catalog foundation
+1. Resume AICLI-F2 structured Agent invocation from the complete 40-command
+   registry/catalog/runtime-introspection foundation
 2. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
 3. Datadog exact-plan parity only after live recheck/idempotency semantics are
@@ -154,22 +154,23 @@ equivalent freshness, the report declares itself non-authoritative and cannot
 replace neutral status or the later engine MCP interface.
 
 Current architecture status: `bin/rules-ctl` is a six-line bootstrap for
-`lib/slo_rules_engine/cli.rb`. The library facade composes ten focused command
+`lib/slo_rules_engine/cli.rb`. The library facade composes eleven focused command
 families, dispatches through the versioned command registry, and retains shared
 manifest/state orchestration. The current component, flow, dependency,
 contract, NFR, use-case, and test maps live in
 `docs/design.md` and
 `docs/housekeeping/atomic-coherence-simplification.md`.
 
-Current agent-interface status: AICLI-F1 is implemented. A validated immutable
-registry covers all 38 current commands and drives Human top-level and grouped
-subcommand dispatch. The separate
+Current agent-interface status: AICLI-F1 and the AICLI-F2 runtime introspection
+slice are implemented. A validated immutable registry covers all 40 current
+commands and drives Human top-level and grouped subcommand dispatch. The separate
 `slo-rules-engine/cli-command-catalog/v1` entity pairs each executable Human CLI
-example with a planned versioned Agent JSON request. Missing/duplicate metadata
-fails closed, and current Human behavior remains characterized. The Agent CLI,
-runtime catalog/describe output, strict executable request schemas, input
-hardening, bounded/sanitized output, versioned skill, and MCP adapter remain
-planned.
+example with a versioned Agent JSON request. Bounded offline `agent catalog`
+and exact `agent describe` expose strict resolved request schemas and complete
+side-effect/I/O/safety metadata with JSON-only errors. Missing/duplicate
+metadata fails closed, and current Human behavior remains characterized.
+Structured invocation, normalized result envelopes, input hardening,
+bounded/sanitized output, versioned skill, and MCP adapter remain planned.
 
 ## Non-Negotiable Working Rules
 
@@ -284,11 +285,11 @@ Implemented by the latest feature slices:
 - `sloth-evidence status` validates artifact schema and content identity before
   trusting source paths, then reports fresh/stale source checks with stable
   findings and no provider I/O
-- The shared Human/Agent command registry/catalog now contains 38 commands,
+- The shared Human/Agent command registry/catalog now contains 40 commands,
   including matching Human CLI and planned Agent JSON mappings for Sloth
   evidence capture/status and MCP comparison
 - AICLI-F1 now provides immutable `CommandDefinition` values, a validated
-  38-command `CommandRegistry`, and a separate versioned `CommandCatalog` that
+  40-command `CommandRegistry`, and a separate versioned `CommandCatalog` that
   pairs current Human CLI examples with planned Agent CLI JSON requests
 - Human top-level and grouped subcommand dispatch now resolve through the
   registry, so an unregistered Human command is unreachable; existing command
@@ -296,12 +297,15 @@ Implemented by the latest feature slices:
 - Registry coverage requires stable IDs/versions, Human and Agent mappings,
   request/result/error contract references, side-effect class, local/provider
   I/O, credential categories, safety gates, output controls, and MCP metadata
+- AICLI-F2 runtime introspection now provides bounded deterministic offline
+  catalog pagination, exact command descriptions, strict resolved request
+  schemas for all 40 commands, and stable JSON-only introspection errors
 - Phase 14 now has an article-derived, revalidated roadmap for a shared command
   registry, feature-parity Human/Agent CLI adapters, strict structured
   requests, runtime schema introspection, bounded/sanitized output,
   adversarial input validation, zero-I/O validation, agent skill distribution,
-  headless credentials, and later MCP projection; these capabilities remain
-  planned rather than implemented
+  headless credentials, and later MCP projection; runtime introspection is now
+  implemented while structured invocation and later capabilities remain open
 - Prometheus Stack generation now emits one non-duplicated base observation recording rule per SLI instance
 - Neutral SLO intent now carries a validated evaluation window with a `30d`
   compatibility default, and generated onboarding drafts expose it explicitly
@@ -514,7 +518,9 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: official Sloth MCP read-only comparison with exact evidence,
+- latest checkpoint: AICLI-F2 bounded offline runtime introspection and strict
+  resolved request schemas across the 40-command registry
+- previous checkpoint: official Sloth MCP read-only comparison with exact evidence,
   capability/schema, identity, bounded-output, and Human/Agent parity gates
 - previous checkpoint: opt-in evidence-backed Sloth downstream release
   verification with complete readable-state evidence
@@ -609,9 +615,9 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Implement AICLI-F2 offline catalog/describe and the first strict structured
-   Agent CLI invocation slice from the completed 38-command registry/catalog
-   foundation
+1. Complete AICLI-F2 with the first strict raw JSON/file/stdin Agent CLI
+   invocation and versioned result/error envelopes from the implemented
+   40-command registry/catalog/introspection foundation
 2. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
 3. Extend exact approval/apply/resume to Datadog only after verified backend
@@ -634,8 +640,6 @@ Secondary gaps:
 
 Next recommended slice:
 
-- resume AICLI-F2 with offline `agent catalog` and `agent describe` generated
-  from the implemented registry/catalog
 - add the first strict raw JSON/file/stdin Agent CLI invocation without changing
   the Human command, result, refusal, or side-effect contract
 - retain `sloth-mcp.compare` in the same parity and schema inventory as every
@@ -650,21 +654,19 @@ Rationale:
   without weakening source freshness, exact-record, status, or mutation gates
 - remaining Sloth work is externally gated on a tagged MCP release and additional
   upstream status evidence, not an unfinished engine feature
-- AICLI-F2 now has a complete 38-command foundation and can resume without losing
-  parity
+- AICLI-F2 now has a complete 40-command registry/catalog/introspection
+  foundation and can add invocation without losing parity
 - Datadog work remains correctly evidence-gated and postponed
 
 ## Next Session Handoff
 
-Prepared on 2026-08-10 for a restart-and-`proceed` workflow.
+Prepared on 2026-08-14 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `d71c0d3 feat: expose Sloth MCP comparison
-  workflow`
-- previous pushed checkpoint: `23933b7 feat: compare reviewed Sloth state
-  through MCP`
+- latest pushed checkpoint: `feat: add offline agent introspection`
+- previous pushed checkpoint: `48eacf1 docs: hand off completed Sloth scope`
 - expected startup state: `git status --short --branch` should show clean
   `main...origin/main`
 - last full verification before handoff:
@@ -673,20 +675,19 @@ Current safe boundary:
 
 Verification evidence:
 
-- target: official Sloth MCP read-only comparison with exact reviewed evidence,
-  pinned runtime/tool/schema contracts, bounded output, and Human/Agent CLI
-  parity
+- target: offline bounded Agent command introspection with complete registry
+  parity, strict resolved request schemas, and machine-only errors
 - command: `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh`
-- recorded date: `2026-08-10`
+- recorded date: `2026-08-14`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 482 tests, 5,843 assertions, 0 failures,
+- result: exit 0, `verification ok`, 487 tests, 6,423 assertions, 0 failures,
   0 errors, 0 skips
-- focused result: Sloth MCP comparison passed with 8 tests and 85 assertions;
-  MCP client/transport passed with 4 tests and 49 assertions; Human CLI passed
-  with 3 tests and 14 assertions; registry parity passed with 6 tests and 2,311
-  assertions; use-case and Agent roadmap checks passed with 7 tests and 494
+- focused result: Agent introspection passed with 5 tests and 378 assertions;
+  registry parity passed with 6 tests and 2,509 assertions; Agent roadmap passed
+  with 4 tests and 278 assertions; use-case documentation passed with 3 tests
+  and 220 assertions; Human CLI characterization passed with 55 tests and 280
   assertions; all had zero failures, errors, and skips
-- parity evidence: the registry and catalog contain the same 38 stable command
+- parity evidence: the registry and catalog contain the same 40 stable command
   IDs, every registered command has one current Human CLI usage and one
   versioned target Agent JSON request, and duplicate IDs/paths fail validation
 - runtime note: macOS system Ruby 2.6.10 lacks `Array#filter_map`, already used
@@ -694,21 +695,19 @@ Verification evidence:
   4.0.1. No runtime compatibility code was changed in this implementation slice.
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
-- upstream verification: a controlled checkout at Sloth main revision
-  `8a3be4fab79defa4448d09d91b48422615980b05` instantiated the official handler;
-  `go test ./internal/http/mcp -run TestSchemaDump -v` used the official Go MCP
-  SDK client to complete initialization and `tools/list`, exited 0, and exposed
-  the six schemas pinned by the engine
+- offline verification: subprocess catalog/describe ran without source files,
+  backend configuration, or credentials; catalog pagination returned explicit
+  limits/counts/truncation/cursors and description exposed no runtime endpoint
+  or environment contents
 - live verification: no tagged Sloth binary contains MCP, so a full comparison
   against a released server and real Prometheus data could not be run. Latest
   observed release `v0.16.0` is intentionally rejected. Datadog live testing
   remains postponed.
-- blast radius: one provider-read Human command and planned Agent mapping,
-  evidence/runtime preflight, read-only MCP transport, comparison artifacts,
-  bounded fake-client/transport/CLI tests, and usage/contracts. No provider
-  mutation, status promotion, Sloth execution, or Prometheus reload was added.
-- rollback path: revert `d71c0d3 feat: expose Sloth MCP comparison workflow`
-  and `23933b7 feat: compare reviewed Sloth state through MCP`
+- blast radius: two side-effect-free Agent introspection commands, strict
+  request-schema metadata across the registry, command/use-case documentation,
+  and parity tests. No handler invocation, local/provider I/O, provider
+  mutation, result projection, or MCP server was added.
+- rollback path: revert `feat: add offline agent introspection`
 
 When the user types `proceed` in a fresh session:
 
@@ -717,8 +716,8 @@ When the user types `proceed` in a fresh session:
 3. Do not resume housekeeping; the atomic checkpoint and Phase 9 are complete.
 4. Treat the supported Sloth engine boundary as complete; do not invent more
    provider work while the tagged MCP release and status-parity fields are absent.
-5. Resume AICLI-F2 offline catalog/describe and the first strict structured Agent
-   CLI slice from the complete 38-command registry/catalog foundation.
+5. Resume AICLI-F2 with the first strict structured Agent invocation slice from
+   the complete 40-command registry/catalog/runtime-introspection foundation.
 6. Preserve the completed AICLI-F1 registry/catalog parity and update both the
    Human CLI usage and target Agent JSON mapping for every CLI change.
 7. Keep the official Sloth MCP runtime comparison-only and do not claim status
@@ -784,15 +783,17 @@ If a new session needs to resume quickly:
 2. Read `docs/implementation-plan.md`
 3. Read `docs/adoption-map.md`
 4. Read the latest 5-10 commits on `main`
-5. Read `docs/agent-interface-roadmap.md` for the completed AICLI-F1 boundary
-   and deferred AICLI-F2 execution contract
-6. Inspect `lib/slo_rules_engine/cli/command_registry.rb` and
-   `test/cli_command_registry_test.rb` before changing any CLI surface
+5. Read `docs/agent-interface-roadmap.md` for the completed AICLI-F1 and
+   AICLI-F2 introspection boundaries plus deferred invocation contract
+6. Inspect `lib/slo_rules_engine/cli/command_registry.rb`,
+   `lib/slo_rules_engine/cli/agent_introspection.rb`, and
+   `test/agent_introspection_test.rb` before changing any CLI surface
 7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
-8. If the user says `proceed`, resume AICLI-F2; the supported Sloth comparison
-   boundary is implemented and a tagged-runtime parity test is externally gated
+8. If the user says `proceed`, resume AICLI-F2 structured invocation; the
+   supported Sloth comparison boundary is implemented and a tagged-runtime
+   parity test is externally gated
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
 10. Keep the official Sloth MCP adapter comparison-only; the current

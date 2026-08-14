@@ -4,6 +4,8 @@ require 'optparse'
 require 'fileutils'
 require_relative '../sre'
 require_relative 'cli/command_registry'
+require_relative 'cli/agent_introspection'
+require_relative 'cli/agent_commands'
 require_relative 'cli/catalog_commands'
 require_relative 'cli/bundle_commands'
 require_relative 'cli/journal_commands'
@@ -16,6 +18,7 @@ require_relative 'cli/sloth_mcp_commands'
 require_relative 'cli/telemetry_commands'
 
 module RulesCtl
+  extend SloRulesEngine::CLI::AgentCommands
   extend SloRulesEngine::CLI::CatalogCommands
   extend SloRulesEngine::CLI::BundleCommands
   extend SloRulesEngine::CLI::JournalCommands
@@ -696,6 +699,8 @@ module RulesCtl
     warn "Error: #{message}" if message
     warn <<~USAGE
       Usage:
+        bin/rules-ctl agent catalog [--format=json] [--limit=<1-100>] [--cursor=<command-id>]
+        bin/rules-ctl agent describe <command-id> [--format=json]
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl validate-handoff <handoff.json>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] [--handoff-dir=<dir>] <definitionfile...>

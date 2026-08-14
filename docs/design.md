@@ -37,16 +37,18 @@ freshness, error rendering, and usage behavior.
 The [Agent Interface Roadmap](agent-interface-roadmap.md) introduced one
 versioned command registry between interface adapters and current handlers.
 AICLI-F1 now implements `CommandDefinition`, `CommandRegistry`, and the separate
-`CommandCatalog` parity entity. The registry validates 38 immutable command
+`CommandCatalog` parity entity. The registry validates 40 immutable command
 definitions and drives current Human top-level and grouped-subcommand dispatch.
 The catalog pairs each executable Human command example with a planned
-versioned Agent JSON request.
+versioned Agent JSON request. `AgentIntrospection` resolves strict request
+schemas from that metadata and serves bounded offline catalog/describe output
+through the focused `AgentCommands` adapter.
 
 The Human CLI adapter preserves existing positional/convenience syntax. The
-planned Agent CLI adapter will validate strict complete JSON requests and return
-stable JSON or NDJSON envelopes. Runtime catalog/schema output, field
-projection, limits, input hardening, validation-only behavior, sanitization,
-skill guidance, and MCP schemas must derive from this implemented foundation.
+next Agent CLI adapter slice will validate strict complete JSON requests and
+return stable result/error envelopes. Field projection, collection limits,
+input hardening, validation-only behavior, sanitization, skill guidance, and
+MCP schemas must derive from this implemented introspection foundation.
 
 The registry is an orchestration contract, not a second policy layer. It cannot
 override neutral intent, provider validation, reviewed evidence, ownership,

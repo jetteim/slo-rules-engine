@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'command_schemas'
+
 module SloRulesEngine
   module CLI
     class CommandDefinition
@@ -11,9 +13,10 @@ module SloRulesEngine
       OUTPUT_KEYS = %i[stdout persisted_artifacts field_masks streaming].freeze
 
       attr_reader :id, :version, :human_path, :human_usage, :adapter, :handler, :agent, :schemas,
+                  :request_schema,
                   :side_effect, :io, :safety_gates, :output, :mcp
 
-      def initialize(id:, version:, human_path:, human_usage:, adapter:, handler:, agent:, schemas:,
+      def initialize(id:, version:, human_path:, human_usage:, adapter:, handler:, agent:, schemas:, request_schema:,
                      side_effect:, io:, safety_gates:, output:, mcp:)
         @id = id
         @version = version
@@ -23,6 +26,7 @@ module SloRulesEngine
         @handler = handler
         @agent = agent
         @schemas = schemas
+        @request_schema = request_schema
         @side_effect = side_effect
         @io = io
         @safety_gates = safety_gates
@@ -45,6 +49,7 @@ module SloRulesEngine
           handler: handler,
           agent: agent,
           schemas: schemas,
+          request_schema: request_schema,
           side_effect: side_effect,
           io: io,
           safety_gates: safety_gates,
@@ -66,6 +71,9 @@ module SloRulesEngine
         invalid!('handler must be a method symbol') unless handler.is_a?(Symbol)
         validate_agent!
         validate_schemas!
+        invalid!('request_schema must be a strict object schema') unless request_schema.is_a?(Hash) &&
+                                                                      request_schema[:type] == 'object' &&
+                                                                      request_schema[:additionalProperties] == false
         invalid!("unsupported side_effect #{side_effect.inspect}") unless SIDE_EFFECT_CLASSES.include?(side_effect)
         validate_exact_keys!(io, IO_KEYS, 'io')
         io.each { |key, values| invalid!("io.#{key} must be an array") unless values.is_a?(Array) }
@@ -231,6 +239,8 @@ module SloRulesEngine
         'sloth-evidence.capture' => 'bin/rules-ctl sloth-evidence capture --manifest=./manifest.json --input=./sloth.yaml --generated-rules=./rules.yaml --reviewer=reviewer@example.com --reviewed-at=2026-08-04T12:00:00Z --output=./sloth-evidence.json',
         'sloth-evidence.status' => 'bin/rules-ctl sloth-evidence status ./sloth-evidence.json',
         'sloth-mcp.compare' => 'bin/rules-ctl sloth-mcp compare --manifest=./manifest.json --evidence=./sloth-evidence.json --endpoint=http://localhost:8080/mcp --allow-host=localhost --expected-version=dev --from=2026-08-01T00:00:00Z --to=2026-08-05T00:00:00Z --output=./sloth-mcp-comparison.json',
+        'agent.catalog' => 'bin/rules-ctl agent catalog --format=json --limit=20',
+        'agent.describe' => 'bin/rules-ctl agent describe bundle.verify --format=json',
         'bundle.create' => 'bin/rules-ctl bundle create --artifact-index=./index.json --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --sloth-evidence=checkout/sloth=./sloth-evidence.json --output=./bundle.json',
         'bundle.plan' => 'bin/rules-ctl bundle plan ./bundle.json --target-output=checkout/prometheus_stack=./managed --output=./apply-ready.json',
         'bundle.apply' => 'bin/rules-ctl bundle apply ./apply-ready.json --confirm --approved-plan=./approved-plan.json --journal-dir=./journals --output=./applied.json',
@@ -271,6 +281,8 @@ module SloRulesEngine
         'sloth-evidence.capture' => { manifest_file: './manifest.json', input_files: ['./sloth.yaml'], generated_rules_file: './rules.yaml', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T12:00:00Z', output_file: './sloth-evidence.json' },
         'sloth-evidence.status' => { evidence_file: './sloth-evidence.json' },
         'sloth-mcp.compare' => { manifest_file: './manifest.json', evidence_file: './sloth-evidence.json', endpoint: 'http://localhost:8080/mcp', allowed_hosts: ['localhost'], expected_version: 'dev', from: '2026-08-01T00:00:00Z', to: '2026-08-05T00:00:00Z', output_file: './sloth-mcp-comparison.json' },
+        'agent.catalog' => { limit: 20 },
+        'agent.describe' => { command_id: 'bundle.verify' },
         'bundle.create' => { artifact_index_file: './index.json', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', sloth_evidence_files: { 'checkout/sloth' => './sloth-evidence.json' }, output_file: './bundle.json' },
         'bundle.plan' => { bundle_file: './bundle.json', target_outputs: { 'checkout/prometheus_stack' => './managed' }, output_file: './apply-ready.json' },
         'bundle.apply' => { bundle_file: './apply-ready.json', confirm: true, approved_plan_files: ['./approved-plan.json'], journal_dir: './journals', output_file: './applied.json' },
@@ -375,6 +387,15 @@ module SloRulesEngine
                          local_writes: %w[sloth_mcp_comparison],
                          provider_reads: %w[sloth_mcp_read_only_tools]),
                   gates: %w[strict_arguments reviewed_manifest exact_manifest_evidence evidence_freshness endpoint_allowlist tested_version pinned_tool_schemas read_only_tool_allowlist exact_sloth_identity bounded_pagination bounded_responses credential_scan no_status_promotion]),
+
+          command('agent.catalog', path: %w[agent catalog], side_effect: 'none',
+                  io: io,
+                  gates: %w[strict_arguments offline_only bounded_pagination deterministic_output],
+                  output: output(streaming: 'not_applicable')),
+          command('agent.describe', path: %w[agent describe], side_effect: 'none',
+                  io: io,
+                  gates: %w[strict_arguments offline_only exact_command_id deterministic_output],
+                  output: output(streaming: 'not_applicable')),
 
           command('bundle.create', path: %w[bundle create], side_effect: 'local_write',
                   io: io(local_reads: %w[artifact_index provider_plans source_evidence],
@@ -485,6 +506,8 @@ module SloRulesEngine
         handler ||= id.tr('.-', '_').to_sym
         adapter ||= human_path.length == 1 ? handler : human_path.first.tr('-', '_').to_sym
         contract_prefix = "slo-rules-engine/cli-command-contract/#{id}"
+        request_ref = "#{contract_prefix}/request/v1"
+        agent_status = id.start_with?('agent.') ? 'implemented' : 'planned'
         CommandDefinition.new(
           id: id,
           version: 1,
@@ -494,7 +517,7 @@ module SloRulesEngine
           handler: handler,
           agent: {
             command_id: id,
-            status: 'planned',
+            status: agent_status,
             invocation: "rules-ctl agent invoke #{id}",
             request_example: {
               schema_version: 'slo-rules-engine/agent-command-request/v1',
@@ -504,10 +527,16 @@ module SloRulesEngine
             }
           },
           schemas: {
-            request: { ref: "#{contract_prefix}/request/v1", status: 'planned' },
+            request: { ref: request_ref, status: 'characterized' },
             result: { ref: "#{contract_prefix}/result/v1", status: 'characterized' },
             error: { ref: "#{contract_prefix}/error/v1", status: 'characterized' }
           },
+          request_schema: CommandSchemas.request(
+            id: id,
+            version: 1,
+            ref: request_ref,
+            example: AGENT_ARGUMENT_EXAMPLES.fetch(id)
+          ),
           side_effect: side_effect,
           io: io,
           safety_gates: gates,

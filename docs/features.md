@@ -244,12 +244,12 @@ equivalent sample freshness.
 ## Planned Agent-Operable Interfaces
 
 The [Agent Interface Roadmap](agent-interface-roadmap.md) defines a planned
-Phase 14 capability. Its AICLI-F1 foundation is implemented; the Agent CLI and
-MCP surfaces are not implemented yet.
+Phase 14 capability. Its AICLI-F1 foundation and AICLI-F2 runtime introspection
+slice are implemented; structured Agent invocation and MCP remain planned.
 
 Implemented foundation:
 
-- **Validated command registry:** all 38 current command IDs declare Human and
+- **Validated command registry:** all 40 current command IDs declare Human and
   planned Agent mappings, contract references, side effects, local/provider
   I/O, credential categories, safety gates, output controls, and MCP
   eligibility. Missing or duplicate metadata fails closed.
@@ -259,6 +259,10 @@ Implemented foundation:
 - **Registry-backed Human dispatch:** top-level and grouped Human commands
   resolve through the registry while retaining existing handlers, stdout, exit
   codes, and refusal behavior.
+- **Runtime introspection:** offline, bounded `agent catalog` and exact `agent
+  describe` output expose request/result/error references, strict resolved
+  request schemas, side effects, provider I/O, credential categories, safety
+  gates, and output/MCP metadata without loading files or providers.
 
 Planned features:
 
@@ -268,8 +272,6 @@ Planned features:
 - **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
   convenience flags and compatibility; a new Agent CLI accepts complete strict
   JSON requests. Both normalize into the same handlers and safety behavior.
-- **Runtime introspection:** offline command catalog and describe output replace
-  prompt-baked command documentation for agents.
 - **Agent input hardening:** strict schemas and field-specific validation cover
   unknown fields, bounds, path traversal/symlink escape, control characters,
   unsafe IDs, embedded query/fragment syntax, pre-encoding, URLs, and
@@ -289,8 +291,9 @@ Planned features:
 
 The raw structured path represents a full rules-engine command, not an
 arbitrary provider API payload. Neutral reliability intent and reviewed
-provider artifacts remain authoritative. Catalog Agent JSON examples are target
-contracts only until AICLI-F2 makes them executable through strict schemas.
+provider artifacts remain authoritative. Catalog Agent JSON examples and their
+strict schemas are introspectable contracts; execution remains unavailable
+until the next AICLI-F2 slice implements `agent invoke` and result envelopes.
 
 ## Change
 

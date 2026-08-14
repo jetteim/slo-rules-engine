@@ -233,12 +233,16 @@ and article revalidation live in
 [`docs/agent-interface-roadmap.md`](agent-interface-roadmap.md).
 
 - [x] **AICLI-F1:** define the versioned single command registry, register all
-  38 current Human CLI commands with schema references, side effects, safety
+  38 pre-Agent Human CLI commands with schema references, side effects, safety
   gates, provider I/O, and output metadata, route Human dispatch through the
   registry, and publish a separate Human-command to Agent-JSON catalog without
   changing command behavior.
 - [ ] **AICLI-F2:** add offline catalog/describe plus a strict Agent CLI raw
   JSON/file/stdin invocation path and versioned result/error envelopes.
+  Offline bounded `agent catalog`, exact `agent describe`, JSON-only
+  introspection errors, and strict resolved request schemas for all 40 current
+  registry commands are complete. Raw JSON/file/stdin invocation and result
+  envelopes remain open.
 - [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz
   coverage, and zero-I/O `validate_only` for every write-capable command.
 - [ ] **AICLI-F4:** add schema-checked field masks, declared limits/cursors,
