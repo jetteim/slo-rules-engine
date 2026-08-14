@@ -4,8 +4,9 @@
 
 The engine is a local Ruby application with explicit boundaries around neutral
 reliability intent, provider translation, reviewed evidence, state execution,
-and read-only status. Phase 14 adds planned Human and Agent CLI adapters plus a
-later MCP adapter without duplicating domain behavior.
+and read-only status. Phase 14 now includes Human dispatch plus Agent runtime
+introspection; structured invocation and a later MCP adapter must reuse domain
+behavior.
 
 ```text
 Operator / CI            AI agent                 MCP client (planned)
@@ -53,6 +54,12 @@ MCP schemas must derive from this implemented introspection foundation.
 The registry is an orchestration contract, not a second policy layer. It cannot
 override neutral intent, provider validation, reviewed evidence, ownership,
 exact-plan, confirmation, journal, or verification requirements.
+
+The measured dependency debt, target direction, eight reversible refactoring
+packets, freeze zones, and all-use-case preservation matrix are in the
+[Project Structure Refactoring Plan](housekeeping/project-structure-refactoring-plan.md).
+STR-0 must make current boundary exceptions visible and reject new edges before
+the larger decomposition packets start.
 
 ## Component Boundaries
 
@@ -210,3 +217,6 @@ The [Evolution Plan](evolution-plan.md) records the broader value-stream model,
 and the [Telemetry-First Adoption Map](adoption-map.md) records the current
 adoption path and roadmap. Phase 14 intent, requirements, parity, and target
 interfaces live in the [Agent Interface Roadmap](agent-interface-roadmap.md).
+The [Project Structure Refactoring Plan](housekeeping/project-structure-refactoring-plan.md)
+records the current structural baseline and requirements-preserving execution
+order.

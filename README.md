@@ -42,6 +42,11 @@ introspection with a strict resolved request schema for every command. The
 structured invocation, result envelopes, input hardening, bounded and sanitized
 output, versioned agent skill, and later MCP projection.
 
+The repository-wide [Project Structure Refactoring Plan](docs/housekeeping/project-structure-refactoring-plan.md)
+records the measured dependency cycles and responsibility hotspots, maps all 19
+engineering use cases to preservation tests, and sequences eight reversible
+packets so Agent and provider growth do not deepen implicit coupling.
+
 ## Provider Outputs
 
 | Provider | Generation output | Dry-run planning output | Confirmed state output |

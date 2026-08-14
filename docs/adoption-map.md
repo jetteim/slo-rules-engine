@@ -120,15 +120,22 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. resume AICLI-F2 structured invocation from the implemented 40-command
-   registry/catalog/introspection foundation
-2. keep Datadog live status, contract testing, exact apply/resume, and Datadog
+1. deliver STR-0 architecture fitness and dependency-debt guardrails from the
+   repository-wide refactoring plan
+2. resume AICLI-F2 structured invocation through the STR-3 typed application
+   seam from the implemented 40-command registry/catalog/introspection foundation
+3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
-3. revalidate the Sloth MCP comparison against a tagged binary only after an
+4. revalidate the Sloth MCP comparison against a tagged binary only after an
    official release includes MCP; retain direct Prometheus evidence as the
    contract-complete path
 
 ## Housekeeping Backlog
+
+Active repository-wide plan:
+
+1. Project structure refactoring plan:
+   `docs/housekeeping/project-structure-refactoring-plan.md`
 
 Completed recommendation reviews:
 

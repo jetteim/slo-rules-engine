@@ -276,3 +276,33 @@ verification requirements apply identically through every interface.
   verification gates pass, and the entire branch/PR can be reverted as one unit.
   Completion evidence and accepted deferrals are recorded in
   `docs/housekeeping/atomic-coherence-simplification.md`.
+
+## Project Backlog: Structure Stabilization And Refactoring
+
+The evidence, dependency model, preservation matrix, packet acceptance gates,
+and revalidation are in
+[`docs/housekeeping/project-structure-refactoring-plan.md`](housekeeping/project-structure-refactoring-plan.md).
+
+- [ ] **STR-0:** establish architecture fitness tests, a current dependency-debt
+  allowlist, deterministic structure reporting, complete command-module
+  ownership, and requirement/contract snapshots.
+- [ ] **STR-1:** consolidate identical artifact fingerprint and credential-key
+  policy behind compatibility delegates.
+- [ ] **STR-2:** make Sloth downstream evidence own shared preflight and split
+  its existing collaborators without changing public constants.
+- [ ] **STR-3:** replace parallel command metadata with bounded-context contract
+  declarations and introduce typed application commands before Agent invocation
+  expands.
+- [ ] **STR-4:** split provider-state journal/approved-plan classes by existing
+  boundaries and invert the provider-state to release default dependency.
+- [ ] **STR-5:** split release verification/application by workflow phase and
+  move bundle/portfolio status input resolution out of core live readers.
+- [ ] **STR-6:** split Sloth MCP comparison and manifest-bundle apply internals
+  behind their stable provider facades.
+- [ ] **STR-7:** split process CLI coverage by command family, add bounded
+  composition roots, remove resolved dependency exceptions, and record final
+  structural evidence.
+
+Each STR packet is a behavior-preserving, independently revertible checkpoint.
+No packet is complete until its named dependency or responsibility debt is
+removed and focused plus full verification is green.
