@@ -67,14 +67,18 @@ class CliCommandRegistryTest < Minitest::Test
       executable_agent_commands = %w[
         agent.catalog
         agent.describe
+        validate
+        diff
         providers.list
         integrations.list
         recommend-calculation-basis
+        migration-report
+        model-report
       ]
       expected_agent_status = executable_agent_commands.include?(definition.id) ? 'implemented' : 'planned'
       assert_equal expected_agent_status, definition.agent.fetch(:status)
       application_command = definition.agent.fetch(:application_command)
-      if %w[providers.list integrations.list recommend-calculation-basis].include?(definition.id)
+      if %w[validate diff providers.list integrations.list recommend-calculation-basis migration-report model-report].include?(definition.id)
         assert_match(/\ASloRulesEngine::Application::/, application_command)
       else
         assert_nil application_command
@@ -236,6 +240,21 @@ class CliCommandRegistryTest < Minitest::Test
       refute SloRulesEngine::CLI::CommandCatalog::HUMAN_USAGE.key?(definition.id)
       refute SloRulesEngine::CLI::CommandCatalog::AGENT_ARGUMENT_EXAMPLES.key?(definition.id)
     end
+  end
+
+  def test_analysis_and_provider_state_families_are_authored_once_with_explicit_request_schemas
+    analysis = SloRulesEngine::CLI::CommandContracts::Analysis.definitions
+    state = SloRulesEngine::CLI::CommandContracts::ProviderState.definitions
+
+    assert_equal %w[validate migration-report model-report], analysis.map(&:id)
+    assert_equal %w[apply diff import prune], state.map(&:id)
+    (analysis + state).each { |definition| assert_equal 'explicit', definition.request_schema_source }
+    (analysis + state).each do |definition|
+      refute SloRulesEngine::CLI::CommandCatalog::HUMAN_USAGE.key?(definition.id)
+      refute SloRulesEngine::CLI::CommandCatalog::AGENT_ARGUMENT_EXAMPLES.key?(definition.id)
+    end
+    assert_equal %w[prometheus_stack sloth],
+                 state.fetch(1).request_schema.dig(:properties, :arguments, :properties, :provider, :enum)
   end
 
   def test_invalid_or_duplicate_metadata_fails_closed

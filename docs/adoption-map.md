@@ -104,7 +104,9 @@ gates; MCP later projects the same registry.
 - implemented single versioned 40-command registry, separate Human-to-Agent
   JSON parity catalog, and offline bounded catalog/schema introspection
 - strict raw command-request JSON invocation and result/error envelopes
-- shared adversarial input validation and zero-I/O `validate_only`
+- implemented workspace-confined adversarial file-input validation for
+  validation/reporting and local file-backed diff, followed by remaining
+  URL/identifier/output-root rules and zero-I/O `validate_only`
 - field masks, limits/cursors, NDJSON, explicit truncation, and response
   sanitization
 - versioned agent skill/context plus headless credential rules
@@ -120,10 +122,12 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. deliver STR-0 architecture fitness and dependency-debt guardrails from the
-   repository-wide refactoring plan
-2. resume AICLI-F2 structured invocation through the STR-3 typed application
-   seam from the implemented 40-command registry/catalog/introspection foundation
+1. extend AICLI-F3 from the implemented workspace-read boundary into confined
+   output roots and zero-I/O `validate_only` for the first local-write command
+   family before enabling Agent writes
+2. continue STR-3 command-family declarations only alongside the Agent feature
+   that consumes them; catalog, analysis, and provider-state families are
+   already explicit
 3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
 4. revalidate the Sloth MCP comparison against a tagged binary only after an

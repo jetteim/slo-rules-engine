@@ -25,6 +25,7 @@ class AgentInvocationTest < Minitest::Test
     assert_equal 'providers.list', first.fetch('command_id')
     assert_equal 1, first.fetch('command_version')
     assert_equal 'succeeded', first.fetch('outcome')
+    assert_equal 0, first.fetch('exit_status')
     assert_equal({ 'declared' => 'none', 'exercised' => 'none' }, first.fetch('side_effect'))
     assert_equal human, first.fetch('result')
     assert_empty first.fetch('findings')
@@ -92,16 +93,17 @@ class AgentInvocationTest < Minitest::Test
     invalid = request_for('providers.list').merge(arguments: { unexpected: true })
     error = invoke_agent_error('providers.list', "--json=#{JSON.generate(invalid)}")
     assert_equal 'invalid_agent_request', error.dig('error', 'code')
+    assert_match(/\Areq-[0-9a-f]{24}\z/, error.fetch('request_id'))
     assert_equal '$.arguments.unexpected', error.dig('error', 'details', 'errors', 0, 'path')
 
     mismatch = request_for('providers.list').merge(command_id: 'integrations.list')
     error = invoke_agent_error('providers.list', "--json=#{JSON.generate(mismatch)}")
     assert_equal 'invalid_agent_request', error.dig('error', 'code')
 
-    unsupported = request_for('validate')
-    error = invoke_agent_error('validate', "--json=#{JSON.generate(unsupported)}")
+    unsupported = request_for('generate')
+    error = invoke_agent_error('generate', "--json=#{JSON.generate(unsupported)}")
     assert_equal 'agent_command_not_executable', error.dig('error', 'code')
-    assert_equal 'validate', error.fetch('command_id')
+    assert_equal 'generate', error.fetch('command_id')
 
     error = invoke_agent_error('unknown.command', '--json={}')
     assert_equal 'unknown_agent_command', error.dig('error', 'code')

@@ -68,7 +68,7 @@ sources of truth takes priority.
 | Full verification | 487 tests, 6,423 assertions | 424 tests, 2,766 assertions | green |
 
 The audit baseline contained 20 unique literal versioned artifact schema IDs.
-The first AICLI-F2/STR-3 slice has since moved the guarded inventory to 86
+The first two AICLI-F2/STR-3 slices have since moved the guarded inventory to 94
 production/executable files, 64 root composition dependencies, and 21 unique
 versioned schema strings. The table remains the pre-refactoring audit baseline;
 the architecture fitness configuration and completion evidence below track the
@@ -283,7 +283,7 @@ terms, and `./scripts/verify.sh`.
 
 **Completion evidence:** `scripts/structure-report` now emits the deterministic
 `structure-report/v1` inventory and `scripts/structure-report --check` is part
-of full verification. `config/architecture_dependencies.json` assigns all 86
+of full verification. `config/architecture_dependencies.json` assigns all 94
 current production/executable files to one boundary and records each current
 forbidden reference with its removal packet. `config/architecture_contracts.json`
 locks the 40-command registry/catalog digests (including 120 per-command schema
@@ -363,13 +363,14 @@ equivalence, no-I/O spies, use-case documentation, and full verification.
 **Rollback:** migrate one command family per commit behind the unchanged
 registry and RulesCtl facade.
 
-**Current progress (2026-08-15):** the complete catalog family
-(`providers.list`, `integrations.list`, and `generate-routes`) now owns Human
-usage, Agent examples, and explicit argument schemas in one bounded declaration
-module. `providers.list`, `integrations.list`, and
-`recommend-calculation-basis` normalize Human flags or Agent JSON into typed
-application commands that return values without printing or exiting. Remaining
-command families still use the compatibility assembly and keep STR-3 open.
+**Current progress (2026-08-15):** the complete catalog, analysis, and
+provider-state families now own Human usage, Agent examples, and explicit
+argument schemas in bounded declaration modules. `providers.list`,
+`integrations.list`, `recommend-calculation-basis`, `validate`,
+`migration-report`, `model-report`, and file-backed `diff` normalize Human
+flags or Agent JSON into typed application commands that return values without
+printing or exiting. Remaining command families still use the compatibility
+assembly and keep STR-3 open.
 
 ### STR-4: Provider-State File Boundaries And Release Inversion
 

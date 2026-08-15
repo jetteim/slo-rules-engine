@@ -36,10 +36,17 @@ module RulesCtl
     SloRulesEngine::CLI::CommandRegistry.default
   end
 
-  def application_context
+  def application_context(input_policy: SloRulesEngine::Application::InputSafety::PathPolicy.human)
     SloRulesEngine::Application::Context.new(
       provider_registry: SloRulesEngine.default_provider_registry,
-      integration_registry: SloRulesEngine.default_integration_registry
+      integration_registry: SloRulesEngine.default_integration_registry,
+      input_policy: input_policy
+    )
+  end
+
+  def agent_application_context
+    application_context(
+      input_policy: SloRulesEngine::Application::InputSafety::PathPolicy.agent
     )
   end
 
@@ -61,11 +68,14 @@ module RulesCtl
   end
 
   def validate(argv)
-    definitions = load_definitions(argv)
-    validator = SloRulesEngine::CoreValidator.new
-    results = definitions.map { |definition| validator.validate(definition).to_h.merge(service: definition.service) }
-    puts JSON.pretty_generate(results)
-    exit(results.all? { |result| result[:valid] } ? 0 : 1)
+    abort_usage('missing definition file') if argv.empty?
+
+    result = SloRulesEngine::Application::ValidateDefinitions.new.call(
+      { 'definition_files' => argv },
+      context: application_context
+    )
+    puts JSON.pretty_generate(result.value)
+    exit result.exit_status unless result.exit_status.zero?
   end
 
   def generate(argv)
@@ -255,22 +265,17 @@ module RulesCtl
     abort_usage('missing --provider') unless provider_key
 
     provider = SloRulesEngine.default_provider_registry.fetch(provider_key)
-    manifests = resolve_state_manifests(argv, provider, manifest_path)
-    if provider.key == 'datadog'
-      applier = SloRulesEngine::Appliers::Datadog.new
-      puts JSON.pretty_generate(manifests.map { |manifest| applier.diff(manifest).to_h })
-      return
-    end
-
-    if %w[manifest_bundle external_generator].include?(provider.automation_mode)
-      abort_usage('missing --output-dir') unless output_dir
-
-      applier = SloRulesEngine::Appliers::ManifestBundle.new(output_dir: output_dir)
-      puts JSON.pretty_generate(manifests.map { |manifest| applier.diff(manifest).to_h })
-      return
-    end
-
-    raise SloRulesEngine::UnsupportedApplyAction, "provider #{provider.key.inspect} does not have a diff adapter yet"
+    arguments = { 'provider' => provider_key }
+    arguments['output_dir'] = output_dir if output_dir
+    arguments['manifest_file'] = manifest_path if manifest_path
+    abort_usage('missing definition file') if !manifest_path && argv.empty?
+    arguments['definition_files'] = argv unless manifest_path
+    result = SloRulesEngine::Application::DiffProviderState.new.call(
+      arguments,
+      context: application_context
+    )
+    puts JSON.pretty_generate(result.value)
+    exit result.exit_status unless result.exit_status.zero?
   rescue SloRulesEngine::Datadog::MissingCredentials => error
     puts JSON.pretty_generate(
       valid: false,

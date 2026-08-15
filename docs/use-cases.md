@@ -1199,12 +1199,15 @@ security, and promotion gates are in
 ## Use Case 19: Operate The Reviewed Workflow From An AI Agent
 
 **Delivery status:** partially implemented. AICLI-F1 provides the shared
-registry/catalog, and the first AICLI-F2 slice provides offline `agent catalog`
-and `agent describe` with strict resolved request schemas. The current AICLI-F2
-slice adds strict JSON/file/stdin invocation and versioned result/error
-envelopes for the three zero-I/O commands `providers.list`,
-`integrations.list`, and `recommend-calculation-basis`. Remaining command
-invocation, projections, validation-only, skills, and MCP remain planned.
+registry/catalog, and AICLI-F2 provides offline `agent catalog` and `agent
+describe` with strict resolved request schemas. Strict JSON/file/stdin
+invocation and versioned result/error envelopes now cover seven commands: the
+three zero-I/O commands `providers.list`, `integrations.list`, and
+`recommend-calculation-basis`; the workspace-reading `validate`,
+`migration-report`, and `model-report`; and file-backed `diff` for
+`prometheus_stack`/`sloth`. The applicable AICLI-F3 read-path gates are
+implemented. Writes, Datadog state reads, projections, full validation-only,
+skills, and MCP remain planned.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
@@ -1237,8 +1240,24 @@ printf '%s' '{"schema_version":"slo-rules-engine/agent-command-request/v1","comm
   bin/rules-ctl agent invoke recommend-calculation-basis --stdin
 ```
 
-Planned file-reading and write-capable invocation after the relevant safety
-gates:
+Implemented workspace-reading validation/reporting and file-backed state
+planning:
+
+```bash
+bin/rules-ctl agent invoke validate \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"validate","command_version":1,"arguments":{"definition_files":["examples/services/checkout.rb"]}}'
+
+bin/rules-ctl agent invoke migration-report \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"migration-report","command_version":1,"arguments":{"legacy_files":["legacy/service.rb"]}}'
+
+bin/rules-ctl agent invoke model-report \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"model-report","command_version":1,"arguments":{"definition_files":["examples/services/checkout.rb"]}}'
+
+bin/rules-ctl agent invoke diff \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"diff","command_version":1,"arguments":{"provider":"prometheus_stack","manifest_file":"work/generated/checkout-api/prometheus_stack/manifest.json","output_dir":"work/managed"}}'
+```
+
+Planned write-capable invocation after output-path and validation-only gates:
 
 ```bash
 bin/rules-ctl agent invoke bundle.verify \
@@ -1253,15 +1272,16 @@ Current catalog mapping entity:
   "schema_version": "slo-rules-engine/cli-command-catalog/v1",
   "commands": [
     {
-      "id": "bundle.verify",
-      "human_cli": "bin/rules-ctl bundle verify ./applied.json --output=./verified.json",
+      "id": "diff",
+      "human_cli": "bin/rules-ctl diff --provider=prometheus_stack --manifest=./manifest.json --output-dir=./managed",
       "agent_cli_json": {
         "schema_version": "slo-rules-engine/agent-command-request/v1",
-        "command_id": "bundle.verify",
+        "command_id": "diff",
         "command_version": 1,
         "arguments": {
-          "bundle_file": "./applied.json",
-          "output_file": "./verified.json"
+          "provider": "prometheus_stack",
+          "manifest_file": "./manifest.json",
+          "output_dir": "./managed"
         }
       }
     }
@@ -1284,10 +1304,14 @@ backend state.
 
 The implemented request carries the complete versioned rules-engine command
 request and no credentials. A JSON request file must resolve inside the current
-workspace. File-reading, output-path, provider-read, and write-capable commands
-remain non-executable through `agent invoke` until their AICLI-F3 validation and
-zero-I/O safety gates exist; arbitrary provider mutation payloads remain
-unsupported.
+workspace. Referenced `.rb`/`.json` inputs and file-backed diff roots are also
+workspace-confined for the Agent surface, even though compatible Human commands
+may still read explicit paths outside the current directory. Agent paths are
+bounded and canonicalized; traversal, absolute paths, pre-encoding, controls,
+unexpected extensions, symlink escape, and oversized inputs fail before file
+content is loaded. Datadog reads and every write-capable command remain
+non-executable through `agent invoke`; arbitrary provider mutation payloads
+remain unsupported.
 
 **What to expect:**
 
@@ -1307,15 +1331,26 @@ unsupported.
   prose to stderr, and exits one.
 - Catalog/describe output is deterministic, contains no timestamp or runtime
   secret values, and performs no filesystem or provider I/O.
-- Catalog entries expose `structured_invocation`; it is currently true only
-  for `providers.list`, `integrations.list`, and
-  `recommend-calculation-basis`.
+- Catalog entries expose `structured_invocation`; it is currently true for
+  `providers.list`, `integrations.list`, `recommend-calculation-basis`,
+  `validate`, `migration-report`, `model-report`, and `diff`.
 - Each implemented invocation prints one
   `slo-rules-engine/agent-command-result/v1` object containing a deterministic
-  request ID, command ID/version, `outcome: succeeded`, declared/exercised
+  request ID, command ID/version, `outcome`, `exit_status`, declared/exercised
   side-effect evidence, the Human-equivalent `result`, findings, artifact
-  references, and explicit non-truncation state. It writes nothing and performs
-  no provider call.
+  references, and explicit non-truncation state. A successful task uses
+  `outcome: succeeded`/`exit_status: 0`; a completed validation or migration
+  report with findings retains its result under `outcome: failed` and exits one.
+- `validate` returns the same per-service `valid`, `errors`, and `warnings`
+  array as the Human command. `migration-report` returns `valid` plus findings
+  and preserves its nonzero finding exit. `model-report` returns model counts,
+  distributions, objectives, handoff requests, and review provenance.
+- Agent `diff` accepts only a reviewed Prometheus Stack or Sloth manifest and a
+  workspace-contained managed root. It returns the Human-equivalent versioned
+  desired/observed state and operations, reads only local manifest/managed
+  files, creates no directory, performs no provider network call, and writes
+  nothing. Datadog `diff` remains available only through the Human CLI while
+  live Agent-read contracts are postponed.
 - Inline JSON, a workspace-contained JSON file, and stdin are mutually
   exclusive. Explicit `--format=json` overrides `RULES_CTL_OUTPUT_FORMAT`; JSON
   is the default, while unsupported formats fail closed.
@@ -1325,6 +1360,11 @@ unsupported.
   writes no result data to stderr, and exits one. Gated commands use
   `agent_command_not_executable` before their application handler or provider
   client runs.
+- Unsafe referenced paths return `unsafe_agent_input_path`; excessive files
+  return stable size/count errors. Parsed-request failures retain the
+  deterministic request ID. Any application command that writes directly to
+  stdout/stderr or attempts `exit` is quarantined and converted to a JSON error
+  without emitting the untrusted text.
 - `scripts/structure-report --check` prints a compact success summary with the
   production-file, command, unique schema, and use-case counts. It exits
   nonzero with deterministic JSON evidence when a boundary gains an
@@ -1333,13 +1373,9 @@ unsupported.
 
 **What to expect after the remaining Agent slices:**
 
-- File-reading, reporting, and one read-only state-planning vertical slice will
-  normalize to typed application commands next. Equivalence tests will then
-  cover their domain result, declared reads, refusal codes, and artifacts.
-- Unknown fields, invalid field masks, path traversal or symlink escape,
-  prohibited control characters, unsafe/pre-encoded identifiers, invalid URLs,
-  excessive depth/size, and credential-like request keys fail before handlers
-  or provider clients are constructed.
+- Output-root, URL, host, resource-ID, query/fragment, exactly-once encoding,
+  and credential-key safety will extend the current request/path policy before
+  commands with those fields become executable.
 - `validate_only` performs no file read/write, provider call, or credential
   loading. Observational planning declares any state reads. Confirmed mutation
   still requires current reviewed provenance, ownership, exact-plan evidence

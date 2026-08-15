@@ -31,9 +31,9 @@ Use the toolkit to:
   sandbox before relying on live provider behavior
 - inspect the current Human/Agent command contract and strict request schema
   offline before an agent constructs a request
-- invoke provider listing, integration listing, and calculation-basis
-  recommendation through strict Agent JSON/file/stdin requests with versioned
-  result/error envelopes and zero local/provider I/O
+- invoke provider/integration listing, calculation-basis recommendation,
+  definition validation, migration/model reporting, and file-backed desired
+  versus managed-state diff through strict Agent JSON/file/stdin requests
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
@@ -41,16 +41,27 @@ Phase 14 now has a validated 40-command catalog and registry. It pairs each
 Human CLI example with an Agent CLI JSON request, owns Human command dispatch,
 and exposes bounded offline `agent catalog` plus exact `agent describe`
 introspection with a strict resolved request schema for every command. Strict
-`agent invoke` is implemented for `providers.list`, `integrations.list`, and
-`recommend-calculation-basis`, accepting exactly one inline JSON, workspace
-JSON file, or stdin request and returning versioned deterministic JSON. The
-[Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the remaining
-command expansion, input hardening, bounded and sanitized output, versioned
-agent skill, and later MCP projection.
+`agent invoke` is implemented for seven commands: `providers.list`,
+`integrations.list`, `recommend-calculation-basis`, `validate`,
+`migration-report`, `model-report`, and file-backed `diff` for
+`prometheus_stack`/`sloth`. Agent-referenced files must be regular,
+workspace-contained, bounded `.rb`/`.json` inputs; traversal, absolute,
+pre-encoded, control-character, symlink-escape, and oversized paths fail before
+content reads. File-backed `diff` reads managed state without provider network
+access or writes. The [Agent Interface Roadmap](docs/agent-interface-roadmap.md)
+defines the remaining command expansion, output-path/URL/identifier hardening,
+validation-only mutation gates, bounded/sanitized output, versioned agent
+skill, and later MCP projection.
 
 ```bash
 bin/rules-ctl agent invoke providers.list \
   --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"providers.list","command_version":1,"arguments":{}}'
+
+bin/rules-ctl agent invoke validate \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"validate","command_version":1,"arguments":{"definition_files":["examples/services/checkout.rb"]}}'
+
+bin/rules-ctl agent invoke diff \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"diff","command_version":1,"arguments":{"provider":"prometheus_stack","manifest_file":"work/generated/checkout-api/prometheus_stack/manifest.json","output_dir":"work/managed"}}'
 ```
 
 The repository-wide [Project Structure Refactoring Plan](docs/housekeeping/project-structure-refactoring-plan.md)

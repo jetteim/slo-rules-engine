@@ -10,12 +10,17 @@ module SloRulesEngine
       MAX_LIMIT = 100
 
       class ContractError < ArgumentError
-        attr_reader :code, :details
+        attr_reader :code, :details, :request_id
 
         def initialize(code, message, details = {})
           @code = code
           @details = details
           super(message)
+        end
+
+        def attach_request_id(value)
+          @request_id ||= value
+          self
         end
       end
 
@@ -66,10 +71,11 @@ module SloRulesEngine
         {
           schema_version: ERROR_SCHEMA_VERSION,
           kind: 'AgentCommandError',
-          request_id: nil,
+          request_id: error.request_id,
           command_id: command_id,
           command_version: definition&.version,
           outcome: 'failed',
+          exit_status: 1,
           side_effect: definition && {
             declared: definition.side_effect,
             exercised: 'none'

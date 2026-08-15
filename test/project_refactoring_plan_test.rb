@@ -51,5 +51,7 @@ class ProjectRefactoringPlanTest < Minitest::Test
     assert_includes plan, 'scripts/structure-report --check'
     assert_includes plan, 'config/architecture_dependencies.json'
     assert_includes plan, 'config/architecture_contracts.json'
+    assert_includes plan, 'complete catalog, analysis, and'
+    assert_includes plan, 'provider-state families'
   end
 end

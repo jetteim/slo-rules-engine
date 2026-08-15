@@ -263,6 +263,14 @@ Implemented foundation:
   describe` output expose request/result/error references, strict resolved
   request schemas, side effects, provider I/O, credential categories, safety
   gates, and output/MCP metadata without loading files or providers.
+- **Structured Agent invocation:** strict inline JSON, workspace request files,
+  or stdin drive seven typed application commands with versioned result/error
+  envelopes and Human result/exit parity.
+- **Agent read boundary:** provider/integration listing and calculation advice
+  remain zero-I/O; validation/migration/model reports use bounded
+  workspace-contained inputs; Prometheus Stack/Sloth `diff` reads only local
+  reviewed manifests and managed files. Traversal, absolute/pre-encoded paths,
+  controls, symlink escape, wrong extensions, and oversized files fail closed.
 
 Planned features:
 
@@ -271,11 +279,11 @@ Planned features:
   Human CLI mapping, Agent CLI mapping, skill reference, and later MCP tool.
 - **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
   convenience flags and compatibility; a new Agent CLI accepts complete strict
-  JSON requests. Both normalize into the same handlers and safety behavior.
-- **Agent input hardening:** strict schemas and field-specific validation cover
-  unknown fields, bounds, path traversal/symlink escape, control characters,
-  unsafe IDs, embedded query/fragment syntax, pre-encoding, URLs, and
-  credential exclusion.
+  JSON requests. Seven commands currently normalize into the same typed
+  application boundary; remaining commands are gated.
+- **Remaining Agent input hardening:** extend the implemented read-path policy
+  to confined output roots, unsafe IDs, embedded query/fragment syntax, URLs,
+  credential exclusion, and broader generated/fuzz coverage.
 - **Distinct safety modes:** zero-I/O `validate_only`, observational planning,
   and confirmed execution are explicit and retain every current review,
   ownership, exact-plan, confirmation, journal, and verification gate.
@@ -292,8 +300,9 @@ Planned features:
 The raw structured path represents a full rules-engine command, not an
 arbitrary provider API payload. Neutral reliability intent and reviewed
 provider artifacts remain authoritative. Catalog Agent JSON examples and their
-strict schemas are introspectable contracts; execution remains unavailable
-until the next AICLI-F2 slice implements `agent invoke` and result envelopes.
+strict schemas are introspectable contracts; only entries advertising
+`structured_invocation: true` are executable, and Datadog reads plus every
+write command remain gated.
 
 ## Change
 

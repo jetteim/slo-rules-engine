@@ -110,9 +110,11 @@ class AgentInterfaceRoadmapTest < Minitest::Test
     assert_includes readme, 'Agent Interface Roadmap'
     assert_includes readme, '40-command catalog'
     assert_includes File.read(ROADMAP_PATH), '**AICLI-F1 status:** implemented'
-    assert_includes File.read(ROADMAP_PATH), 'first zero-I/O `agent invoke` vertical slice'
+    assert_includes File.read(ROADMAP_PATH), 'first workspace-read/state-plan'
+    assert_includes File.read(ROADMAP_PATH), '**AICLI-F3 status:** partially implemented'
     assert_includes File.read(ROADMAP_PATH), '`structured_invocation`'
     assert_includes readme, '`agent invoke` is implemented'
+    assert_includes readme, '`migration-report`'
   end
 
   def test_current_human_cli_registry_and_usage_are_not_missing_from_the_roadmap

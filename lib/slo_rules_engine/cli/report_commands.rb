@@ -8,14 +8,22 @@ module SloRulesEngine
       def migration_report(argv)
         abort_usage('missing file') if argv.empty?
 
-        report = SloRulesEngine::MigrationReport.scan_files(argv)
-        puts JSON.pretty_generate(report.to_h)
-        exit(report.valid? ? 0 : 1)
+        result = SloRulesEngine::Application::BuildMigrationReport.new.call(
+          { 'legacy_files' => argv },
+          context: application_context
+        )
+        puts JSON.pretty_generate(result.value)
+        exit result.exit_status unless result.exit_status.zero?
       end
 
       def model_report(argv)
-        definitions = load_definitions(argv)
-        puts JSON.pretty_generate(SloRulesEngine::ReliabilityModel::ReportBuilder.new.build(definitions))
+        abort_usage('missing definition file') if argv.empty?
+
+        result = SloRulesEngine::Application::BuildModelReport.new.call(
+          { 'definition_files' => argv },
+          context: application_context
+        )
+        puts JSON.pretty_generate(result.value)
       end
     end
   end

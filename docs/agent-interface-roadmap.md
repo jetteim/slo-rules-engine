@@ -8,14 +8,17 @@
 
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
-**Delivery status:** AICLI-F1, AICLI-F2 introspection, and the first executable
-AICLI-F2 vertical slice are implemented. The Human CLI dispatches through a
+**Delivery status:** AICLI-F1, AICLI-F2 introspection, and two executable
+AICLI-F2 vertical slices are implemented. The Human CLI dispatches through a
 validated 40-command registry; a separate versioned command catalog pairs every
 Human example with its Agent JSON request; and bounded offline `agent catalog`
 plus exact `agent describe` expose strict resolved request schemas and safety
 metadata. Strict JSON/file/stdin invocation with versioned envelopes is enabled
-for three zero-I/O commands. Remaining command invocation, agent skill,
-response sanitizer, and MCP adapter remain planned.
+for seven commands, including workspace-confined validation/report reads and
+file-backed state diff. AICLI-F3 read-path/control/size hardening and handler
+output quarantine are implemented for that surface. Remaining command
+invocation, output/URL/identifier hardening, validation-only mutation gates,
+agent skill, response sanitizer, and MCP adapter remain planned.
 
 ## Article Summary And Intent
 
@@ -48,12 +51,12 @@ Therefore the article's raw-payload guidance is adapted as follows:
 
 | Article capability | Current baseline | Roadmap gap and decision |
 | --- | --- | --- |
-| Raw Structured Requests Alongside Convenience Flags | Strict inline JSON, workspace-file, and stdin requests now reach typed application commands for provider listing, integration listing, and calculation-basis recommendation. | Expand one safe command family at a time while retaining existing Human CLI syntax; keep file/provider/write commands gated until their safety class is ready. |
+| Raw Structured Requests Alongside Convenience Flags | Strict inline JSON, workspace-file, and stdin requests now reach typed application commands for three zero-I/O tasks, validation/migration/model reporting, and file-backed state diff. | Expand one safe command family at a time while retaining existing Human CLI syntax; keep Datadog reads and writes gated until their safety class is ready. |
 | Runtime Schema Introspection | A validated registry/catalog covers all 40 commands. Bounded offline `agent catalog` and exact `agent describe` expose strict resolved request schemas, contract references, side effects, I/O, credentials categories, safety gates, and output/MCP metadata. | Keep introspection generated from the registry while invocation, result envelopes, projections, and later MCP are added. |
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
-| Input Hardening | Manifest, bundle, credential-key, ownership, and managed-path validation are strong but distributed. There is no shared agent-input policy or adversarial fuzz suite. | Add strict request schemas, field-specific path/ID/URL rules, size/depth limits, and generated-input testing. |
+| Input Hardening | Enabled Agent read commands share workspace confinement, canonical/symlink checks, traversal/control/pre-encoding rejection, extensions, file/count/byte bounds, deterministic path errors, and adversarial cases. | Extend the policy to output roots, IDs, URLs/hosts, query/fragment syntax, credential-like keys, and generated fuzz coverage before exposing commands that use them. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
-| Multiple Surfaces From One Contract | Human dispatch, Agent introspection, and three zero-I/O Agent invocations resolve through one registry and typed application seam; a rules-engine MCP server remains absent. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry/application seam into remaining Agent invocation, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
+| Multiple Surfaces From One Contract | Human dispatch, Agent introspection, and seven Agent invocations resolve through one registry and typed application seam; a rules-engine MCP server remains absent. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry/application seam into remaining Agent invocation, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
 | Validation-Only Safety And Response Sanitization | Mutation planning, confirmation, review gates, journals, and sanitized backend errors exist. Some current dry-run planning may read backend state, and there is no prompt-injection-aware response policy. | Add a distinct `validate_only` mode with no backend calls or writes, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
 
 ## Target Architecture
@@ -90,9 +93,10 @@ The separate `slo-rules-engine/cli-command-catalog/v1` entity is the compact
 parity view. Every entry contains `id`, `human_cli`, and `agent_cli_json`. The
 Human form is executable now. Every Agent JSON form has a strict runtime-
 introspectable request schema. Catalog entries expose
-`structured_invocation`; it is initially true for `providers.list`,
-`integrations.list`, and `recommend-calculation-basis`, whose Human and Agent
-adapters share typed application commands.
+`structured_invocation`; it is true for `providers.list`, `integrations.list`,
+`recommend-calculation-basis`, `validate`, `migration-report`, `model-report`,
+and file-backed `diff`, whose Human and Agent adapters share typed application
+commands.
 
 Adapters only parse or render. They do not reimplement review policy, provider translation, state planning, or mutation logic.
 
@@ -150,12 +154,12 @@ interface syntax into domain handlers:
 
 | Human CLI command group | Registry coverage required | Agent CLI target | MCP target after AICLI-F6 |
 | --- | --- | --- | --- |
-| `validate` | Yes | Full parity | Yes |
+| `validate` | Yes | Implemented workspace-confined structured invocation | Yes |
 | `validate-handoff` | Yes | Full parity | Yes |
 | `generate` | Yes | Full parity, local-write intent explicit | Yes |
 | `manifest-review` | Yes | Full parity | Yes |
 | `apply` | Yes | Validate, plan, and confirmed execution remain distinct | Yes, mutation metadata mandatory |
-| `diff` | Yes | Full parity | Yes |
+| `diff` | Yes | Implemented for local Prometheus Stack/Sloth managed-state reads; Datadog Agent reads remain gated | Yes |
 | `import` | Yes | Full parity | Yes |
 | `prune` | Yes | Validate, plan, and confirmed execution remain distinct | Yes, mutation metadata mandatory |
 | `status` | Yes | Manifest, bundle, and portfolio forms | Yes |
@@ -178,8 +182,8 @@ interface syntax into domain handlers:
 | `review-handoff` | Yes | Explicit local-write classification | Yes |
 | `recommend-calculation-basis` | Yes | Implemented structured invocation with zero I/O | Yes |
 | `reality-check` | Yes | Full parity | Yes |
-| `migration-report` | Yes | Full parity | Yes |
-| `model-report` | Yes | Full parity | Yes |
+| `migration-report` | Yes | Implemented workspace-confined structured invocation with finding exit parity | Yes |
+| `model-report` | Yes | Implemented workspace-confined structured invocation | Yes |
 
 ## Functional Requirements
 
@@ -252,10 +256,12 @@ describe, strict resolved request schemas for all 40 commands, and JSON-only
 introspection errors are complete. Strict inline JSON, workspace-file, and
 stdin request sources, explicit/environment/default format precedence,
 deterministic request IDs, and versioned result/error envelopes are implemented
-for `providers.list`, `integrations.list`, and
-`recommend-calculation-basis`. Their Human and Agent adapters share typed
-application commands that do not print or exit. Remaining file-reading,
-provider-read, and write-capable commands remain gated.
+for `providers.list`, `integrations.list`, `recommend-calculation-basis`,
+`validate`, `migration-report`, `model-report`, and `diff`. Their Human and
+Agent adapters share typed application commands that do not print or exit.
+`diff` is intentionally Agent-enabled only for Prometheus Stack/Sloth local
+managed-file reads; Datadog state reads and all write-capable commands remain
+gated.
 
 **Value:** agents can discover and invoke complete current contracts through JSON instead of reconstructing shell syntax.
 
@@ -264,14 +270,26 @@ provider-read, and write-capable commands remain gated.
 **Architecture impact:** Agent CLI adapter, request/result envelopes, schema resolver, `--format=json|ndjson` terminology that does not conflict with existing `--output=FILE` persistence.
 
 **Current evidence:** inline, file, and subprocess-stdin requests produce the
-same results as their Human commands. Unknown fields, mismatched command
+same results and exit classes as their Human commands. Unknown fields, mismatched command
 identity/version, malformed JSON, ambiguous sources, out-of-workspace request
 files, unknown commands, unsupported formats, and gated commands return one
 `slo-rules-engine/agent-command-error/v1` value with no result data on stderr.
-The success path returns `slo-rules-engine/agent-command-result/v1` with
-declared/exercised `none` side effects and explicit non-truncation state.
+The result path returns `slo-rules-engine/agent-command-result/v1` with explicit
+exit status, declared/exercised side effects, retained findings, and explicit
+non-truncation state. Application stdout/stderr and direct exits are quarantined
+instead of contaminating machine output.
 
 ### AICLI-F3: Adversarial Input And Validation-Only Boundary
+
+**AICLI-F3 status:** partially implemented. The seven executable commands
+reject control characters before dispatch. Agent file inputs are
+workspace-confined and bounded, reject absolute/traversal/pre-encoded paths,
+enforce expected extensions, canonicalize symlinks, and reject escape or
+oversized input before content reads. File-backed diff validates every input
+path before parsing its manifest and performs no provider network call or
+write. Output-root mutation policy, IDs, URLs/hosts, credential-like keys,
+broader generated fuzzing, and zero-I/O `validate_only` for write commands
+remain open.
 
 **Value:** machine-generated mistakes fail before file access, credentials, backend reads, or writes.
 
@@ -358,10 +376,11 @@ After drafting this roadmap, every recommendation in the source article was chec
 | Test agent-specific mistakes | AICLI-NFR-011/012; AICLI-F3/F7 | Covered with generated/fuzz inputs and fail-closed isolation. |
 
 No article theme remains orphaned at roadmap level. AICLI-F1, AICLI-F2 runtime
-introspection, and the first zero-I/O `agent invoke` vertical slice are
-implemented; remaining structured invocation and AICLI-F3 through F7 stay open
-and must progress through the feature gates above. This revalidation does not
-claim full Agent CLI parity or that the rules-engine MCP exists.
+introspection, the zero-I/O slice, and the first workspace-read/state-plan
+slice are implemented. AICLI-F3 is proven only for the enabled read fields;
+remaining structured invocation and AICLI-F3 through F7 stay open and must
+progress through the feature gates above. This revalidation does not claim full
+Agent CLI parity or that the rules-engine MCP exists.
 
 ## Accepted Deferrals
 

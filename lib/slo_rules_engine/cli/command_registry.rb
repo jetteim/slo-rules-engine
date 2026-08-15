@@ -3,6 +3,8 @@
 require_relative 'command_schemas'
 require_relative 'command_contract'
 require_relative 'command_contracts/catalog'
+require_relative 'command_contracts/analysis'
+require_relative 'command_contracts/provider_state'
 
 module SloRulesEngine
   module CLI
@@ -235,14 +237,9 @@ module SloRulesEngine
     module CommandCatalog
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
-        'validate' => 'bin/rules-ctl validate ./service.rb',
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
         'generate' => 'bin/rules-ctl generate --provider=prometheus_stack --output-dir=./generated ./service.rb',
         'manifest-review' => 'bin/rules-ctl manifest-review --provider=prometheus_stack --manifest=./manifest.json',
-        'apply' => 'bin/rules-ctl apply --provider=datadog --dry-run --manifest=./manifest.json',
-        'diff' => 'bin/rules-ctl diff --provider=datadog --manifest=./manifest.json',
-        'import' => 'bin/rules-ctl import --provider=datadog --manifest=./manifest.json',
-        'prune' => 'bin/rules-ctl prune --provider=datadog --dry-run --manifest=./manifest.json',
         'status' => 'bin/rules-ctl status --provider=sloth --manifest=./manifest.json --evidence=./sloth-evidence.json --base-url=http://localhost:9090',
         'sloth-evidence.capture' => 'bin/rules-ctl sloth-evidence capture --manifest=./manifest.json --input=./sloth.yaml --generated-rules=./rules.yaml --reviewer=reviewer@example.com --reviewed-at=2026-08-04T12:00:00Z --output=./sloth-evidence.json',
         'sloth-evidence.status' => 'bin/rules-ctl sloth-evidence status ./sloth-evidence.json',
@@ -270,18 +267,11 @@ module SloRulesEngine
         'review-handoff' => 'bin/rules-ctl review-handoff --accept=request-availability --note=Reviewed ./handoff.json',
         'recommend-calculation-basis' => 'bin/rules-ctl recommend-calculation-basis --observations-per-second=1 --failed-observations-to-alert=5',
         'reality-check' => 'bin/rules-ctl reality-check --provider=prometheus_stack --telemetry=./telemetry.json ./service.rb',
-        'migration-report' => 'bin/rules-ctl migration-report ./legacy.rb',
-        'model-report' => 'bin/rules-ctl model-report ./service.rb'
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
-        'validate' => { definition_files: ['./service.rb'] },
         'validate-handoff' => { handoff_file: './handoff.json' },
         'generate' => { provider: 'prometheus_stack', definition_files: ['./service.rb'], output_dir: './generated' },
         'manifest-review' => { provider: 'prometheus_stack', manifest_files: ['./manifest.json'] },
-        'apply' => { provider: 'datadog', manifest_file: './manifest.json', mode: 'plan' },
-        'diff' => { provider: 'datadog', manifest_file: './manifest.json' },
-        'import' => { provider: 'datadog', manifest_file: './manifest.json' },
-        'prune' => { provider: 'datadog', manifest_file: './manifest.json', mode: 'plan' },
         'status' => { provider: 'sloth', manifest_file: './manifest.json', evidence_file: './sloth-evidence.json', base_url: 'http://localhost:9090' },
         'sloth-evidence.capture' => { manifest_file: './manifest.json', input_files: ['./sloth.yaml'], generated_rules_file: './rules.yaml', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T12:00:00Z', output_file: './sloth-evidence.json' },
         'sloth-evidence.status' => { evidence_file: './sloth-evidence.json' },
@@ -309,8 +299,6 @@ module SloRulesEngine
         'review-handoff' => { handoff_file: './handoff.json', accept: ['request-availability'], notes: ['Reviewed'] },
         'recommend-calculation-basis' => { observations_per_second: 1.0, failed_observations_to_alert: 5.0 },
         'reality-check' => { provider: 'prometheus_stack', telemetry_file: './telemetry.json', definition_files: ['./service.rb'] },
-        'migration-report' => { legacy_files: ['./legacy.rb'] },
-        'model-report' => { definition_files: ['./service.rb'] }
       }.freeze
 
       module_function
@@ -334,9 +322,7 @@ module SloRulesEngine
 
       def build
         [
-          command('validate', side_effect: 'local_read',
-                  io: io(local_reads: %w[definitions]),
-                  gates: %w[strict_arguments neutral_model_validation]),
+          CommandContracts::Analysis.fetch('validate'),
           command('validate-handoff', handler: :validate_handoff, side_effect: 'local_read',
                   io: io(local_reads: %w[handoff_packet]),
                   gates: %w[strict_arguments handoff_schema reviewed_provenance]),
@@ -348,30 +334,7 @@ module SloRulesEngine
                   io: io(local_reads: %w[definitions provider_manifests handoff_packets saved_review_report],
                          local_writes: %w[manifest_review_report]),
                   gates: %w[strict_arguments manifest_schema reviewed_provenance evidence_freshness]),
-          command('apply', side_effect: 'provider_mutation',
-                  io: io(local_reads: %w[definitions provider_manifests handoff_packets saved_review_report operation_journal],
-                         local_writes: %w[managed_files operation_journal provider_state_result],
-                         provider_reads: %w[provider_state managed_files],
-                         provider_writes: %w[provider_state managed_files],
-                         credentials: %w[provider_environment_when_live]),
-                  gates: %w[strict_arguments reviewed_manifest reviewed_provenance evidence_freshness managed_ownership explicit_confirmation durable_journal post_apply_verification]),
-          command('diff', side_effect: 'provider_read',
-                  io: io(local_reads: %w[definitions provider_manifests managed_files],
-                         provider_reads: %w[provider_state managed_files],
-                         credentials: %w[provider_environment_when_live]),
-                  gates: %w[strict_arguments provider_validation read_only]),
-          command('import', handler: :import_existing, side_effect: 'provider_read',
-                  io: io(local_reads: %w[definitions provider_manifests managed_files],
-                         provider_reads: %w[provider_state managed_files],
-                         credentials: %w[provider_environment_when_live]),
-                  gates: %w[strict_arguments provider_validation managed_ownership read_only]),
-          command('prune', side_effect: 'provider_mutation',
-                  io: io(local_reads: %w[definitions provider_manifests handoff_packets saved_review_report operation_journal],
-                         local_writes: %w[managed_files operation_journal provider_state_result],
-                         provider_reads: %w[provider_state managed_files],
-                         provider_writes: %w[provider_state managed_files],
-                         credentials: %w[provider_environment_when_live]),
-                  gates: %w[strict_arguments reviewed_manifest reviewed_provenance evidence_freshness managed_ownership explicit_confirmation durable_journal post_apply_verification]),
+          *CommandContracts::ProviderState.definitions,
           command('status', side_effect: 'provider_read',
                   io: io(local_reads: %w[provider_manifest release_bundle live_status_portfolio sloth_downstream_evidence sloth_evidence_sources],
                          local_writes: %w[live_status_report],
@@ -490,12 +453,7 @@ module SloRulesEngine
                          provider_reads: %w[telemetry_backend],
                          credentials: %w[provider_environment_when_online]),
                   gates: %w[strict_arguments reviewed_provider_binding read_only_backend]),
-          command('migration-report', handler: :migration_report, side_effect: 'local_read',
-                  io: io(local_reads: %w[legacy_definitions]),
-                  gates: %w[strict_arguments public_safe_reporting]),
-          command('model-report', handler: :model_report, side_effect: 'local_read',
-                  io: io(local_reads: %w[definitions]),
-                  gates: %w[strict_arguments neutral_model_validation reviewed_provenance_visibility])
+          *CommandContracts::Analysis.reports
         ]
       end
 

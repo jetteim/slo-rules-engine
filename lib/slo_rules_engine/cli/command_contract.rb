@@ -79,14 +79,36 @@ module SloRulesEngine
         }
       end
 
-      def argument(example:, schema:, required: true)
-        { example: example, schema: schema, required: required }
+      def argument(example:, schema:, required: true, include_in_example: true)
+        {
+          example: example,
+          schema: schema,
+          required: required,
+          include_in_example: include_in_example
+        }
+      end
+
+      def path_schema
+        CommandSchemas.bounded_string(pattern: '^[^\u0000-\u001F\u007F]+$')
+      end
+
+      def path_list_schema(max_items: 100)
+        {
+          type: 'array',
+          minItems: 1,
+          maxItems: max_items,
+          items: path_schema
+        }
       end
 
       def normalize_arguments(arguments, example)
         return [example, nil, nil] unless arguments
 
-        request_example = arguments.transform_values { |definition| definition.fetch(:example) }
+        request_example = arguments.each_with_object({}) do |(name, definition), result|
+          next unless definition.fetch(:include_in_example)
+
+          result[name] = definition.fetch(:example)
+        end
         properties = arguments.transform_values { |definition| definition.fetch(:schema) }
         required = arguments.filter_map { |name, definition| name.to_s if definition.fetch(:required) }
         [request_example, properties, required]

@@ -4,9 +4,9 @@
 
 The engine is a local Ruby application with explicit boundaries around neutral
 reliability intent, provider translation, reviewed evidence, state execution,
-and read-only status. Phase 14 now includes Human dispatch plus Agent runtime
-introspection; structured invocation and a later MCP adapter must reuse domain
-behavior.
+and read-only status. Phase 14 now includes Human dispatch, Agent runtime
+introspection, and typed structured invocation for seven commands; later Agent
+commands and MCP must reuse the same application behavior.
 
 ```text
 Operator / CI            AI agent                 MCP client (planned)
@@ -14,6 +14,8 @@ Operator / CI            AI agent                 MCP client (planned)
 Human CLI adapter      Agent CLI adapter        MCP stdio adapter
   |                         |                         |
   +------------- versioned command registry --------+
+                            |
+             typed application commands
                             |
 RulesCtl library orchestration + command-family modules
   |
@@ -33,23 +35,27 @@ Shared manifest/state orchestration remains in the library facade because those
 commands intentionally share definition loading, provider validation, review
 freshness, error rendering, and usage behavior.
 
-### Command Contract And Planned Agent Interfaces
+### Command Contract And Agent Interfaces
 
 The [Agent Interface Roadmap](agent-interface-roadmap.md) introduced one
 versioned command registry between interface adapters and current handlers.
 AICLI-F1 now implements `CommandDefinition`, `CommandRegistry`, and the separate
 `CommandCatalog` parity entity. The registry validates 40 immutable command
 definitions and drives current Human top-level and grouped-subcommand dispatch.
-The catalog pairs each executable Human command example with a planned
+The catalog pairs each executable Human command example with its target
 versioned Agent JSON request. `AgentIntrospection` resolves strict request
 schemas from that metadata and serves bounded offline catalog/describe output
 through the focused `AgentCommands` adapter.
 
 The Human CLI adapter preserves existing positional/convenience syntax. The
-next Agent CLI adapter slice will validate strict complete JSON requests and
-return stable result/error envelopes. Field projection, collection limits,
-input hardening, validation-only behavior, sanitization, skill guidance, and
-MCP schemas must derive from this implemented introspection foundation.
+Agent adapter validates complete JSON requests and returns stable result/error
+envelopes for seven registry-mapped application commands. Analysis commands
+use bounded workspace-contained `.rb` inputs; file-backed `diff` additionally
+uses a reviewed `.json` manifest and confined managed root, with no provider
+network or writes. Application stdout/stderr and direct exits are quarantined.
+Field projection, collection limits, remaining output/URL/ID hardening,
+validation-only behavior, sanitization, skill guidance, and MCP schemas must
+derive from this foundation.
 
 The registry is an orchestration contract, not a second policy layer. It cannot
 override neutral intent, provider validation, reviewed evidence, ownership,

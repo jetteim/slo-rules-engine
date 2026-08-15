@@ -2,12 +2,15 @@
 
 require 'digest'
 require 'json'
+require 'stringio'
 require 'time'
 require 'uri'
 
 module SloRulesEngine
   module CLI
     class AgentRequestValidator
+      CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/
+
       def validate!(value, schema)
         errors = []
         validate_node(value, schema, '$', errors)
@@ -70,6 +73,7 @@ module SloRulesEngine
       def validate_string(value, schema, path, errors)
         return add_type_error(errors, path, 'string') unless value.is_a?(String)
 
+        add_error(errors, path, 'control_character', 'must not contain control characters') if value.match?(CONTROL_CHARACTERS)
         minimum = schema_value(schema, :minLength)
         maximum = schema_value(schema, :maxLength)
         add_error(errors, path, 'too_short', "must contain at least #{minimum} characters") if minimum && value.length < minimum
@@ -192,8 +196,8 @@ module SloRulesEngine
 
       def invoke(command_id, request, format:)
         validate_format!(format)
-        definition = fetch_definition(command_id)
         request_id = request_id(request)
+        definition = fetch_definition(command_id)
         @validator.validate!(request, definition.request_schema)
         application_command = definition.agent.fetch(:application_command)
         unless definition.agent.fetch(:status) == 'implemented' && application_command
@@ -206,19 +210,55 @@ module SloRulesEngine
           )
         end
 
-        result = resolve_application_command(application_command).new.call(
-          request.fetch('arguments'),
-          context: @application_context
-        )
+        result = execute_application_command(application_command, request.fetch('arguments'))
+        unless result.is_a?(SloRulesEngine::Application::CommandResult)
+          raise AgentIntrospection::ContractError.new(
+            'invalid_application_result',
+            'application command did not return a typed result'
+          )
+        end
+        unless result.side_effect == definition.side_effect
+          raise AgentIntrospection::ContractError.new(
+            'application_side_effect_mismatch',
+            'application command side-effect evidence does not match its declaration',
+            declared: definition.side_effect,
+            exercised: result.side_effect
+          )
+        end
         result_payload(definition, request_id, result)
-      rescue AgentIntrospection::ContractError
+      rescue AgentIntrospection::ContractError => error
+        error.attach_request_id(request_id) if defined?(request_id) && request_id
         raise
+      rescue SloRulesEngine::Application::InputSafety::Error,
+             SloRulesEngine::Application::CommandError => error
+        contract_error = AgentIntrospection::ContractError.new(error.code, error.message, error.details)
+        contract_error.attach_request_id(request_id) if defined?(request_id) && request_id
+        raise contract_error
+      rescue SloRulesEngine::ManifestSchemaError => error
+        contract_error = AgentIntrospection::ContractError.new(
+          'invalid_manifest_schema',
+          'manifest input does not match the reviewed manifest contract',
+          errors: error.result.errors.map(&:to_h),
+          warnings: error.result.warnings.map(&:to_h)
+        )
+        contract_error.attach_request_id(request_id) if defined?(request_id) && request_id
+        raise contract_error
       rescue ArgumentError => error
-        raise AgentIntrospection::ContractError.new(
+        contract_error = AgentIntrospection::ContractError.new(
           'invalid_application_command',
           'normalized application command rejected the request',
           error_class: error.class.name
         )
+        contract_error.attach_request_id(request_id) if defined?(request_id) && request_id
+        raise contract_error
+      rescue StandardError => error
+        contract_error = AgentIntrospection::ContractError.new(
+          'application_command_failed',
+          'application command failed without producing a result',
+          error_class: error.class.name
+        )
+        contract_error.attach_request_id(request_id) if defined?(request_id) && request_id
+        raise contract_error
       end
 
       private
@@ -266,6 +306,34 @@ module SloRulesEngine
         )
       end
 
+      def execute_application_command(name, arguments)
+        stdout = StringIO.new
+        stderr = StringIO.new
+        original_stdout = $stdout
+        original_stderr = $stderr
+        $stdout = stdout
+        $stderr = stderr
+        result = resolve_application_command(name).new.call(arguments, context: @application_context)
+        unless stdout.string.empty? && stderr.string.empty?
+          raise AgentIntrospection::ContractError.new(
+            'unexpected_application_output',
+            'application command emitted output outside its typed result',
+            stdout_bytes: stdout.string.bytesize,
+            stderr_bytes: stderr.string.bytesize
+          )
+        end
+        result
+      rescue SystemExit => error
+        raise AgentIntrospection::ContractError.new(
+          'unexpected_application_exit',
+          'application command attempted to terminate the process',
+          exit_status: error.status
+        )
+      ensure
+        $stdout = original_stdout
+        $stderr = original_stderr
+      end
+
       def request_id(request)
         canonical = canonicalize(request)
         "req-#{Digest::SHA256.hexdigest(JSON.generate(canonical))[0, 24]}"
@@ -289,7 +357,8 @@ module SloRulesEngine
           request_id: request_id,
           command_id: definition.id,
           command_version: definition.version,
-          outcome: 'succeeded',
+          outcome: result.exit_status.zero? ? 'succeeded' : 'failed',
+          exit_status: result.exit_status,
           side_effect: {
             declared: definition.side_effect,
             exercised: result.side_effect

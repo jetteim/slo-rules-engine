@@ -108,7 +108,9 @@
       "allowed_dependencies": [
         "neutral_intent",
         "telemetry_onboarding",
-        "provider_translation"
+        "provider_translation",
+        "provider_state",
+        "artifact_review"
       ]
     },
     {

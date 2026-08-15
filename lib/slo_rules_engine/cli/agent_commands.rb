@@ -51,6 +51,7 @@ module SloRulesEngine
         request = agent_invocation.parse_request(raw)
         payload = agent_invocation.invoke(command_id, request, format: format)
         puts JSON.pretty_generate(payload)
+        exit payload.fetch(:exit_status) unless payload.fetch(:exit_status).zero?
       rescue OptionParser::ParseError => error
         render_agent_contract_error('invalid_agent_arguments', error.message, command_id: command_id)
       rescue SloRulesEngine::CLI::AgentIntrospection::ContractError => error
@@ -100,7 +101,7 @@ module SloRulesEngine
       def agent_invocation
         SloRulesEngine::CLI::AgentInvocation.new(
           registry: command_registry,
-          application_context: application_context
+          application_context: agent_application_context
         )
       end
 
