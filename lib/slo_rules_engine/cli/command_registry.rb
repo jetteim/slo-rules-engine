@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative 'command_schemas'
+require_relative 'command_contract'
+require_relative 'command_contracts/catalog'
 
 module SloRulesEngine
   module CLI
@@ -13,11 +15,11 @@ module SloRulesEngine
       OUTPUT_KEYS = %i[stdout persisted_artifacts field_masks streaming].freeze
 
       attr_reader :id, :version, :human_path, :human_usage, :adapter, :handler, :agent, :schemas,
-                  :request_schema,
+                  :request_schema, :request_schema_source,
                   :side_effect, :io, :safety_gates, :output, :mcp
 
       def initialize(id:, version:, human_path:, human_usage:, adapter:, handler:, agent:, schemas:, request_schema:,
-                     side_effect:, io:, safety_gates:, output:, mcp:)
+                     request_schema_source: 'inferred', side_effect:, io:, safety_gates:, output:, mcp:)
         @id = id
         @version = version
         @human_path = human_path
@@ -27,6 +29,7 @@ module SloRulesEngine
         @agent = agent
         @schemas = schemas
         @request_schema = request_schema
+        @request_schema_source = request_schema_source
         @side_effect = side_effect
         @io = io
         @safety_gates = safety_gates
@@ -50,6 +53,7 @@ module SloRulesEngine
           agent: agent,
           schemas: schemas,
           request_schema: request_schema,
+          request_schema_source: request_schema_source,
           side_effect: side_effect,
           io: io,
           safety_gates: safety_gates,
@@ -74,6 +78,7 @@ module SloRulesEngine
         invalid!('request_schema must be a strict object schema') unless request_schema.is_a?(Hash) &&
                                                                       request_schema[:type] == 'object' &&
                                                                       request_schema[:additionalProperties] == false
+        invalid!('request_schema_source must be explicit or inferred') unless %w[explicit inferred].include?(request_schema_source)
         invalid!("unsupported side_effect #{side_effect.inspect}") unless SIDE_EFFECT_CLASSES.include?(side_effect)
         validate_exact_keys!(io, IO_KEYS, 'io')
         io.each { |key, values| invalid!("io.#{key} must be an array") unless values.is_a?(Array) }
@@ -92,11 +97,14 @@ module SloRulesEngine
       end
 
       def validate_agent!
-        validate_exact_keys!(agent, %i[command_id status invocation request_example], 'agent')
+        validate_exact_keys!(agent, %i[command_id status invocation application_command request_example], 'agent')
         invalid!('agent.command_id is required') if agent[:command_id].to_s.empty?
         invalid!('agent.command_id must match id') unless agent[:command_id] == id
         invalid!('agent.status is required') if agent[:status].to_s.empty?
         invalid!('agent.invocation is required') if agent[:invocation].to_s.empty?
+        unless agent[:application_command].nil? || agent[:application_command].to_s.start_with?('SloRulesEngine::Application::')
+          invalid!('agent.application_command must use the application namespace')
+        end
         validate_exact_keys!(
           agent[:request_example],
           %i[schema_version command_id command_version arguments],
@@ -254,9 +262,6 @@ module SloRulesEngine
         'plan.resume' => 'bin/rules-ctl plan resume ./approved-plan.json --confirm --journal-dir=./journals',
         'lookup-telemetry' => 'bin/rules-ctl lookup-telemetry --provider=prometheus_stack --metric=http_requests_total --base-url=http://localhost:9090',
         'discover-telemetry' => 'bin/rules-ctl discover-telemetry --provider=prometheus_stack --service=checkout --base-url=http://localhost:9090',
-        'providers.list' => 'bin/rules-ctl providers list',
-        'integrations.list' => 'bin/rules-ctl integrations list',
-        'generate-routes' => 'bin/rules-ctl generate-routes --integration=notification_router ./service.rb',
         'candidates' => 'bin/rules-ctl candidates ./telemetry.json',
         'draft-definition' => 'bin/rules-ctl draft-definition --service=checkout --owner=platform ./telemetry.json',
         'draft-from-handoff' => 'bin/rules-ctl draft-from-handoff --service=checkout --owner=platform ./handoff.json',
@@ -296,16 +301,13 @@ module SloRulesEngine
         'plan.resume' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
         'lookup-telemetry' => { provider: 'prometheus_stack', metric: 'http_requests_total', base_url: 'http://localhost:9090' },
         'discover-telemetry' => { provider: 'prometheus_stack', service: 'checkout', base_url: 'http://localhost:9090' },
-        'providers.list' => {},
-        'integrations.list' => {},
-        'generate-routes' => { integration: 'notification_router', definition_files: ['./service.rb'] },
         'candidates' => { telemetry_file: './telemetry.json' },
         'draft-definition' => { service: 'checkout', owner: 'platform', telemetry_file: './telemetry.json' },
         'draft-from-handoff' => { service: 'checkout', owner: 'platform', handoff_file: './handoff.json' },
         'onboarding-summary' => { discovery_index_file: './discovery/index.json', handoff_dir: './handoffs' },
         'onboarding-artifact-index' => { discovery_index_file: './discovery/index.json', handoff_dir: './handoffs', manifest_dir: './generated', output_file: './artifact-index.json' },
         'review-handoff' => { handoff_file: './handoff.json', accept: ['request-availability'], notes: ['Reviewed'] },
-        'recommend-calculation-basis' => { observations_per_second: 1, failed_observations_to_alert: 5 },
+        'recommend-calculation-basis' => { observations_per_second: 1.0, failed_observations_to_alert: 5.0 },
         'reality-check' => { provider: 'prometheus_stack', telemetry_file: './telemetry.json', definition_files: ['./service.rb'] },
         'migration-report' => { legacy_files: ['./legacy.rb'] },
         'model-report' => { definition_files: ['./service.rb'] }
@@ -456,13 +458,7 @@ module SloRulesEngine
                          provider_reads: %w[telemetry_backend],
                          credentials: %w[provider_environment_when_required]),
                   gates: %w[strict_arguments bounded_scope one_provider_per_run read_only_backend]),
-          command('providers.list', path: %w[providers list], side_effect: 'none',
-                  io: io, gates: %w[offline_only], output: output(streaming: 'not_applicable')),
-          command('integrations.list', path: %w[integrations list], side_effect: 'none',
-                  io: io, gates: %w[offline_only], output: output(streaming: 'not_applicable')),
-          command('generate-routes', handler: :generate_routes, side_effect: 'local_read',
-                  io: io(local_reads: %w[definitions]),
-                  gates: %w[strict_arguments neutral_model_validation no_delivery_secrets]),
+          *CommandContracts::Catalog.definitions,
           command('candidates', side_effect: 'local_read',
                   io: io(local_reads: %w[telemetry_evidence]),
                   gates: %w[strict_arguments normalized_telemetry conservative_classification]),
@@ -486,7 +482,9 @@ module SloRulesEngine
                   io: io(local_reads: %w[handoff_packet], local_writes: %w[handoff_packet]),
                   gates: %w[strict_arguments handoff_schema explicit_review_decision preserve_discovery_evidence]),
           command('recommend-calculation-basis', handler: :recommend_calculation_basis, side_effect: 'none',
-                  io: io, gates: %w[strict_arguments numeric_bounds], output: output(streaming: 'not_applicable')),
+                  io: io, gates: %w[strict_arguments numeric_bounds], output: output(streaming: 'not_applicable'),
+                  agent_status: 'implemented',
+                  application_command: 'SloRulesEngine::Application::RecommendCalculationBasis'),
           command('reality-check', handler: :reality_check, side_effect: 'provider_read',
                   io: io(local_reads: %w[definitions telemetry_evidence lookup_results],
                          provider_reads: %w[telemetry_backend],
@@ -501,51 +499,21 @@ module SloRulesEngine
         ]
       end
 
-      def command(id, side_effect:, io:, gates:, path: nil, adapter: nil, handler: nil, output: nil)
-        human_path = path || id.split('.')
-        handler ||= id.tr('.-', '_').to_sym
-        adapter ||= human_path.length == 1 ? handler : human_path.first.tr('-', '_').to_sym
-        contract_prefix = "slo-rules-engine/cli-command-contract/#{id}"
-        request_ref = "#{contract_prefix}/request/v1"
-        agent_status = id.start_with?('agent.') ? 'implemented' : 'planned'
-        CommandDefinition.new(
+      def command(id, side_effect:, io:, gates:, path: nil, adapter: nil, handler: nil, output: nil,
+                  agent_status: nil, application_command: nil)
+        CommandContract.build(
           id: id,
-          version: 1,
-          human_path: human_path,
           human_usage: HUMAN_USAGE.fetch(id),
-          adapter: adapter,
-          handler: handler,
-          agent: {
-            command_id: id,
-            status: agent_status,
-            invocation: "rules-ctl agent invoke #{id}",
-            request_example: {
-              schema_version: 'slo-rules-engine/agent-command-request/v1',
-              command_id: id,
-              command_version: 1,
-              arguments: AGENT_ARGUMENT_EXAMPLES.fetch(id)
-            }
-          },
-          schemas: {
-            request: { ref: request_ref, status: 'characterized' },
-            result: { ref: "#{contract_prefix}/result/v1", status: 'characterized' },
-            error: { ref: "#{contract_prefix}/error/v1", status: 'characterized' }
-          },
-          request_schema: CommandSchemas.request(
-            id: id,
-            version: 1,
-            ref: request_ref,
-            example: AGENT_ARGUMENT_EXAMPLES.fetch(id)
-          ),
+          example: AGENT_ARGUMENT_EXAMPLES.fetch(id),
           side_effect: side_effect,
           io: io,
-          safety_gates: gates,
-          output: output || output(persisted_artifacts: io[:local_writes]),
-          mcp: {
-            eligible: true,
-            status: 'planned',
-            tool_id: id.tr('.-', '_')
-          }
+          gates: gates,
+          path: path,
+          adapter: adapter,
+          handler: handler,
+          output: output,
+          agent_status: agent_status,
+          application_command: application_command
         )
       end
 

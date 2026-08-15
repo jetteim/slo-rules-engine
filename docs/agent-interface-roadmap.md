@@ -8,13 +8,14 @@
 
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
-**Delivery status:** AICLI-F1 and the AICLI-F2 introspection slice are
-implemented. The Human CLI dispatches through a validated 40-command registry;
-a separate versioned command catalog pairs every Human example with its Agent
-JSON request; and bounded offline `agent catalog` plus exact `agent describe`
-expose strict resolved request schemas and safety metadata. Structured
-invocation, result envelopes, agent skill, response sanitizer, and MCP adapter
-remain planned.
+**Delivery status:** AICLI-F1, AICLI-F2 introspection, and the first executable
+AICLI-F2 vertical slice are implemented. The Human CLI dispatches through a
+validated 40-command registry; a separate versioned command catalog pairs every
+Human example with its Agent JSON request; and bounded offline `agent catalog`
+plus exact `agent describe` expose strict resolved request schemas and safety
+metadata. Strict JSON/file/stdin invocation with versioned envelopes is enabled
+for three zero-I/O commands. Remaining command invocation, agent skill,
+response sanitizer, and MCP adapter remain planned.
 
 ## Article Summary And Intent
 
@@ -47,12 +48,12 @@ Therefore the article's raw-payload guidance is adapted as follows:
 
 | Article capability | Current baseline | Roadmap gap and decision |
 | --- | --- | --- |
-| Raw Structured Requests Alongside Convenience Flags | Commands already consume JSON manifests, telemetry envelopes, bundles, journals, and plans, but orchestration still depends on positional arguments and bespoke flags. | Add one strict Agent CLI request object per command while retaining existing Human CLI syntax. |
+| Raw Structured Requests Alongside Convenience Flags | Strict inline JSON, workspace-file, and stdin requests now reach typed application commands for provider listing, integration listing, and calculation-basis recommendation. | Expand one safe command family at a time while retaining existing Human CLI syntax; keep file/provider/write commands gated until their safety class is ready. |
 | Runtime Schema Introspection | A validated registry/catalog covers all 40 commands. Bounded offline `agent catalog` and exact `agent describe` expose strict resolved request schemas, contract references, side effects, I/O, credentials categories, safety gates, and output/MCP metadata. | Keep introspection generated from the registry while invocation, result envelopes, projections, and later MCP are added. |
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
 | Input Hardening | Manifest, bundle, credential-key, ownership, and managed-path validation are strong but distributed. There is no shared agent-input policy or adversarial fuzz suite. | Add strict request schemas, field-specific path/ID/URL rules, size/depth limits, and generated-input testing. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
-| Multiple Surfaces From One Contract | Human dispatch and Agent introspection resolve through one registry; structured Agent invocation and a rules-engine MCP server remain absent. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry into Agent invocation, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
+| Multiple Surfaces From One Contract | Human dispatch, Agent introspection, and three zero-I/O Agent invocations resolve through one registry and typed application seam; a rules-engine MCP server remains absent. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry/application seam into remaining Agent invocation, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
 | Validation-Only Safety And Response Sanitization | Mutation planning, confirmation, review gates, journals, and sanitized backend errors exist. Some current dry-run planning may read backend state, and there is no prompt-injection-aware response policy. | Add a distinct `validate_only` mode with no backend calls or writes, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
 
 ## Target Architecture
@@ -87,9 +88,11 @@ The single command registry owns:
 
 The separate `slo-rules-engine/cli-command-catalog/v1` entity is the compact
 parity view. Every entry contains `id`, `human_cli`, and `agent_cli_json`. The
-Human form is executable now. The Agent JSON form has a strict runtime-
-introspectable request schema but is not executable until the remaining
-AICLI-F2 Agent invocation adapter is implemented.
+Human form is executable now. Every Agent JSON form has a strict runtime-
+introspectable request schema. Catalog entries expose
+`structured_invocation`; it is initially true for `providers.list`,
+`integrations.list`, and `recommend-calculation-basis`, whose Human and Agent
+adapters share typed application commands.
 
 Adapters only parse or render. They do not reimplement review policy, provider translation, state planning, or mutation logic.
 
@@ -164,8 +167,8 @@ interface syntax into domain handlers:
 | `plan approve/status/apply/resume` | Yes | Full parity with review and confirmation | Yes |
 | `lookup-telemetry` | Yes | Full parity with bounded output | Yes |
 | `discover-telemetry` | Yes | Single and batch parity with NDJSON option | Yes |
-| `providers list` | Yes | Full parity | Yes |
-| `integrations list` | Yes | Full parity | Yes |
+| `providers list` | Yes | Implemented structured invocation with zero I/O | Yes |
+| `integrations list` | Yes | Implemented structured invocation with zero I/O | Yes |
 | `generate-routes` | Yes | Full parity | Yes |
 | `candidates` | Yes | Full parity with field masks | Yes |
 | `draft-definition` | Yes | Full parity | Yes |
@@ -173,7 +176,7 @@ interface syntax into domain handlers:
 | `onboarding-summary` | Yes | Full parity with bounded scopes | Yes |
 | `onboarding-artifact-index` | Yes | Full parity | Yes |
 | `review-handoff` | Yes | Explicit local-write classification | Yes |
-| `recommend-calculation-basis` | Yes | Full parity | Yes |
+| `recommend-calculation-basis` | Yes | Implemented structured invocation with zero I/O | Yes |
 | `reality-check` | Yes | Full parity | Yes |
 | `migration-report` | Yes | Full parity | Yes |
 | `model-report` | Yes | Full parity | Yes |
@@ -237,7 +240,7 @@ root-adapter consistency, and required metadata for 40 commands. Human top-level
 and grouped-subcommand dispatch resolve through it. `CommandCatalog` is a
 separate versioned entity pairing current Human commands with planned Agent JSON
 requests. Existing CLI characterization remains unchanged. Strict request
-schemas are resolved for every command; executable invocation remains AICLI-F2
+schemas are resolved for every command; executable expansion remains AICLI-F2
 scope.
 
 **Architecture impact:** new command-contract component between adapters and existing handlers; no provider or neutral-model dependency reversal.
@@ -246,14 +249,27 @@ scope.
 
 **AICLI-F2 status:** partially implemented. Offline bounded catalog, exact
 describe, strict resolved request schemas for all 40 commands, and JSON-only
-introspection errors are complete. Raw JSON/file/stdin invocation, normalized
-handler execution, and versioned result envelopes remain open.
+introspection errors are complete. Strict inline JSON, workspace-file, and
+stdin request sources, explicit/environment/default format precedence,
+deterministic request IDs, and versioned result/error envelopes are implemented
+for `providers.list`, `integrations.list`, and
+`recommend-calculation-basis`. Their Human and Agent adapters share typed
+application commands that do not print or exit. Remaining file-reading,
+provider-read, and write-capable commands remain gated.
 
 **Value:** agents can discover and invoke complete current contracts through JSON instead of reconstructing shell syntax.
 
 **Acceptance criteria:** offline catalog/describe and strict raw JSON/file/stdin invocation work for an initial vertical slice, then every registered command; Human and Agent normalized requests/results are equivalent; JSON errors never degrade to prose usage output.
 
 **Architecture impact:** Agent CLI adapter, request/result envelopes, schema resolver, `--format=json|ndjson` terminology that does not conflict with existing `--output=FILE` persistence.
+
+**Current evidence:** inline, file, and subprocess-stdin requests produce the
+same results as their Human commands. Unknown fields, mismatched command
+identity/version, malformed JSON, ambiguous sources, out-of-workspace request
+files, unknown commands, unsupported formats, and gated commands return one
+`slo-rules-engine/agent-command-error/v1` value with no result data on stderr.
+The success path returns `slo-rules-engine/agent-command-result/v1` with
+declared/exercised `none` side effects and explicit non-truncation state.
 
 ### AICLI-F3: Adversarial Input And Validation-Only Boundary
 
@@ -341,10 +357,11 @@ After drafting this roadmap, every recommendation in the source article was chec
 | Keep human ergonomics | AICLI-FR-001/004/025/026; AICLI-F7 | Covered with backward compatibility and mandatory dual-interface updates. |
 | Test agent-specific mistakes | AICLI-NFR-011/012; AICLI-F3/F7 | Covered with generated/fuzz inputs and fail-closed isolation. |
 
-No article theme remains orphaned at roadmap level. AICLI-F1 and the AICLI-F2
-runtime introspection slice are implemented; structured invocation and AICLI-F3
-through F7 remain open and must progress through the feature gates above. This
-revalidation does not claim that `agent invoke` or the rules-engine MCP exists.
+No article theme remains orphaned at roadmap level. AICLI-F1, AICLI-F2 runtime
+introspection, and the first zero-I/O `agent invoke` vertical slice are
+implemented; remaining structured invocation and AICLI-F3 through F7 stay open
+and must progress through the feature gates above. This revalidation does not
+claim full Agent CLI parity or that the rules-engine MCP exists.
 
 ## Accepted Deferrals
 

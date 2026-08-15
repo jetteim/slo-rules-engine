@@ -98,9 +98,14 @@ class UseCasesDocumentationTest < Minitest::Test
     assert_includes document, 'zero provider writes'
     assert_includes document, 'scripts/structure-report --check'
     assert_includes document, 'unapproved dependency'
+    assert_includes document, 'bin/rules-ctl agent invoke providers.list'
+    assert_includes document, 'slo-rules-engine/agent-command-result/v1'
+    assert_includes document, 'structured_invocation: true'
+    assert_includes document, 'agent_command_not_executable'
     assert_includes readme, 'Sloth Downstream Evidence'
     assert_includes readme, 'Official Sloth MCP Comparison'
     assert_includes readme, 'scripts/structure-report --check'
+    assert_includes readme, 'bin/rules-ctl agent invoke providers.list'
   end
 
   private

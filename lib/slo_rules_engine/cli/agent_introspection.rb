@@ -62,10 +62,18 @@ module SloRulesEngine
         )
       end
 
-      def error_payload(error)
+      def error_payload(error, command_id: nil, definition: nil)
         {
           schema_version: ERROR_SCHEMA_VERSION,
           kind: 'AgentCommandError',
+          request_id: nil,
+          command_id: command_id,
+          command_version: definition&.version,
+          outcome: 'failed',
+          side_effect: definition && {
+            declared: definition.side_effect,
+            exercised: 'none'
+          },
           error: {
             code: error.code,
             message: error.message,
@@ -114,6 +122,8 @@ module SloRulesEngine
           version: definition.version,
           human_cli: definition.human_usage,
           agent_cli_json: definition.agent.fetch(:request_example),
+          structured_invocation: !definition.agent[:application_command].nil?,
+          request_schema_source: definition.request_schema_source,
           side_effect: definition.side_effect,
           io: definition.io,
           safety_gates: definition.safety_gates,
@@ -129,7 +139,7 @@ module SloRulesEngine
             path: definition.human_path,
             usage: definition.human_usage
           },
-          agent: definition.agent,
+          agent: definition.agent.reject { |key, _value| key == :application_command },
           handler: definition.handler,
           request_schema: definition.request_schema
         )

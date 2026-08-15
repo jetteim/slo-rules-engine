@@ -36,6 +36,13 @@ module RulesCtl
     SloRulesEngine::CLI::CommandRegistry.default
   end
 
+  def application_context
+    SloRulesEngine::Application::Context.new(
+      provider_registry: SloRulesEngine.default_provider_registry,
+      integration_registry: SloRulesEngine.default_integration_registry
+    )
+  end
+
   def dispatch_registered_subcommand(root, argv, usage)
     subcommand = argv.shift
     definition = command_registry.find_human([root, subcommand])
@@ -701,6 +708,7 @@ module RulesCtl
       Usage:
         bin/rules-ctl agent catalog [--format=json] [--limit=<1-100>] [--cursor=<command-id>]
         bin/rules-ctl agent describe <command-id> [--format=json]
+        bin/rules-ctl agent invoke <command-id> (--json=<request> | --json-file=<file> | --stdin) [--format=json]
         bin/rules-ctl validate <definitionfile...>
         bin/rules-ctl validate-handoff <handoff.json>
         bin/rules-ctl generate --provider=<provider> [--output-dir=<dir>] [--handoff-dir=<dir>] <definitionfile...>

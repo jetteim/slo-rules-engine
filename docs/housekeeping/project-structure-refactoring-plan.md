@@ -2,7 +2,7 @@
 
 Date: 2026-08-15
 
-Status: active; STR-0 completed
+Status: active; STR-0 completed, STR-3 started
 
 Baseline commit: `6dc0ffb`
 
@@ -66,6 +66,13 @@ sources of truth takes priority.
 | Root composition dependencies | 63 direct requires | not recorded | flat load graph |
 | Unique versioned schema strings in production | 20 | not recorded | preservation inventory |
 | Full verification | 487 tests, 6,423 assertions | 424 tests, 2,766 assertions | green |
+
+The audit baseline contained 20 unique literal versioned artifact schema IDs.
+The first AICLI-F2/STR-3 slice has since moved the guarded inventory to 86
+production/executable files, 64 root composition dependencies, and 21 unique
+versioned schema strings. The table remains the pre-refactoring audit baseline;
+the architecture fitness configuration and completion evidence below track the
+current inventory.
 
 Largest production concentration:
 
@@ -276,11 +283,11 @@ terms, and `./scripts/verify.sh`.
 
 **Completion evidence:** `scripts/structure-report` now emits the deterministic
 `structure-report/v1` inventory and `scripts/structure-report --check` is part
-of full verification. `config/architecture_dependencies.json` assigns all 82
-production/executable files to one boundary and records each current forbidden
-reference with its removal packet. `config/architecture_contracts.json` locks
-the 40-command registry/catalog digests (including 120 per-command schema
-references), 20 unique literal versioned artifact schema IDs, and
+of full verification. `config/architecture_dependencies.json` assigns all 86
+current production/executable files to one boundary and records each current
+forbidden reference with its removal packet. `config/architecture_contracts.json`
+locks the 40-command registry/catalog digests (including 120 per-command schema
+references), 21 current unique literal versioned artifact schema IDs, and
 all 19 use-case-to-test mappings. `test/architecture_fitness_test.rb` enforces
 those contracts, while `test/cli_architecture_test.rb` derives all 11 command
 modules and their registered adapters from the filesystem and registry. No
@@ -355,6 +362,14 @@ equivalence, no-I/O spies, use-case documentation, and full verification.
 
 **Rollback:** migrate one command family per commit behind the unchanged
 registry and RulesCtl facade.
+
+**Current progress (2026-08-15):** the complete catalog family
+(`providers.list`, `integrations.list`, and `generate-routes`) now owns Human
+usage, Agent examples, and explicit argument schemas in one bounded declaration
+module. `providers.list`, `integrations.list`, and
+`recommend-calculation-basis` normalize Human flags or Agent JSON into typed
+application commands that return values without printing or exiting. Remaining
+command families still use the compatibility assembly and keep STR-3 open.
 
 ### STR-4: Provider-State File Boundaries And Release Inversion
 
@@ -550,8 +565,9 @@ Gaps found and corrected during revalidation:
    current seam. They are freeze zones with growth triggers rather than
    speculative work.
 8. The initial schema inventory counted repeated occurrences across files.
-   STR-0 now snapshots the 20 unique literal artifact schema IDs and hashes the
-   full command registry/catalog contracts separately.
+   STR-0 originally snapshotted 20 unique literal artifact schema IDs; its
+   current guard snapshots 21 after the Agent result envelope was added and
+   hashes the full command registry/catalog contracts separately.
 
 Result: every observed hotspot is either assigned to a packet or explicitly
 frozen with a trigger; every use case has preservation evidence; the next Agent

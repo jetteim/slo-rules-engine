@@ -107,11 +107,14 @@ module SloRulesEngine
         abort_usage('missing --observations-per-second') unless observations_per_second
         abort_usage('missing --failed-observations-to-alert') unless failed_observations_to_alert
 
-        recommendation = SloRulesEngine::RealityCheck::CalculationBasisAdvisor.new.recommend(
-          observations_per_second: observations_per_second,
-          failed_observations_to_alert: failed_observations_to_alert
+        result = SloRulesEngine::Application::RecommendCalculationBasis.new.call(
+          {
+            'observations_per_second' => observations_per_second,
+            'failed_observations_to_alert' => failed_observations_to_alert
+          },
+          context: application_context
         )
-        puts JSON.pretty_generate(recommendation.to_h)
+        puts JSON.pretty_generate(result.value)
       end
 
       def reality_check(argv)

@@ -241,8 +241,11 @@ and article revalidation live in
   JSON/file/stdin invocation path and versioned result/error envelopes.
   Offline bounded `agent catalog`, exact `agent describe`, JSON-only
   introspection errors, and strict resolved request schemas for all 40 current
-  registry commands are complete. Raw JSON/file/stdin invocation and result
-  envelopes remain open.
+  registry commands are complete. Strict inline JSON, workspace-file, and stdin
+  invocation plus deterministic result/error envelopes are complete for
+  `providers.list`, `integrations.list`, and
+  `recommend-calculation-basis`; file-reading, provider-read, and write-capable
+  commands remain gated.
 - [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz
   coverage, and zero-I/O `validate_only` for every write-capable command.
 - [ ] **AICLI-F4:** add schema-checked field masks, declared limits/cursors,
@@ -292,7 +295,9 @@ and revalidation are in
   its existing collaborators without changing public constants.
 - [ ] **STR-3:** replace parallel command metadata with bounded-context contract
   declarations and introduce typed application commands before Agent invocation
-  expands.
+  expands. The catalog command family now uses single explicit declarations,
+  and three zero-I/O Human/Agent commands share typed application commands;
+  remaining families are open.
 - [ ] **STR-4:** split provider-state journal/approved-plan classes by existing
   boundaries and invert the provider-state to release default dependency.
 - [ ] **STR-5:** split release verification/application by workflow phase and

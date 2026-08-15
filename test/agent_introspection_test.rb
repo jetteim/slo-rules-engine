@@ -21,7 +21,8 @@ class AgentIntrospectionTest < Minitest::Test
     refute_nil first.dig('page', 'next_cursor')
     first.fetch('commands').each do |entry|
       assert_equal %w[
-        agent_cli_json human_cli id io mcp output safety_gates schemas side_effect version
+        agent_cli_json human_cli id io mcp output request_schema_source
+        safety_gates schemas side_effect structured_invocation version
       ], entry.keys.sort
       assert_equal entry.fetch('id'), entry.dig('agent_cli_json', 'command_id')
     end

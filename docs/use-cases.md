@@ -1200,9 +1200,11 @@ security, and promotion gates are in
 
 **Delivery status:** partially implemented. AICLI-F1 provides the shared
 registry/catalog, and the first AICLI-F2 slice provides offline `agent catalog`
-and `agent describe` with strict resolved request schemas. Structured `agent
-invoke`, result envelopes, projections, validation-only, skills, and MCP remain
-planned.
+and `agent describe` with strict resolved request schemas. The current AICLI-F2
+slice adds strict JSON/file/stdin invocation and versioned result/error
+envelopes for the three zero-I/O commands `providers.list`,
+`integrations.list`, and `recommend-calculation-basis`. Remaining command
+invocation, projections, validation-only, skills, and MCP remain planned.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
@@ -1222,7 +1224,21 @@ boundaries still match the reviewed baseline before changing either interface:
 scripts/structure-report --check
 ```
 
-Planned structured invocation:
+Implemented zero-I/O structured invocation:
+
+```bash
+bin/rules-ctl agent invoke providers.list \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"providers.list","command_version":1,"arguments":{}}'
+
+bin/rules-ctl agent invoke integrations.list \
+  --json-file=./work/requests/list-integrations.json
+
+printf '%s' '{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"recommend-calculation-basis","command_version":1,"arguments":{"observations_per_second":1,"failed_observations_to_alert":5}}' | \
+  bin/rules-ctl agent invoke recommend-calculation-basis --stdin
+```
+
+Planned file-reading and write-capable invocation after the relevant safety
+gates:
 
 ```bash
 bin/rules-ctl agent invoke bundle.verify \
@@ -1266,10 +1282,12 @@ provider reads/writes, credential categories, safety gates, output policy, and
 MCP eligibility. It reads no definition, manifest, environment credential, or
 backend state.
 
-The request file carries the complete versioned rules-engine command request,
-including the applied bundle path, verified output path, workspace root, and
-`validate_only`, plan, or execute mode where the command supports them. It does
-not carry provider credentials or arbitrary provider mutation payloads.
+The implemented request carries the complete versioned rules-engine command
+request and no credentials. A JSON request file must resolve inside the current
+workspace. File-reading, output-path, provider-read, and write-capable commands
+remain non-executable through `agent invoke` until their AICLI-F3 validation and
+zero-I/O safety gates exist; arbitrary provider mutation payloads remain
+unsupported.
 
 **What to expect:**
 
@@ -1289,6 +1307,24 @@ not carry provider credentials or arbitrary provider mutation payloads.
   prose to stderr, and exits one.
 - Catalog/describe output is deterministic, contains no timestamp or runtime
   secret values, and performs no filesystem or provider I/O.
+- Catalog entries expose `structured_invocation`; it is currently true only
+  for `providers.list`, `integrations.list`, and
+  `recommend-calculation-basis`.
+- Each implemented invocation prints one
+  `slo-rules-engine/agent-command-result/v1` object containing a deterministic
+  request ID, command ID/version, `outcome: succeeded`, declared/exercised
+  side-effect evidence, the Human-equivalent `result`, findings, artifact
+  references, and explicit non-truncation state. It writes nothing and performs
+  no provider call.
+- Inline JSON, a workspace-contained JSON file, and stdin are mutually
+  exclusive. Explicit `--format=json` overrides `RULES_CTL_OUTPUT_FORMAT`; JSON
+  is the default, while unsupported formats fail closed.
+- Malformed JSON, unknown fields, command/version mismatch, multiple or missing
+  request sources, an out-of-workspace request file, an unknown command, or a
+  registered but gated command prints one versioned JSON error to stdout,
+  writes no result data to stderr, and exits one. Gated commands use
+  `agent_command_not_executable` before their application handler or provider
+  client runs.
 - `scripts/structure-report --check` prints a compact success summary with the
   production-file, command, unique schema, and use-case counts. It exits
   nonzero with deterministic JSON evidence when a boundary gains an
@@ -1297,14 +1333,9 @@ not carry provider credentials or arbitrary provider mutation payloads.
 
 **What to expect after the remaining Agent slices:**
 
-- `agent invoke` prints one versioned
-  `slo-rules-engine/agent-command-result/v1` JSON envelope on success or one
-  versioned JSON error envelope on failure. It never replaces result data with
-  prose usage text.
-- Inline JSON, JSON file, and stdin forms are mutually exclusive and normalize
-  to the same request as the Human CLI convenience form. Equivalence tests
-  prove the same domain result, provider reads/writes, refusal codes, and
-  persisted artifacts.
+- File-reading, reporting, and one read-only state-planning vertical slice will
+  normalize to typed application commands next. Equivalence tests will then
+  cover their domain result, declared reads, refusal codes, and artifacts.
 - Unknown fields, invalid field masks, path traversal or symlink escape,
   prohibited control characters, unsafe/pre-encoded identifiers, invalid URLs,
   excessive depth/size, and credential-like request keys fail before handlers
@@ -1331,8 +1362,9 @@ not carry provider credentials or arbitrary provider mutation payloads.
 Raw structured requests express rules-engine commands; neutral reliability
 intent, review evidence, provider validation, freshness, ownership, exact-plan,
 confirmation, journal, and verification requirements remain unchanged. Until
-`agent invoke` is implemented, agents may use catalog/describe for discovery
-but must execute engineering tasks through the documented Human CLI.
+an entry advertises `structured_invocation: true`, agents must use
+catalog/describe for discovery and execute that engineering task through the
+documented Human CLI.
 
 ## CLI Execution Boundary
 

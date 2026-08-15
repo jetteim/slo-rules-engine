@@ -78,7 +78,7 @@ class ArchitectureFitnessTest < Minitest::Test
 
     assert evaluation.fetch(:valid), JSON.pretty_generate(evaluation)
     assert_equal 40, evaluation.dig(:actual, :command_ids).length
-    assert_equal 20, evaluation.dig(:actual, :schema_ids).length
+    assert_equal 21, evaluation.dig(:actual, :schema_ids).length
     assert_equal 19, evaluation.dig(:actual, :use_cases).length
   end
 
@@ -88,8 +88,8 @@ class ArchitectureFitnessTest < Minitest::Test
 
     assert_equal JSON.generate(first), JSON.generate(second)
     assert_equal 'structure-report/v1', first.fetch(:schema_version)
-    assert_equal 82, first.dig(:production, :file_count)
-    assert_equal 63, first.dig(:composition, :root_require_count)
+    assert_equal 86, first.dig(:production, :file_count)
+    assert_equal 64, first.dig(:composition, :root_require_count)
     assert_equal 11, first.dig(:commands, :module_count)
     assert_equal 120, first.dig(:schema_contracts, :command_ref_count)
     assert first.dig(:boundaries, :valid)

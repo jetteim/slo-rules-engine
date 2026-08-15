@@ -31,16 +31,27 @@ Use the toolkit to:
   sandbox before relying on live provider behavior
 - inspect the current Human/Agent command contract and strict request schema
   offline before an agent constructs a request
+- invoke provider listing, integration listing, and calculation-basis
+  recommendation through strict Agent JSON/file/stdin requests with versioned
+  result/error envelopes and zero local/provider I/O
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
 Phase 14 now has a validated 40-command catalog and registry. It pairs each
 Human CLI example with an Agent CLI JSON request, owns Human command dispatch,
 and exposes bounded offline `agent catalog` plus exact `agent describe`
-introspection with a strict resolved request schema for every command. The
+introspection with a strict resolved request schema for every command. Strict
+`agent invoke` is implemented for `providers.list`, `integrations.list`, and
+`recommend-calculation-basis`, accepting exactly one inline JSON, workspace
+JSON file, or stdin request and returning versioned deterministic JSON. The
 [Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the remaining
-structured invocation, result envelopes, input hardening, bounded and sanitized
-output, versioned agent skill, and later MCP projection.
+command expansion, input hardening, bounded and sanitized output, versioned
+agent skill, and later MCP projection.
+
+```bash
+bin/rules-ctl agent invoke providers.list \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"providers.list","command_version":1,"arguments":{}}'
+```
 
 The repository-wide [Project Structure Refactoring Plan](docs/housekeeping/project-structure-refactoring-plan.md)
 records the measured dependency cycles and responsibility hotspots, maps all 19

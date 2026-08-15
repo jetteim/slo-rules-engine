@@ -8,8 +8,9 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Resume AICLI-F2 structured Agent invocation through the STR-3 typed
-   application-command seam
+1. Expand AICLI-F2 from the zero-I/O Agent invocation baseline into validated
+   file-reading/reporting and one read-only state-planning slice through STR-3
+   and the applicable AICLI-F3 input-safety gates
 2. Continue STR-1 through STR-7 only through their named preservation and
    dependency-removal gates
 3. Production-grade Datadog reconciliation only when isolated backend evidence
@@ -54,8 +55,8 @@ missing sources, and source drift.
 
 Current architecture-fitness status: STR-0 is complete without production-code
 changes. `scripts/structure-report` deterministically inventories the current
-82 production/executable files, 63 root requires, 40 registered commands, 11
-command modules, 20 unique literal artifact schema IDs, all 120 per-command
+86 production/executable files, 64 root requires, 40 registered commands, 11
+command modules, 21 unique literal artifact schema IDs, all 120 per-command
 schema references, 19 engineering use cases, and
 the current hotspot set. `config/architecture_dependencies.json` assigns every
 production file to exactly one boundary and allowlists every current forbidden
@@ -179,16 +180,23 @@ dependency debt, hotspot evidence, target direction, and eight execution
 packets live in
 `docs/housekeeping/project-structure-refactoring-plan.md`.
 
-Current agent-interface status: AICLI-F1 and the AICLI-F2 runtime introspection
-slice are implemented. A validated immutable registry covers all 40 current
-commands and drives Human top-level and grouped subcommand dispatch. The separate
+Current agent-interface status: AICLI-F1, AICLI-F2 runtime introspection, and
+the first executable AICLI-F2 vertical slice are implemented. A validated
+immutable registry covers all 40 current commands and drives Human top-level
+and grouped subcommand dispatch. The separate
 `slo-rules-engine/cli-command-catalog/v1` entity pairs each executable Human CLI
 example with a versioned Agent JSON request. Bounded offline `agent catalog`
 and exact `agent describe` expose strict resolved request schemas and complete
-side-effect/I/O/safety metadata with JSON-only errors. Missing/duplicate
-metadata fails closed, and current Human behavior remains characterized.
-Structured invocation, normalized result envelopes, input hardening,
-bounded/sanitized output, versioned skill, and MCP adapter remain planned.
+side-effect/I/O/safety metadata with JSON-only errors. Strict inline JSON,
+workspace-file, and stdin invocation now shares typed application commands with
+the Human CLI for `providers.list`, `integrations.list`, and
+`recommend-calculation-basis`. Success returns deterministic
+`slo-rules-engine/agent-command-result/v1`; malformed, ambiguous, unknown,
+out-of-workspace, unsupported, or gated requests return JSON-only errors before
+an application handler or provider client runs. Missing/duplicate metadata
+fails closed, and current Human behavior remains characterized. Remaining
+command invocation, broader input hardening, bounded/sanitized output,
+versioned skill, and MCP adapter remain planned.
 
 ## Non-Negotiable Working Rules
 
@@ -200,9 +208,9 @@ bounded/sanitized output, versioned skill, and MCP adapter remain planned.
 - Keep `README.md` and `docs/use-cases.md` current whenever command scope, provider output, workflow behavior, or safety boundaries change; rewrite usage around engineering tasks instead of appending to a stale command catalog.
 - Every CLI change must update both the Human CLI and Agent CLI sub-interfaces,
   their shared registry/schema metadata, equivalence tests, runtime
-  introspection, and usage in the same checkpoint. Until the Agent CLI ships,
-  update its target mapping and parity inventory; once MCP ships, update its
-  generated projection as well.
+  introspection, and usage in the same checkpoint. For commands not yet enabled
+  through structured invocation, update the target mapping and parity
+  inventory; once MCP ships, update its generated projection as well.
 
 ## Current State Summary
 
@@ -318,16 +326,29 @@ Implemented by the latest feature slices:
 - AICLI-F2 runtime introspection now provides bounded deterministic offline
   catalog pagination, exact command descriptions, strict resolved request
   schemas for all 40 commands, and stable JSON-only introspection errors
-- A repository-wide structure audit now maps all 19 use cases, 40 commands, 22
-  versioned production schema identifiers, dependency cycles, duplicated
+- AICLI-F2 structured invocation now accepts exactly one complete inline JSON,
+  workspace-file, or stdin request for three zero-I/O commands, validates it
+  against the registered strict schema, applies explicit/environment/default
+  JSON format precedence, and returns deterministic result/error envelopes
+- Human and Agent provider listing, integration listing, and calculation-basis
+  recommendation now share typed application commands that return values
+  without printing or exiting; all other registered commands fail with
+  `agent_command_not_executable` before their handlers run
+- The STR-3 catalog contract family now authors `providers.list`,
+  `integrations.list`, and `generate-routes` once with Human usage, Agent
+  examples, and explicit request schemas; remaining families retain the
+  compatibility assembly
+- A repository-wide structure audit maps all 19 use cases, 40 commands, the
+  original 20 literal versioned production schema identifiers, dependency cycles, duplicated
   artifact policy, responsibility hotspots, freeze zones, and eight reversible
   STR packets with packet-specific verification and rollback gates
 - Phase 14 now has an article-derived, revalidated roadmap for a shared command
   registry, feature-parity Human/Agent CLI adapters, strict structured
   requests, runtime schema introspection, bounded/sanitized output,
   adversarial input validation, zero-I/O validation, agent skill distribution,
-  headless credentials, and later MCP projection; runtime introspection is now
-  implemented while structured invocation and later capabilities remain open
+  headless credentials, and later MCP projection; runtime introspection and the
+  first zero-I/O invocation slice are implemented while broader invocation and
+  later capabilities remain open
 - Prometheus Stack generation now emits one non-duplicated base observation recording rule per SLI instance
 - Neutral SLO intent now carries a validated evaluation window with a `30d`
   compatibility default, and generated onboarding drafts expose it explicitly
@@ -540,7 +561,10 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: STR-0 deterministic architecture fitness, exact
+- latest checkpoint: strict zero-I/O Agent JSON/file/stdin invocation with
+  deterministic envelopes, typed Human/Agent application commands, and the
+  first single-declaration STR-3 command family
+- previous checkpoint: STR-0 deterministic architecture fitness, exact
   dependency-debt allowlisting, contract snapshots, and complete
   registry-derived command-module ownership
 - previous checkpoint: evidence-based whole-project structure refactoring plan
@@ -642,17 +666,20 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Complete AICLI-F2 with the first strict raw JSON/file/stdin Agent CLI
-   invocation and versioned result/error envelopes from the implemented
-   40-command registry/catalog/introspection foundation through STR-3
-2. Run the Datadog sandbox probes and resume live provider-contract work only
+1. Expand AICLI-F2 to file-reading validation/reporting and one read-only
+   state-planning command only after shared read-path, control-character,
+   resource-bound, and URL/identifier validation exists through AICLI-F3
+2. Continue STR-3 one command family at a time until every command owns its
+   Human usage, Agent example, explicit schema, side effects, I/O, safety,
+   contract references, and MCP metadata in one declaration
+3. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
-3. Extend exact approval/apply/resume to Datadog only after verified backend
+4. Extend exact approval/apply/resume to Datadog only after verified backend
    recheck and idempotency semantics exist
-4. Revalidate Sloth MCP against a tagged official binary and real Prometheus
+5. Revalidate Sloth MCP against a tagged official binary and real Prometheus
    data only after a release contains the MCP surface; do not promote status
    while observations, exact record identity, and equivalent freshness are absent
-5. Add automatic rollback execution only after a reviewed compensating-plan
+6. Add automatic rollback execution only after a reviewed compensating-plan
    contract exists; current exact failures provide manual guidance
 
 Secondary gaps:
@@ -667,8 +694,11 @@ Secondary gaps:
 
 Next recommended slice:
 
-- resume the first strict Agent invocation vertically through STR-3; do
-  not reconstruct Human `argv` in the Agent adapter
+- add shared AICLI-F3 validation for Agent-facing read paths and bounded request
+  fields, then enable typed `validate`, `migration-report`, and `model-report`
+  application commands plus one read-only state-planning command
+- migrate the affected command families to explicit STR-3 declarations in the
+  same slice; do not reconstruct Human `argv` in the Agent adapter
 
 Rationale:
 
@@ -680,7 +710,10 @@ Rationale:
 - remaining Sloth work is externally gated on a tagged MCP release and additional
   upstream status evidence, not an unfinished engine feature
 - AICLI-F2 now has a complete 40-command registry/catalog/introspection
-  foundation and can add invocation without losing parity
+  foundation plus a proven three-command invocation/envelope path
+- file-reading and provider-read expansion now needs shared path and input
+  validation; local writes and provider mutation remain correctly gated on the
+  rest of AICLI-F3
 - STR-0 now prevents new cross-layer debt and locks the current command, schema,
   use-case, boundary, and command-module inventories before feature growth
 - the refactoring plan revalidated every hotspot against all 19 use cases and
@@ -694,30 +727,28 @@ Prepared on 2026-08-15 for a restart-and-`proceed` workflow.
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `chore: enforce architecture fitness baseline`
-- previous pushed checkpoint: `dd18de4 docs: plan project structure refactoring`
+- latest pushed checkpoint: `feat: add strict agent invocation`
+- previous pushed checkpoint: `02a7bf5 chore: enforce architecture fitness baseline`
 - expected startup state: `git status --short --branch` should show clean
-  `main...origin/main`
 - last full verification before handoff:
   `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh` exited 0 with
   `verification ok`
 
 Verification evidence:
 
-- target: STR-0 architecture fitness and preservation baseline without runtime
-  behavior changes
+- target: strict zero-I/O Agent invocation and first STR-3 typed application
+  command/explicit contract-family slice
 - command: `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh`
 - recorded date: `2026-08-15`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 495 tests, 6,609 assertions, 0 failures,
+- result: exit 0, `verification ok`, 503 tests, 6,871 assertions, 0 failures,
   0 errors, 0 skips
-- focused result: architecture fitness passed with 5 tests and 26 assertions;
-  registry-derived CLI ownership passed with 2 tests and 113 assertions;
-  project refactoring plan passed with 3 tests and 110 assertions; use-case
-  documentation passed with 3 tests and 226 assertions; all had zero failures,
-  errors, and skips
-- structural evidence: `scripts/structure-report --check` passed with 82
-  production files, 40 commands, 20 unique literal artifact schemas, 120
+- focused result: Agent invocation passed with 7 tests and 113 assertions;
+  registry/contracts passed with 7 tests and 2,642 assertions; introspection
+  passed with 5 tests and 378 assertions; architecture fitness passed with 5
+  tests and 26 assertions; all had zero failures, errors, and skips
+- structural evidence: `scripts/structure-report --check` passed with 86
+  production files, 40 commands, 21 unique literal artifact schemas, 120
   per-command schema references, 19 use cases, complete
   single-boundary file ownership, and exact dependency-debt references
 - parity evidence: SHA-256 snapshots cover the full registry and Human/Agent
@@ -728,19 +759,20 @@ Verification evidence:
   4.0.1. No runtime compatibility code was changed in this implementation slice.
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
-- offline verification: subprocess catalog/describe ran without source files,
-  backend configuration, or credentials; catalog pagination returned explicit
-  limits/counts/truncation/cursors and description exposed no runtime endpoint
-  or environment contents
+- offline verification: subprocess catalog/describe and stdin invocation ran
+  without source files, backend configuration, or credentials; inline and
+  workspace-file invocation matched Human results; invalid requests remained
+  JSON-only and gated commands did not reach application/provider handlers
 - live verification: no tagged Sloth binary contains MCP, so a full comparison
   against a released server and real Prometheus data could not be run. Latest
   observed release `v0.16.0` is intentionally rejected. Datadog live testing
   remains postponed.
-- blast radius: architecture policy/contract JSON, development-only reporting,
-  tests, verification wiring, and documentation. No production code, CLI
-  behavior, provider artifact, provider I/O, mutation, or runtime dependency
-  changed.
-- rollback path: revert `chore: enforce architecture fitness baseline`
+- blast radius: Agent CLI parsing/validation/envelopes, three zero-I/O typed
+  application commands, one explicit command-contract family, architecture
+  snapshots, tests, and usage. Existing Human output remains compatible; no
+  provider artifact, provider read/write, mutation, or external dependency was
+  added.
+- rollback path: revert `feat: add strict agent invocation`
 
 When the user types `proceed` in a fresh session:
 
@@ -750,8 +782,9 @@ When the user types `proceed` in a fresh session:
    complete, so preserve its checks while implementing the next vertical slice.
 4. Treat the supported Sloth engine boundary as complete; do not invent more
    provider work while the tagged MCP release and status-parity fields are absent.
-5. Resume AICLI-F2 through STR-3; do not reconstruct Human `argv` inside the
-   Agent adapter.
+5. Extend AICLI-F2 only after adding the AICLI-F3 validation required by the
+   next command's read/URL/path fields; do not reconstruct Human `argv` inside
+   the Agent adapter.
 6. Preserve the completed AICLI-F1 registry/catalog parity and update both the
    Human CLI usage and target Agent JSON mapping for every CLI change.
 7. Keep the official Sloth MCP runtime comparison-only and do not claim status
@@ -770,6 +803,7 @@ Use these before claiming a checkpoint:
 ruby -Ilib test/project_refactoring_plan_test.rb
 ruby -Ilib test/architecture_fitness_test.rb
 ruby -Ilib test/agent_introspection_test.rb
+ruby -Ilib test/agent_invocation_test.rb
 ruby -Ilib test/agent_interface_roadmap_test.rb
 ruby -Ilib test/cli_command_registry_test.rb
 ruby -Ilib test/sloth_mcp_client_test.rb
@@ -823,15 +857,17 @@ If a new session needs to resume quickly:
 4. Read the latest 5-10 commits on `main`
 5. Read `docs/housekeeping/project-structure-refactoring-plan.md`, then read
    `docs/agent-interface-roadmap.md` for the completed AICLI-F1 and
-   AICLI-F2 introspection boundaries plus deferred invocation contract
+   AICLI-F2 introspection and initial invocation boundaries plus remaining
+   command gates
 6. Inspect `lib/slo_rules_engine/cli/command_registry.rb`,
    `lib/slo_rules_engine/cli/agent_introspection.rb`, and
-   `test/agent_introspection_test.rb` before changing any CLI surface
+   `lib/slo_rules_engine/cli/agent_invocation.rb`, plus
+   `test/agent_invocation_test.rb` before changing any CLI surface
 7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
-8. If the user says `proceed`, resume AICLI-F2 structured invocation through
-   STR-3; the supported Sloth
+8. If the user says `proceed`, add read-path input safety and expand AICLI-F2
+   through typed STR-3 application commands; the supported Sloth
    comparison boundary is implemented and a tagged-runtime parity test is
    externally gated
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not

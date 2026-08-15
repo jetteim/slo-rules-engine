@@ -11,15 +11,8 @@ module SloRulesEngine
       end
 
       def providers_list(_argv)
-        providers = SloRulesEngine.default_provider_registry.list.map do |provider|
-          {
-            key: provider.key,
-            capabilities: provider.capabilities,
-            automation_mode: provider.automation_mode,
-            state_actions: provider.state_actions
-          }
-        end
-        puts JSON.pretty_generate(providers)
+        result = SloRulesEngine::Application::ListProviders.new.call({}, context: application_context)
+        puts JSON.pretty_generate(result.value)
       end
 
       def integrations(argv)
@@ -27,10 +20,8 @@ module SloRulesEngine
       end
 
       def integrations_list(_argv)
-        integrations = SloRulesEngine.default_integration_registry.list.map do |integration|
-          { key: integration.key, capabilities: integration.capabilities }
-        end
-        puts JSON.pretty_generate(integrations)
+        result = SloRulesEngine::Application::ListIntegrations.new.call({}, context: application_context)
+        puts JSON.pretty_generate(result.value)
       end
 
       def generate_routes(argv)

@@ -8,8 +8,8 @@ module SloRulesEngine
 
       module_function
 
-      def request(id:, version:, ref:, example:)
-        argument_properties = example.each_with_object({}) do |(name, value), properties|
+      def request(id:, version:, ref:, example:, argument_properties: nil, explicit_required_arguments: nil)
+        argument_properties ||= example.each_with_object({}) do |(name, value), properties|
           properties[name.to_sym] = property_schema(name, value)
         end
         argument_properties.merge!(introspection_properties(id))
@@ -27,7 +27,7 @@ module SloRulesEngine
             arguments: {
               type: 'object',
               additionalProperties: false,
-              required: required_arguments(id, example),
+              required: explicit_required_arguments || required_arguments(id, example),
               properties: argument_properties
             }
           }

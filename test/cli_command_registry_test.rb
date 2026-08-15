@@ -64,14 +64,28 @@ class CliCommandRegistryTest < Minitest::Test
       assert_kind_of Symbol, definition.adapter
       assert_kind_of Symbol, definition.handler
       assert_equal definition.id, definition.agent.fetch(:command_id)
-      expected_agent_status = definition.id.start_with?('agent.') ? 'implemented' : 'planned'
+      executable_agent_commands = %w[
+        agent.catalog
+        agent.describe
+        providers.list
+        integrations.list
+        recommend-calculation-basis
+      ]
+      expected_agent_status = executable_agent_commands.include?(definition.id) ? 'implemented' : 'planned'
       assert_equal expected_agent_status, definition.agent.fetch(:status)
+      application_command = definition.agent.fetch(:application_command)
+      if %w[providers.list integrations.list recommend-calculation-basis].include?(definition.id)
+        assert_match(/\ASloRulesEngine::Application::/, application_command)
+      else
+        assert_nil application_command
+      end
       request_example = definition.agent.fetch(:request_example)
       assert_equal 'slo-rules-engine/agent-command-request/v1', request_example.fetch(:schema_version)
       assert_equal definition.id, request_example.fetch(:command_id)
       assert_equal definition.version, request_example.fetch(:command_version)
       assert_kind_of Hash, request_example.fetch(:arguments)
       assert_kind_of Hash, definition.request_schema
+      assert_includes %w[explicit inferred], definition.request_schema_source
       assert_equal false, definition.request_schema.fetch(:additionalProperties)
       assert_equal 'planned', definition.mcp.fetch(:status)
       assert_includes [true, false], definition.mcp.fetch(:eligible)
@@ -211,6 +225,17 @@ class CliCommandRegistryTest < Minitest::Test
     apply = catalog.fetch(:commands).find { |entry| entry.fetch(:id) == 'apply' }
     assert_equal 'plan', apply.fetch(:agent_cli_json).fetch(:arguments).fetch(:mode)
     assert_equal './manifest.json', apply.fetch(:agent_cli_json).fetch(:arguments).fetch(:manifest_file)
+  end
+
+  def test_catalog_family_is_authored_once_with_explicit_request_schemas
+    definitions = SloRulesEngine::CLI::CommandContracts::Catalog.definitions
+
+    assert_equal %w[providers.list integrations.list generate-routes], definitions.map(&:id)
+    definitions.each { |definition| assert_equal 'explicit', definition.request_schema_source }
+    definitions.each do |definition|
+      refute SloRulesEngine::CLI::CommandCatalog::HUMAN_USAGE.key?(definition.id)
+      refute SloRulesEngine::CLI::CommandCatalog::AGENT_ARGUMENT_EXAMPLES.key?(definition.id)
+    end
   end
 
   def test_invalid_or_duplicate_metadata_fails_closed

@@ -13,6 +13,7 @@
         "telemetry_onboarding",
         "provider_translation",
         "provider_state",
+        "application_commands",
         "artifact_review",
         "release_bundle",
         "live_status",
@@ -32,6 +33,7 @@
         "telemetry_onboarding",
         "provider_translation",
         "provider_state",
+        "application_commands",
         "artifact_review",
         "release_bundle",
         "live_status",
@@ -95,6 +97,18 @@
         "neutral_intent",
         "provider_translation",
         "artifact_review"
+      ]
+    },
+    {
+      "id": "application_commands",
+      "description": "Typed application commands shared by Human and Agent adapters.",
+      "paths": [
+        "lib/slo_rules_engine/application/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "telemetry_onboarding",
+        "provider_translation"
       ]
     },
     {

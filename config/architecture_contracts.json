@@ -42,13 +42,14 @@
     "migration-report",
     "model-report"
   ],
-  "command_registry_sha256": "066bb87eedc4f9632a53ddd4264d0009d2526c10939aaa62365e34897c7abcc6",
-  "command_catalog_sha256": "c411ec2a7a78fe94d73fb3e2983301f95cef5a2d2004f581378f452df595aab7",
+  "command_registry_sha256": "b474954009e84f6309db337961ba7e7be2e5767866c977042764f08e285911dd",
+  "command_catalog_sha256": "e0dae5a448bb1465ca063ad1fe8170054550c7da1cf2cf2eb1f5cedc00372ebd",
   "schema_ids": [
     "slo-rules-engine/agent-command-catalog/v1",
     "slo-rules-engine/agent-command-description/v1",
     "slo-rules-engine/agent-command-error/v1",
     "slo-rules-engine/agent-command-request/v1",
+    "slo-rules-engine/agent-command-result/v1",
     "slo-rules-engine/alertmanager-route-intent/v1",
     "slo-rules-engine/approved-provider-plan/v1",
     "slo-rules-engine/bundle-target-execution/v1",
@@ -235,6 +236,7 @@
       "tests": [
         "test/cli_command_registry_test.rb",
         "test/agent_introspection_test.rb",
+        "test/agent_invocation_test.rb",
         "test/agent_interface_roadmap_test.rb",
         "test/rules_ctl_test.rb"
       ]
