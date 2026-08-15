@@ -1215,6 +1215,13 @@ bin/rules-ctl agent catalog --format=json
 bin/rules-ctl agent describe bundle.verify --format=json
 ```
 
+Maintainers can verify that the registered Human/Agent contract and structural
+boundaries still match the reviewed baseline before changing either interface:
+
+```bash
+scripts/structure-report --check
+```
+
 Planned structured invocation:
 
 ```bash
@@ -1282,6 +1289,11 @@ not carry provider credentials or arbitrary provider mutation payloads.
   prose to stderr, and exits one.
 - Catalog/describe output is deterministic, contains no timestamp or runtime
   secret values, and performs no filesystem or provider I/O.
+- `scripts/structure-report --check` prints a compact success summary with the
+  production-file, command, unique schema, and use-case counts. It exits
+  nonzero with deterministic JSON evidence when a boundary gains an
+  unapproved dependency, a file loses ownership, a command contract changes,
+  or a documented use case loses its mapped tests.
 
 **What to expect after the remaining Agent slices:**
 

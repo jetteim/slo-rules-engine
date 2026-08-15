@@ -1,0 +1,243 @@
+{
+  "schema_version": "architecture-contracts/v1",
+  "command_ids": [
+    "validate",
+    "validate-handoff",
+    "generate",
+    "manifest-review",
+    "apply",
+    "diff",
+    "import",
+    "prune",
+    "status",
+    "sloth-evidence.capture",
+    "sloth-evidence.status",
+    "sloth-mcp.compare",
+    "agent.catalog",
+    "agent.describe",
+    "bundle.create",
+    "bundle.plan",
+    "bundle.apply",
+    "bundle.verify",
+    "bundle.status",
+    "journal.create",
+    "journal.status",
+    "plan.approve",
+    "plan.status",
+    "plan.apply",
+    "plan.resume",
+    "lookup-telemetry",
+    "discover-telemetry",
+    "providers.list",
+    "integrations.list",
+    "generate-routes",
+    "candidates",
+    "draft-definition",
+    "draft-from-handoff",
+    "onboarding-summary",
+    "onboarding-artifact-index",
+    "review-handoff",
+    "recommend-calculation-basis",
+    "reality-check",
+    "migration-report",
+    "model-report"
+  ],
+  "command_registry_sha256": "066bb87eedc4f9632a53ddd4264d0009d2526c10939aaa62365e34897c7abcc6",
+  "command_catalog_sha256": "c411ec2a7a78fe94d73fb3e2983301f95cef5a2d2004f581378f452df595aab7",
+  "schema_ids": [
+    "slo-rules-engine/agent-command-catalog/v1",
+    "slo-rules-engine/agent-command-description/v1",
+    "slo-rules-engine/agent-command-error/v1",
+    "slo-rules-engine/agent-command-request/v1",
+    "slo-rules-engine/alertmanager-route-intent/v1",
+    "slo-rules-engine/approved-provider-plan/v1",
+    "slo-rules-engine/bundle-target-execution/v1",
+    "slo-rules-engine/bundle-target-verification/v1",
+    "slo-rules-engine/cli-command-catalog/v1",
+    "slo-rules-engine/cli-command-registry/v1",
+    "slo-rules-engine/datadog-sandbox-smoke/v1",
+    "slo-rules-engine/live-slo-status-aggregate/v1",
+    "slo-rules-engine/live-slo-status/v1",
+    "slo-rules-engine/live-status-portfolio/v1",
+    "slo-rules-engine/provider-operation-journal/v1",
+    "slo-rules-engine/provider-state/v1",
+    "slo-rules-engine/release-bundle/v1",
+    "slo-rules-engine/sloth-downstream-evidence-status/v1",
+    "slo-rules-engine/sloth-downstream-evidence/v1",
+    "slo-rules-engine/sloth-mcp-comparison/v1"
+  ],
+  "use_cases": [
+    {
+      "id": "UC-01",
+      "title": "Find Candidate SLOs In Existing Telemetry",
+      "tests": [
+        "test/telemetry_lookup_test.rb",
+        "test/cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-02",
+      "title": "Build A Portfolio Onboarding Queue",
+      "tests": [
+        "test/telemetry_batch_discovery_test.rb",
+        "test/onboarding_summary_test.rb",
+        "test/onboarding_handoff_test.rb",
+        "test/onboarding_artifact_index_test.rb",
+        "test/telemetry_first_walkthrough_test.rb"
+      ]
+    },
+    {
+      "id": "UC-03",
+      "title": "Discover With One Provider And Deliver Through Another",
+      "tests": [
+        "test/provider_bindings_test.rb",
+        "test/providers_test.rb",
+        "test/reality_check_test.rb"
+      ]
+    },
+    {
+      "id": "UC-04",
+      "title": "Generate A Complete Provider Delivery Bundle",
+      "tests": [
+        "test/providers_test.rb",
+        "test/prometheus_stack_provider_test.rb",
+        "test/manifest_schema_test.rb",
+        "test/manifest_review_queue_test.rb"
+      ]
+    },
+    {
+      "id": "UC-05",
+      "title": "Package A Reviewed Multi-Provider Release",
+      "tests": [
+        "test/release_bundle_test.rb",
+        "test/release_bundle_cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-06",
+      "title": "Understand Drift Before Applying",
+      "tests": [
+        "test/apply_test.rb",
+        "test/datadog_state_planner_test.rb",
+        "test/cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-07",
+      "title": "Inventory Existing Managed State",
+      "tests": [
+        "test/datadog_state_reader_test.rb",
+        "test/apply_test.rb",
+        "test/cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-08",
+      "title": "Create An Auditable Operation Journal",
+      "tests": [
+        "test/provider_state_journal_test.rb",
+        "test/provider_state_journal_cli_test.rb",
+        "test/provider_state_journal_transition_test.rb"
+      ]
+    },
+    {
+      "id": "UC-09",
+      "title": "Approve And Execute An Exact File-Backed Plan",
+      "tests": [
+        "test/provider_state_approved_plan_test.rb",
+        "test/provider_state_exact_plan_cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-10",
+      "title": "Apply And Verify An Approved Multi-Target File Release",
+      "tests": [
+        "test/release_bundle_apply_test.rb",
+        "test/release_bundle_apply_cli_test.rb",
+        "test/release_bundle_verify_test.rb",
+        "test/release_bundle_verify_cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-11",
+      "title": "Apply Reviewed State",
+      "tests": [
+        "test/apply_test.rb",
+        "test/datadog_execution_cli_test.rb",
+        "test/manifest_bundle_execution_cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-12",
+      "title": "Remove Managed State",
+      "tests": [
+        "test/apply_test.rb",
+        "test/datadog_execution_journal_test.rb",
+        "test/manifest_bundle_execution_journal_test.rb"
+      ]
+    },
+    {
+      "id": "UC-13",
+      "title": "Verify Telemetry Before Production Adoption",
+      "tests": [
+        "test/reality_check_test.rb",
+        "test/telemetry_lookup_test.rb",
+        "test/cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-14",
+      "title": "Generate Contextual Alert Routes",
+      "tests": [
+        "test/providers_test.rb",
+        "test/cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-15",
+      "title": "Validate Datadog Lookup In An Isolated Sandbox",
+      "tests": [
+        "test/datadog_sandbox_smoke_test.rb",
+        "test/datadog_request_transport_test.rb",
+        "test/datadog_state_reader_test.rb"
+      ]
+    },
+    {
+      "id": "UC-16",
+      "title": "Review Sloth Downstream Generated Rules",
+      "tests": [
+        "test/sloth_downstream_evidence_test.rb",
+        "test/sloth_downstream_evidence_cli_test.rb"
+      ]
+    },
+    {
+      "id": "UC-17",
+      "title": "Inspect Live SLO And Error-Budget Status",
+      "tests": [
+        "test/live_status_test.rb",
+        "test/live_status_aggregate_test.rb",
+        "test/live_status_cli_test.rb",
+        "test/sloth_live_status_test.rb"
+      ]
+    },
+    {
+      "id": "UC-18",
+      "title": "Cross-Check Reviewed Sloth State Through Official MCP",
+      "tests": [
+        "test/sloth_mcp_client_test.rb",
+        "test/sloth_mcp_cli_test.rb",
+        "test/sloth_mcp_comparison_test.rb"
+      ]
+    },
+    {
+      "id": "UC-19",
+      "title": "Operate The Reviewed Workflow From An AI Agent",
+      "tests": [
+        "test/cli_command_registry_test.rb",
+        "test/agent_introspection_test.rb",
+        "test/agent_interface_roadmap_test.rb",
+        "test/rules_ctl_test.rb"
+      ]
+    }
+  ]
+}

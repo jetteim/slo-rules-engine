@@ -1,8 +1,8 @@
 # Project Structure Refactoring Plan
 
-Date: 2026-08-14
+Date: 2026-08-15
 
-Status: planned
+Status: active; STR-0 completed
 
 Baseline commit: `6dc0ffb`
 
@@ -64,7 +64,7 @@ sources of truth takes priority.
 | Registered commands | 40 | not applicable | Human/Agent contract baseline |
 | Focused CLI command modules | 11 | 8 | +3 |
 | Root composition dependencies | 63 direct requires | not recorded | flat load graph |
-| Unique versioned schema strings in production | 22 | not recorded | preservation inventory |
+| Unique versioned schema strings in production | 20 | not recorded | preservation inventory |
 | Full verification | 487 tests, 6,423 assertions | 424 tests, 2,766 assertions | green |
 
 Largest production concentration:
@@ -256,7 +256,7 @@ the next AICLI-F2 invocation slice because it is the feature-aligned seam.
 Structural dependency order is STR-1 before STR-2/STR-4, STR-2 and STR-4 before
 STR-5/STR-6, and STR-7 last. Only one packet is active at a time.
 
-### STR-0: Architecture Fitness And Preservation Baseline
+### STR-0: Architecture Fitness And Preservation Baseline (completed 2026-08-15)
 
 **Intent:** stop structural debt from increasing before moving code.
 
@@ -273,6 +273,20 @@ schema IDs remain identical; all 19 use cases map to tests.
 terms, and `./scripts/verify.sh`.
 
 **Rollback:** revert STR-0 only; runtime behavior is untouched.
+
+**Completion evidence:** `scripts/structure-report` now emits the deterministic
+`structure-report/v1` inventory and `scripts/structure-report --check` is part
+of full verification. `config/architecture_dependencies.json` assigns all 82
+production/executable files to one boundary and records each current forbidden
+reference with its removal packet. `config/architecture_contracts.json` locks
+the 40-command registry/catalog digests (including 120 per-command schema
+references), 20 unique literal versioned artifact schema IDs, and
+all 19 use-case-to-test mappings. `test/architecture_fitness_test.rb` enforces
+those contracts, while `test/cli_architecture_test.rb` derives all 11 command
+modules and their registered adapters from the filesystem and registry. No
+production file or runtime behavior changed. The original audit's schema count
+was corrected from 22 to 20 after filename-qualified duplicate occurrences
+were deduplicated.
 
 ### STR-1: Shared Artifact Identity And Safety Kernel
 
@@ -535,6 +549,9 @@ Gaps found and corrected during revalidation:
 7. Stable DSL, Datadog, onboarding, and validation code did not show a safe
    current seam. They are freeze zones with growth triggers rather than
    speculative work.
+8. The initial schema inventory counted repeated occurrences across files.
+   STR-0 now snapshots the 20 unique literal artifact schema IDs and hashes the
+   full command registry/catalog contracts separately.
 
 Result: every observed hotspot is either assigned to a packet or explicitly
 frozen with a trigger; every use case has preservation evidence; the next Agent

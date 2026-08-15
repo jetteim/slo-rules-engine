@@ -5,39 +5,23 @@ require_relative '../lib/slo_rules_engine/cli'
 
 class CliArchitectureTest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
-  COMMAND_MODULES = {
-    SloRulesEngine::CLI::CatalogCommands => %i[providers integrations generate_routes],
-    SloRulesEngine::CLI::BundleCommands => %i[bundle],
-    SloRulesEngine::CLI::JournalCommands => %i[journal],
-    SloRulesEngine::CLI::OnboardingCommands => %i[
-      validate_handoff
-      draft_from_handoff
-      onboarding_summary
-      onboarding_artifact_index
-      review_handoff
-    ],
-    SloRulesEngine::CLI::PlanCommands => %i[plan],
-    SloRulesEngine::CLI::ReportCommands => %i[migration_report model_report],
-    SloRulesEngine::CLI::StatusCommands => %i[status],
-    SloRulesEngine::CLI::SlothEvidenceCommands => %i[sloth_evidence],
-    SloRulesEngine::CLI::TelemetryCommands => %i[
-      lookup_telemetry
-      discover_telemetry
-      candidates
-      draft_definition
-      recommend_calculation_basis
-      reality_check
-    ]
-  }.freeze
 
   def test_rules_ctl_composes_every_command_family_from_the_library_boundary
     ancestors = RulesCtl.singleton_class.ancestors
+    registry = SloRulesEngine::CLI::CommandRegistry.default
+    modules = command_modules
 
-    COMMAND_MODULES.each do |command_module, commands|
+    modules.each do |command_module|
       assert_includes ancestors, command_module
-      commands.each do |command|
-        assert_includes command_module.instance_methods(false), command
+      owned_adapters = registry.definitions.map(&:adapter).uniq.select do |adapter|
+        RulesCtl.method(adapter).owner == command_module
       end
+      refute_empty owned_adapters, "#{command_module} must own a registered command adapter"
+    end
+
+    allowed_owners = modules + [RulesCtl.singleton_class]
+    registry.definitions.map(&:adapter).uniq.each do |adapter|
+      assert_includes allowed_owners, RulesCtl.method(adapter).owner, adapter
     end
     assert_equal File.join(ROOT, 'lib/slo_rules_engine/cli.rb'),
                  RulesCtl.method(:run).source_location.fetch(0)
@@ -50,5 +34,14 @@ class CliArchitectureTest < Minitest::Test
     assert_includes executable, "require_relative '../lib/slo_rules_engine/cli'"
     assert_includes executable, 'RulesCtl.run(ARGV)'
     refute_includes executable, 'module RulesCtl'
+  end
+
+  private
+
+  def command_modules
+    Dir.glob(File.join(ROOT, 'lib/slo_rules_engine/cli/*_commands.rb')).sort.map do |path|
+      constant_name = File.basename(path, '.rb').split('_').map(&:capitalize).join
+      SloRulesEngine::CLI.const_get(constant_name, false)
+    end
   end
 end

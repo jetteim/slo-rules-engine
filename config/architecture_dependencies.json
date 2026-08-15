@@ -1,0 +1,318 @@
+{
+  "schema_version": "architecture-dependencies/v1",
+  "boundaries": [
+    {
+      "id": "composition",
+      "description": "Library composition roots only.",
+      "paths": [
+        "lib/slo_rules_engine.rb",
+        "lib/sre.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "telemetry_onboarding",
+        "provider_translation",
+        "provider_state",
+        "artifact_review",
+        "release_bundle",
+        "live_status",
+        "sloth_runtime"
+      ]
+    },
+    {
+      "id": "interface",
+      "description": "Human and agent CLI parsing, dispatch, schemas, and introspection.",
+      "paths": [
+        "bin/rules-ctl",
+        "lib/slo_rules_engine/cli.rb",
+        "lib/slo_rules_engine/cli/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "telemetry_onboarding",
+        "provider_translation",
+        "provider_state",
+        "artifact_review",
+        "release_bundle",
+        "live_status",
+        "sloth_runtime"
+      ]
+    },
+    {
+      "id": "neutral_intent",
+      "description": "Provider-independent DSL, model, validation, policy, and reliability reasoning.",
+      "paths": [
+        "lib/slo_rules_engine/burn_rate_policy.rb",
+        "lib/slo_rules_engine/dsl.rb",
+        "lib/slo_rules_engine/dsl/**/*.rb",
+        "lib/slo_rules_engine/model.rb",
+        "lib/slo_rules_engine/reliability_model.rb",
+        "lib/slo_rules_engine/validation.rb"
+      ],
+      "allowed_dependencies": []
+    },
+    {
+      "id": "telemetry_onboarding",
+      "description": "Telemetry discovery, candidates, evidence review, and onboarding artifacts.",
+      "paths": [
+        "lib/slo_rules_engine/onboarding/**/*.rb",
+        "lib/slo_rules_engine/reality_check.rb",
+        "lib/slo_rules_engine/telemetry_batch_discovery.rb",
+        "lib/slo_rules_engine/telemetry_lookup.rb",
+        "lib/slo_rules_engine/telemetry_lookup/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "provider_translation",
+        "artifact_review"
+      ]
+    },
+    {
+      "id": "provider_translation",
+      "description": "Provider adapters, renderers, backend clients, and integrations.",
+      "paths": [
+        "lib/slo_rules_engine/datadog/**/*.rb",
+        "lib/slo_rules_engine/integration.rb",
+        "lib/slo_rules_engine/integrations/**/*.rb",
+        "lib/slo_rules_engine/prometheus_stack/**/*.rb",
+        "lib/slo_rules_engine/provider.rb",
+        "lib/slo_rules_engine/providers/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent"
+      ]
+    },
+    {
+      "id": "provider_state",
+      "description": "Provider and managed-file planning, apply, verification, and journals.",
+      "paths": [
+        "lib/slo_rules_engine/apply.rb",
+        "lib/slo_rules_engine/appliers/**/*.rb",
+        "lib/slo_rules_engine/provider_state.rb",
+        "lib/slo_rules_engine/provider_state/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "provider_translation",
+        "artifact_review"
+      ]
+    },
+    {
+      "id": "artifact_review",
+      "description": "Manifest review, validation, and migration reports.",
+      "paths": [
+        "lib/slo_rules_engine/manifest_review_evidence.rb",
+        "lib/slo_rules_engine/manifest_review_queue.rb",
+        "lib/slo_rules_engine/manifest_schema.rb",
+        "lib/slo_rules_engine/migration_report.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "provider_translation"
+      ]
+    },
+    {
+      "id": "release_bundle",
+      "description": "Multi-target reviewed release planning, application, verification, and status.",
+      "paths": [
+        "lib/slo_rules_engine/release_bundle/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "provider_translation",
+        "provider_state",
+        "artifact_review",
+        "sloth_runtime"
+      ]
+    },
+    {
+      "id": "live_status",
+      "description": "Read-only provider status and portfolio aggregation.",
+      "paths": [
+        "lib/slo_rules_engine/live_status.rb",
+        "lib/slo_rules_engine/live_status/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "provider_translation",
+        "artifact_review",
+        "sloth_runtime"
+      ]
+    },
+    {
+      "id": "sloth_runtime",
+      "description": "Sloth downstream evidence and official MCP comparison.",
+      "paths": [
+        "lib/slo_rules_engine/sloth/**/*.rb"
+      ],
+      "allowed_dependencies": [
+        "neutral_intent",
+        "provider_translation",
+        "artifact_review"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "domain_must_not_depend_on_cli",
+      "intent": "Domain and orchestration code must remain callable without CLI parsing or dispatch.",
+      "source_paths": [
+        "lib/slo_rules_engine/**/*.rb"
+      ],
+      "exclude_paths": [
+        "lib/slo_rules_engine/cli.rb",
+        "lib/slo_rules_engine/cli/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "\\b(?:RulesCtl|OptionParser)\\b",
+      "allowed_references": []
+    },
+    {
+      "id": "neutral_intent_must_not_depend_on_outer_domains",
+      "intent": "The neutral model must not acquire provider, state, release, status, Sloth, or CLI dependencies.",
+      "source_paths": [
+        "lib/slo_rules_engine/burn_rate_policy.rb",
+        "lib/slo_rules_engine/dsl.rb",
+        "lib/slo_rules_engine/dsl/**/*.rb",
+        "lib/slo_rules_engine/model.rb",
+        "lib/slo_rules_engine/reliability_model.rb",
+        "lib/slo_rules_engine/validation.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?(?:Providers|Datadog|PrometheusStack|Sloth|ProviderState|ReleaseBundle|LiveStatus|CLI)::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": []
+    },
+    {
+      "id": "provider_generation_must_not_orchestrate_workflows",
+      "intent": "Provider generation and integration adapters must not own state, release, status, or CLI orchestration.",
+      "source_paths": [
+        "lib/slo_rules_engine/integrations/**/*.rb",
+        "lib/slo_rules_engine/prometheus_stack/**/*.rb",
+        "lib/slo_rules_engine/providers/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?(?:ReleaseBundle|LiveStatus|ProviderState|CLI)::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": []
+    },
+    {
+      "id": "release_bundle_to_live_status",
+      "intent": "Release orchestration must consume a read-only status port instead of the concrete live-status reader.",
+      "removal_packet": "STR-5",
+      "source_paths": [
+        "lib/slo_rules_engine/release_bundle/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?LiveStatus::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": [
+        {
+          "path": "lib/slo_rules_engine/release_bundle/builder.rb",
+          "constant": "SloRulesEngine::LiveStatus::SlothReader",
+          "occurrences": 1,
+          "removal_packet": "STR-5"
+        },
+        {
+          "path": "lib/slo_rules_engine/release_bundle/verifier.rb",
+          "constant": "SloRulesEngine::LiveStatus::SlothReader",
+          "occurrences": 2,
+          "removal_packet": "STR-5"
+        }
+      ]
+    },
+    {
+      "id": "provider_state_to_release_bundle",
+      "intent": "Exact-plan execution must consume a status-evaluation port instead of release orchestration.",
+      "removal_packet": "STR-4",
+      "source_paths": [
+        "lib/slo_rules_engine/provider_state.rb",
+        "lib/slo_rules_engine/provider_state/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?ReleaseBundle::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": [
+        {
+          "path": "lib/slo_rules_engine/provider_state/approved_plan.rb",
+          "constant": "ReleaseBundle::StatusEvaluator",
+          "occurrences": 1,
+          "removal_packet": "STR-4"
+        }
+      ]
+    },
+    {
+      "id": "live_status_to_release_bundle",
+      "intent": "Live-status aggregation must use shared integrity primitives rather than release-orchestration internals.",
+      "removal_packet": "STR-2",
+      "source_paths": [
+        "lib/slo_rules_engine/live_status.rb",
+        "lib/slo_rules_engine/live_status/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?ReleaseBundle::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": [
+        {
+          "path": "lib/slo_rules_engine/live_status/aggregate.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::CredentialScanner",
+          "occurrences": 1,
+          "removal_packet": "STR-2"
+        },
+        {
+          "path": "lib/slo_rules_engine/live_status/aggregate.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::Fingerprint",
+          "occurrences": 4,
+          "removal_packet": "STR-2"
+        },
+        {
+          "path": "lib/slo_rules_engine/live_status/aggregate.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::StatusEvaluator",
+          "occurrences": 1,
+          "removal_packet": "STR-5"
+        }
+      ]
+    },
+    {
+      "id": "sloth_runtime_to_release_bundle",
+      "intent": "Sloth evidence and MCP comparison must use shared integrity primitives rather than release-orchestration internals.",
+      "removal_packet": "STR-2",
+      "source_paths": [
+        "lib/slo_rules_engine/sloth/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?ReleaseBundle::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": [
+        {
+          "path": "lib/slo_rules_engine/sloth/downstream_evidence.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::CredentialScanner",
+          "occurrences": 1,
+          "removal_packet": "STR-2"
+        },
+        {
+          "path": "lib/slo_rules_engine/sloth/downstream_evidence.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::Fingerprint",
+          "occurrences": 1,
+          "removal_packet": "STR-2"
+        },
+        {
+          "path": "lib/slo_rules_engine/sloth/mcp.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::Fingerprint",
+          "occurrences": 1,
+          "removal_packet": "STR-2"
+        },
+        {
+          "path": "lib/slo_rules_engine/sloth/mcp/comparison.rb",
+          "constant": "SloRulesEngine::ReleaseBundle::CredentialScanner",
+          "occurrences": 1,
+          "removal_packet": "STR-2"
+        }
+      ]
+    },
+    {
+      "id": "sloth_runtime_to_live_status",
+      "intent": "Sloth MCP comparison must consume a status-reading port instead of the concrete live-status reader.",
+      "removal_packet": "STR-5",
+      "source_paths": [
+        "lib/slo_rules_engine/sloth/**/*.rb"
+      ],
+      "forbidden_constant_pattern": "(?:SloRulesEngine::)?LiveStatus::[A-Z][A-Za-z0-9]*(?:::[A-Z][A-Za-z0-9]*)*",
+      "allowed_references": [
+        {
+          "path": "lib/slo_rules_engine/sloth/mcp/comparison.rb",
+          "constant": "SloRulesEngine::LiveStatus::SlothReader",
+          "occurrences": 1,
+          "removal_packet": "STR-5"
+        }
+      ]
+    }
+  ]
+}

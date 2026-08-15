@@ -13,6 +13,7 @@ class ProjectRefactoringPlanTest < Minitest::Test
     assert_includes plan, '21,467'
     assert_includes plan, '16,092'
     assert_includes plan, '63 direct requires'
+    assert_includes plan, '20 unique literal versioned artifact schema IDs'
     (1..19).each { |number| assert_match(/UC-#{format('%02d', number)}\b/, plan) }
   end
 
@@ -46,5 +47,9 @@ class ProjectRefactoringPlanTest < Minitest::Test
     assert_includes plan, './scripts/verify.sh'
     assert_includes plan, 'Freeze Zones'
     assert_includes plan, 'Revalidation'
+    assert_includes plan, 'STR-0 completed'
+    assert_includes plan, 'scripts/structure-report --check'
+    assert_includes plan, 'config/architecture_dependencies.json'
+    assert_includes plan, 'config/architecture_contracts.json'
   end
 end

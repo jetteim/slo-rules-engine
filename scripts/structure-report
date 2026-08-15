@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'json'
+require_relative 'support/structure_inventory'
+
+root = File.expand_path('..', __dir__)
+inventory = StructureInventory.new(
+  root: root,
+  policy_path: File.join(root, 'config/architecture_dependencies.json'),
+  contracts_path: File.join(root, 'config/architecture_contracts.json')
+)
+report = inventory.report
+
+case ARGV
+when []
+  puts JSON.pretty_generate(report)
+when ['--check']
+  failures = %i[boundaries dependency_debt contracts].reject { |key| report.dig(key, :valid) }
+  if failures.empty?
+    puts "structure verification ok: #{report.dig(:production, :file_count)} production files, " \
+         "#{report.dig(:commands, :count)} commands, #{report.dig(:schema_contracts, :count)} artifact schemas, " \
+         "#{report.dig(:schema_contracts, :command_ref_count)} command schema refs, " \
+         "#{report.dig(:use_cases, :count)} use cases"
+  else
+    warn JSON.pretty_generate(report.slice(*failures))
+    exit 1
+  end
+else
+  warn 'usage: scripts/structure-report [--check]'
+  exit 64
+end

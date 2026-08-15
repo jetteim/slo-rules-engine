@@ -283,7 +283,7 @@ The evidence, dependency model, preservation matrix, packet acceptance gates,
 and revalidation are in
 [`docs/housekeeping/project-structure-refactoring-plan.md`](housekeeping/project-structure-refactoring-plan.md).
 
-- [ ] **STR-0:** establish architecture fitness tests, a current dependency-debt
+- [x] **STR-0:** establish architecture fitness tests, a current dependency-debt
   allowlist, deterministic structure reporting, complete command-module
   ownership, and requirement/contract snapshots.
 - [ ] **STR-1:** consolidate identical artifact fingerprint and credential-key

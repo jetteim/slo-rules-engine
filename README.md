@@ -598,8 +598,13 @@ The initial delivery integration is `notification_router`, which generates conte
 
 ```bash
 ruby -Ilib test/all_test.rb
+scripts/structure-report --check
 bin/rules-ctl validate examples/services/checkout.rb
 ./scripts/verify.sh
 ```
+
+Run `scripts/structure-report` without `--check` for the deterministic JSON
+inventory of code hotspots, command modules, schema contracts, use cases,
+boundary coverage, and explicitly allowlisted dependency debt.
 
 No external Ruby dependencies are required.

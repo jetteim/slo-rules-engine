@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ruby -Ilib test/all_test.rb
+scripts/structure-report --check
 bin/rules-ctl validate examples/services/checkout.rb >/tmp/slo-rules-engine-validate.json
 bin/rules-ctl generate --provider=datadog examples/services/checkout.rb >/tmp/slo-rules-engine-datadog.json
 bin/rules-ctl generate --provider=prometheus_stack examples/services/checkout.rb >/tmp/slo-rules-engine-prometheus-stack.json
