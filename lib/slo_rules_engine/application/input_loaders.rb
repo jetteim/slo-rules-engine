@@ -27,14 +27,26 @@ module SloRulesEngine
 
     class ManifestLoader
       def load_file(path, provider:, context:, prevalidated: false)
-        resolved_path = context.input_policy.resolve_read_file(
-          path,
+        load_files(
+          [path],
+          provider: provider,
+          context: context,
           field: 'manifest_file',
+          prevalidated: prevalidated
+        )
+      end
+
+      def load_files(paths, provider:, context:, field: 'manifest_files', prevalidated: false)
+        resolved_paths = context.input_policy.resolve_read_files(
+          paths,
+          field: field,
           extensions: ['.json'],
           prevalidated: prevalidated
         )
-        payload = JSON.parse(File.read(resolved_path), symbolize_names: true)
-        manifests = payload.is_a?(Array) ? payload : [payload]
+        manifests = resolved_paths.flat_map do |resolved_path|
+          payload = JSON.parse(File.read(resolved_path), symbolize_names: true)
+          payload.is_a?(Array) ? payload : [payload]
+        end
         manifests.each do |manifest|
           manifest_provider = manifest.fetch(:provider) { manifest.fetch('provider', nil) }
           unless manifest_provider == provider.key
@@ -52,7 +64,7 @@ module SloRulesEngine
         raise CommandError.new(
           'invalid_agent_input_file',
           'manifest input is not valid JSON',
-          field: 'manifest_file'
+          field: field
         )
       end
     end

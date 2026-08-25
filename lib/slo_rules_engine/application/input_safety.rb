@@ -44,12 +44,17 @@ module SloRulesEngine
           @max_total_bytes = max_total_bytes
         end
 
+        def confined?
+          @confined
+        end
+
         def validate_lexical_paths!(entries)
           entries.compact.each do |entry|
             validate_lexical!(
               entry.fetch(:path),
               field: entry.fetch(:field),
-              extensions: entry[:extensions]
+              extensions: entry[:extensions],
+              access: entry.fetch(:access, :read)
             )
           end
         end
@@ -133,21 +138,82 @@ module SloRulesEngine
           )
         end
 
+        def resolve_write_root(path, field:, prevalidated: false)
+          validate_lexical!(path, field: field, access: :write) unless prevalidated
+          expanded = File.expand_path(path, @workspace_root)
+          resolved = resolve_existing_or_ancestor(expanded)
+          ensure_contained!(resolved, field, access: :write)
+          unsafe_path!(field, 'not_directory', access: :write) if File.exist?(expanded) && !File.directory?(expanded)
+          expanded
+        rescue Errno::ENOENT, Errno::EACCES, Errno::ELOOP => error
+          raise Error.new(
+            'unresolvable_agent_output_path',
+            'agent output path cannot be resolved safely',
+            field: field,
+            reason: error.class.name
+          )
+        end
+
+        def resolve_write_file(path, field:, extensions:, prevalidated: false)
+          validate_lexical!(path, field: field, extensions: extensions, access: :write) unless prevalidated
+          expanded = File.expand_path(path, @workspace_root)
+          resolved = if File.exist?(expanded) || File.symlink?(expanded)
+                       File.realpath(expanded)
+                     else
+                       resolve_existing_or_ancestor(File.dirname(expanded))
+                     end
+          ensure_contained!(resolved, field, access: :write)
+          unsafe_path!(field, 'not_regular_file', access: :write) if File.exist?(expanded) && !File.file?(expanded)
+          expanded
+        rescue Errno::ENOENT, Errno::EACCES, Errno::ELOOP, Errno::ENOTDIR => error
+          raise Error.new(
+            'unresolvable_agent_output_path',
+            'agent output path cannot be resolved safely',
+            field: field,
+            reason: error.class.name
+          )
+        end
+
+        def resolve_write_child(root, segments, field:)
+          return File.join(root, *segments) unless @confined
+
+          Array(segments).each do |segment|
+            unsafe_path!(field, 'unsafe_generated_segment', access: :write) unless safe_child_segment?(segment)
+          end
+          expanded_root = File.expand_path(root)
+          candidate = File.join(expanded_root, *segments)
+          canonical_root = canonical_future_path(expanded_root)
+          canonical_candidate = canonical_future_path(candidate)
+          ensure_contained!(canonical_candidate, field, access: :write)
+          unless canonical_candidate.start_with?("#{canonical_root}#{File::SEPARATOR}")
+            unsafe_path!(field, 'generated_path_escape', access: :write)
+          end
+          unsafe_path!(field, 'not_regular_file', access: :write) if File.exist?(candidate) && !File.file?(candidate)
+          candidate
+        rescue Errno::ENOENT, Errno::EACCES, Errno::ELOOP, Errno::ENOTDIR => error
+          raise Error.new(
+            'unresolvable_agent_output_path',
+            'agent output path cannot be resolved safely',
+            field: field,
+            reason: error.class.name
+          )
+        end
+
         private
 
-        def validate_lexical!(path, field:, extensions: nil)
-          unsafe_path!(field, 'not_a_string') unless path.is_a?(String)
-          unsafe_path!(field, 'empty') if path.empty?
-          unsafe_path!(field, 'too_long') if path.bytesize > MAX_PATH_BYTES
-          unsafe_path!(field, 'control_character') if path.match?(CONTROL_CHARACTERS)
+        def validate_lexical!(path, field:, extensions: nil, access: :read)
+          unsafe_path!(field, 'not_a_string', access: access) unless path.is_a?(String)
+          unsafe_path!(field, 'empty', access: access) if path.empty?
+          unsafe_path!(field, 'too_long', access: access) if path.bytesize > MAX_PATH_BYTES
+          unsafe_path!(field, 'control_character', access: access) if path.match?(CONTROL_CHARACTERS)
           if @confined && extensions && !extensions.include?(File.extname(path).downcase)
-            unsafe_path!(field, 'unexpected_extension')
+            unsafe_path!(field, 'unexpected_extension', access: access)
           end
           return unless @confined
 
-          unsafe_path!(field, 'absolute_path') if Pathname.new(path).absolute?
-          unsafe_path!(field, 'path_traversal') if path.match?(TRAVERSAL_SEGMENT)
-          unsafe_path!(field, 'pre_encoded_path') if path.match?(PREENCODED_SEGMENT)
+          unsafe_path!(field, 'absolute_path', access: access) if Pathname.new(path).absolute?
+          unsafe_path!(field, 'path_traversal', access: access) if path.match?(TRAVERSAL_SEGMENT)
+          unsafe_path!(field, 'pre_encoded_path', access: access) if path.match?(PREENCODED_SEGMENT)
         end
 
         def resolve_existing(path, field:)
@@ -156,19 +222,40 @@ module SloRulesEngine
           resolved
         end
 
-        def ensure_contained!(resolved, field)
+        def resolve_existing_or_ancestor(path)
+          ancestor = path
+          ancestor = File.dirname(ancestor) until File.exist?(ancestor) || File.symlink?(ancestor) || File.dirname(ancestor) == ancestor
+          File.realpath(ancestor)
+        end
+
+        def canonical_future_path(path)
+          ancestor = path
+          ancestor = File.dirname(ancestor) until File.exist?(ancestor) || File.symlink?(ancestor) || File.dirname(ancestor) == ancestor
+          resolved_ancestor = File.realpath(ancestor)
+          suffix = Pathname.new(path).relative_path_from(Pathname.new(ancestor)).to_s
+          File.expand_path(suffix, resolved_ancestor)
+        end
+
+        def safe_child_segment?(segment)
+          segment.is_a?(String) && !segment.empty? && segment.bytesize <= MAX_PATH_BYTES &&
+            !%w[. ..].include?(segment) && !segment.match?(CONTROL_CHARACTERS) &&
+            !segment.match?(%r{[/\\]}) && !segment.match?(PREENCODED_SEGMENT)
+        end
+
+        def ensure_contained!(resolved, field, access: :read)
           return unless @confined
 
           root = File.realpath(@workspace_root)
           return if resolved == root || resolved.start_with?("#{root}#{File::SEPARATOR}")
 
-          unsafe_path!(field, 'symlink_escape')
+          unsafe_path!(field, 'symlink_escape', access: access)
         end
 
-        def unsafe_path!(field, reason)
+        def unsafe_path!(field, reason, access: :read)
+          output = access == :write
           raise Error.new(
-            'unsafe_agent_input_path',
-            'agent input path is not allowed',
+            output ? 'unsafe_agent_output_path' : 'unsafe_agent_input_path',
+            output ? 'agent output path is not allowed' : 'agent input path is not allowed',
             field: field,
             reason: reason
           )

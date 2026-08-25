@@ -34,6 +34,8 @@ Use the toolkit to:
 - invoke provider/integration listing, calculation-basis recommendation,
   definition validation, migration/model reporting, and file-backed desired
   versus managed-state diff through strict Agent JSON/file/stdin requests
+- validate and execute workspace-confined provider generation and manifest
+  review through the same typed Human/Agent command boundary
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
@@ -41,17 +43,23 @@ Phase 14 now has a validated 40-command catalog and registry. It pairs each
 Human CLI example with an Agent CLI JSON request, owns Human command dispatch,
 and exposes bounded offline `agent catalog` plus exact `agent describe`
 introspection with a strict resolved request schema for every command. Strict
-`agent invoke` is implemented for seven commands: `providers.list`,
+`agent invoke` is implemented for nine commands: `providers.list`,
 `integrations.list`, `recommend-calculation-basis`, `validate`,
 `migration-report`, `model-report`, and file-backed `diff` for
-`prometheus_stack`/`sloth`. Agent-referenced files must be regular,
+`prometheus_stack`/`sloth`, plus `generate` and `manifest-review`.
+Agent-referenced files must be regular,
 workspace-contained, bounded `.rb`/`.json` inputs; traversal, absolute,
 pre-encoded, control-character, symlink-escape, and oversized paths fail before
-content reads. File-backed `diff` reads managed state without provider network
-access or writes. The [Agent Interface Roadmap](docs/agent-interface-roadmap.md)
-defines the remaining command expansion, output-path/URL/identifier hardening,
-validation-only mutation gates, bounded/sanitized output, versioned agent
-skill, and later MCP projection.
+content reads. Agent generation/review destinations and generated child paths
+must also remain inside the workspace after symlink resolution. Their
+`validate_only` mode checks the strict request, provider, path policy, input
+selection, and output contract without reading or writing a file, calling a
+provider, or loading credentials. File-backed `diff` reads managed state
+without provider network access or writes. The
+[Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the
+remaining command expansion, URL/identifier hardening, validation-only gates
+for other write families, bounded/sanitized output, versioned agent skill, and
+later MCP projection.
 
 ```bash
 bin/rules-ctl agent invoke providers.list \
@@ -62,7 +70,14 @@ bin/rules-ctl agent invoke validate \
 
 bin/rules-ctl agent invoke diff \
   --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"diff","command_version":1,"arguments":{"provider":"prometheus_stack","manifest_file":"work/generated/checkout-api/prometheus_stack/manifest.json","output_dir":"work/managed"}}'
+
+bin/rules-ctl agent invoke generate \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"generate","command_version":1,"arguments":{"provider":"prometheus_stack","definition_files":["examples/services/checkout.rb"],"output_dir":"work/generated","validate_only":true}}'
 ```
+
+After the validation-only request succeeds, omit `validate_only` (or set it to
+`false`) to read the definitions and write the provider manifests plus the
+fresh manifest-review report under the confined output directory.
 
 The repository-wide [Project Structure Refactoring Plan](docs/housekeeping/project-structure-refactoring-plan.md)
 records the measured dependency cycles and responsibility hotspots, maps all 19

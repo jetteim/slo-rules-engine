@@ -105,8 +105,9 @@ gates; MCP later projects the same registry.
   JSON parity catalog, and offline bounded catalog/schema introspection
 - strict raw command-request JSON invocation and result/error envelopes
 - implemented workspace-confined adversarial file-input validation for
-  validation/reporting and local file-backed diff, followed by remaining
-  URL/identifier/output-root rules and zero-I/O `validate_only`
+  validation/reporting and local file-backed diff, plus confined
+  generation/review outputs and zero-I/O `validate_only`; followed by remaining
+  URL/identifier rules and validation-only coverage for other writes
 - field masks, limits/cursors, NDJSON, explicit truncation, and response
   sanitization
 - versioned agent skill/context plus headless credential rules
@@ -122,12 +123,12 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. extend AICLI-F3 from the implemented workspace-read boundary into confined
-   output roots and zero-I/O `validate_only` for the first local-write command
-   family before enabling Agent writes
+1. extend AICLI-F3 with URL/host/resource-ID policy before enabling the first
+   Agent provider-read family, and carry the proven confined-output plus
+   zero-I/O `validate_only` contract into the next local-write family
 2. continue STR-3 command-family declarations only alongside the Agent feature
-   that consumes them; catalog, analysis, and provider-state families are
-   already explicit
+   that consumes them; catalog, analysis, generation/review, and provider-state
+   families are already explicit
 3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
 4. revalidate the Sloth MCP comparison against a tagged binary only after an

@@ -8,17 +8,19 @@
 
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
-**Delivery status:** AICLI-F1, AICLI-F2 introspection, and two executable
+**Delivery status:** AICLI-F1, AICLI-F2 introspection, and three executable
 AICLI-F2 vertical slices are implemented. The Human CLI dispatches through a
 validated 40-command registry; a separate versioned command catalog pairs every
 Human example with its Agent JSON request; and bounded offline `agent catalog`
 plus exact `agent describe` expose strict resolved request schemas and safety
 metadata. Strict JSON/file/stdin invocation with versioned envelopes is enabled
-for seven commands, including workspace-confined validation/report reads and
-file-backed state diff. AICLI-F3 read-path/control/size hardening and handler
-output quarantine are implemented for that surface. Remaining command
-invocation, output/URL/identifier hardening, validation-only mutation gates,
-agent skill, response sanitizer, and MCP adapter remain planned.
+for nine commands, including workspace-confined validation/report reads,
+file-backed state diff, and confined provider generation/manifest review.
+AICLI-F3 read-path/control/size hardening, generated-output containment,
+zero-I/O `validate_only` for the first local-write family, and handler output
+quarantine are implemented. Remaining command invocation, URL/identifier
+hardening, validation-only gates for other write families, agent skill,
+response sanitizer, and MCP adapter remain planned.
 
 ## Article Summary And Intent
 
@@ -51,13 +53,13 @@ Therefore the article's raw-payload guidance is adapted as follows:
 
 | Article capability | Current baseline | Roadmap gap and decision |
 | --- | --- | --- |
-| Raw Structured Requests Alongside Convenience Flags | Strict inline JSON, workspace-file, and stdin requests now reach typed application commands for three zero-I/O tasks, validation/migration/model reporting, and file-backed state diff. | Expand one safe command family at a time while retaining existing Human CLI syntax; keep Datadog reads and writes gated until their safety class is ready. |
+| Raw Structured Requests Alongside Convenience Flags | Strict inline JSON, workspace-file, and stdin requests now reach typed application commands for three zero-I/O tasks, validation/migration/model reporting, file-backed state diff, and confined generation/manifest review. | Expand one safe command family at a time while retaining existing Human CLI syntax; keep Datadog reads and writes gated until their safety class is ready. |
 | Runtime Schema Introspection | A validated registry/catalog covers all 40 commands. Bounded offline `agent catalog` and exact `agent describe` expose strict resolved request schemas, contract references, side effects, I/O, credentials categories, safety gates, and output/MCP metadata. | Keep introspection generated from the registry while invocation, result envelopes, projections, and later MCP are added. |
 | Context Window Discipline | Most stdout is JSON, but callers cannot project fields, bound collections consistently, or stream NDJSON pages. | Add schema-checked field masks, explicit limits/cursors, and NDJSON collection streaming. |
-| Input Hardening | Enabled Agent read commands share workspace confinement, canonical/symlink checks, traversal/control/pre-encoding rejection, extensions, file/count/byte bounds, deterministic path errors, and adversarial cases. | Extend the policy to output roots, IDs, URLs/hosts, query/fragment syntax, credential-like keys, and generated fuzz coverage before exposing commands that use them. |
+| Input Hardening | Enabled Agent read commands share workspace confinement, canonical/symlink checks, traversal/control/pre-encoding rejection, extensions, file/count/byte bounds, deterministic path errors, and adversarial cases. Generation/review output roots, files, derived child paths, and existing symlink ancestors are confined too. | Extend the policy to IDs, URLs/hosts, query/fragment syntax, credential-like keys, and broader generated fuzz coverage before exposing commands that use them. |
 | Agent Skills | Repository instructions exist for contributors, not a distributable end-user agent skill. | Ship a versioned `SKILL.md` plus compact context guidance generated or checked against the command registry. |
-| Multiple Surfaces From One Contract | Human dispatch, Agent introspection, and seven Agent invocations resolve through one registry and typed application seam; a rules-engine MCP server remains absent. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry/application seam into remaining Agent invocation, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
-| Validation-Only Safety And Response Sanitization | Mutation planning, confirmation, review gates, journals, and sanitized backend errors exist. Some current dry-run planning may read backend state, and there is no prompt-injection-aware response policy. | Add a distinct `validate_only` mode with no backend calls or writes, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
+| Multiple Surfaces From One Contract | Human dispatch, Agent introspection, and nine Agent invocations resolve through one registry and typed application seam; a rules-engine MCP server remains absent. A separate bounded client consumes Sloth's provider-runtime HTTP MCP only for exact reviewed comparison evidence. | Extend the same registry/application seam into remaining Agent invocation, skills metadata, and a later rules-engine MCP stdio adapter. Keep the Sloth MCP comparison behind shared evidence, schema, identity, and no-status-promotion gates. |
+| Validation-Only Safety And Response Sanitization | Generation and manifest review now expose distinct zero-I/O `validate_only`; mutation planning, confirmation, review gates, journals, and sanitized backend errors also exist. Other write families and some current dry-run planning may read state, and there is no prompt-injection-aware response policy. | Extend the proven validation-only contract to each remaining write family, preserve observational planning separately, and sanitize or quarantine untrusted free text before Agent CLI/MCP output. |
 
 ## Target Architecture
 
@@ -95,8 +97,8 @@ Human form is executable now. Every Agent JSON form has a strict runtime-
 introspectable request schema. Catalog entries expose
 `structured_invocation`; it is true for `providers.list`, `integrations.list`,
 `recommend-calculation-basis`, `validate`, `migration-report`, `model-report`,
-and file-backed `diff`, whose Human and Agent adapters share typed application
-commands.
+file-backed `diff`, `generate`, and `manifest-review`, whose Human and Agent
+adapters share typed application commands.
 
 Adapters only parse or render. They do not reimplement review policy, provider translation, state planning, or mutation logic.
 
@@ -156,8 +158,8 @@ interface syntax into domain handlers:
 | --- | --- | --- | --- |
 | `validate` | Yes | Implemented workspace-confined structured invocation | Yes |
 | `validate-handoff` | Yes | Full parity | Yes |
-| `generate` | Yes | Full parity, local-write intent explicit | Yes |
-| `manifest-review` | Yes | Full parity | Yes |
+| `generate` | Yes | Implemented confined local-write parity plus zero-I/O `validate_only` | Yes |
+| `manifest-review` | Yes | Implemented confined local-write parity plus zero-I/O `validate_only` | Yes |
 | `apply` | Yes | Validate, plan, and confirmed execution remain distinct | Yes, mutation metadata mandatory |
 | `diff` | Yes | Implemented for local Prometheus Stack/Sloth managed-state reads; Datadog Agent reads remain gated | Yes |
 | `import` | Yes | Full parity | Yes |
@@ -281,15 +283,18 @@ instead of contaminating machine output.
 
 ### AICLI-F3: Adversarial Input And Validation-Only Boundary
 
-**AICLI-F3 status:** partially implemented. The seven executable commands
+**AICLI-F3 status:** partially implemented. The nine executable commands
 reject control characters before dispatch. Agent file inputs are
 workspace-confined and bounded, reject absolute/traversal/pre-encoded paths,
 enforce expected extensions, canonicalize symlinks, and reject escape or
 oversized input before content reads. File-backed diff validates every input
 path before parsing its manifest and performs no provider network call or
-write. Output-root mutation policy, IDs, URLs/hosts, credential-like keys,
-broader generated fuzzing, and zero-I/O `validate_only` for write commands
-remain open.
+write. Generation/review validate every input and destination lexically before
+content reads; normal execution confines output roots/files and derived
+service/provider children after symlink resolution; `validate_only` returns
+explicit zero-I/O evidence without opening missing sources or creating output
+parents. IDs, URLs/hosts, credential-like keys, broader generated fuzzing, and
+zero-I/O `validate_only` for the remaining write commands remain open.
 
 **Value:** machine-generated mistakes fail before file access, credentials, backend reads, or writes.
 
@@ -376,11 +381,12 @@ After drafting this roadmap, every recommendation in the source article was chec
 | Test agent-specific mistakes | AICLI-NFR-011/012; AICLI-F3/F7 | Covered with generated/fuzz inputs and fail-closed isolation. |
 
 No article theme remains orphaned at roadmap level. AICLI-F1, AICLI-F2 runtime
-introspection, the zero-I/O slice, and the first workspace-read/state-plan
-slice are implemented. AICLI-F3 is proven only for the enabled read fields;
-remaining structured invocation and AICLI-F3 through F7 stay open and must
-progress through the feature gates above. This revalidation does not claim full
-Agent CLI parity or that the rules-engine MCP exists.
+introspection, the zero-I/O slice, the first workspace-read/state-plan slice,
+and the first confined local-write slice are implemented. AICLI-F3 is proven
+for the enabled read fields and generation/review outputs; remaining structured
+invocation and AICLI-F3 through F7 stay open and must progress through the
+feature gates above. This revalidation does not claim full Agent CLI parity or
+that the rules-engine MCP exists.
 
 ## Accepted Deferrals
 

@@ -100,10 +100,10 @@ class AgentInvocationTest < Minitest::Test
     error = invoke_agent_error('providers.list', "--json=#{JSON.generate(mismatch)}")
     assert_equal 'invalid_agent_request', error.dig('error', 'code')
 
-    unsupported = request_for('generate')
-    error = invoke_agent_error('generate', "--json=#{JSON.generate(unsupported)}")
+    unsupported = request_for('validate-handoff')
+    error = invoke_agent_error('validate-handoff', "--json=#{JSON.generate(unsupported)}")
     assert_equal 'agent_command_not_executable', error.dig('error', 'code')
-    assert_equal 'generate', error.fetch('command_id')
+    assert_equal 'validate-handoff', error.fetch('command_id')
 
     error = invoke_agent_error('unknown.command', '--json={}')
     assert_equal 'unknown_agent_command', error.dig('error', 'code')

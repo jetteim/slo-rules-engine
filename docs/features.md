@@ -264,13 +264,17 @@ Implemented foundation:
   request schemas, side effects, provider I/O, credential categories, safety
   gates, and output/MCP metadata without loading files or providers.
 - **Structured Agent invocation:** strict inline JSON, workspace request files,
-  or stdin drive seven typed application commands with versioned result/error
+  or stdin drive nine typed application commands with versioned result/error
   envelopes and Human result/exit parity.
 - **Agent read boundary:** provider/integration listing and calculation advice
   remain zero-I/O; validation/migration/model reports use bounded
   workspace-contained inputs; Prometheus Stack/Sloth `diff` reads only local
   reviewed manifests and managed files. Traversal, absolute/pre-encoded paths,
   controls, symlink escape, wrong extensions, and oversized files fail closed.
+- **First Agent local-write boundary:** `generate` and `manifest-review` share
+  typed commands with the Human CLI, require explicit confined Agent
+  destinations, validate derived service/provider child paths, and expose
+  `validate_only` with explicit zero file/provider/credential I/O evidence.
 
 Planned features:
 
@@ -279,14 +283,15 @@ Planned features:
   Human CLI mapping, Agent CLI mapping, skill reference, and later MCP tool.
 - **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
   convenience flags and compatibility; a new Agent CLI accepts complete strict
-  JSON requests. Seven commands currently normalize into the same typed
+  JSON requests. Nine commands currently normalize into the same typed
   application boundary; remaining commands are gated.
-- **Remaining Agent input hardening:** extend the implemented read-path policy
-  to confined output roots, unsafe IDs, embedded query/fragment syntax, URLs,
-  credential exclusion, and broader generated/fuzz coverage.
-- **Distinct safety modes:** zero-I/O `validate_only`, observational planning,
-  and confirmed execution are explicit and retain every current review,
-  ownership, exact-plan, confirmation, journal, and verification gate.
+- **Remaining Agent input hardening:** extend the implemented read/output-path
+  policy to unsafe IDs, embedded query/fragment syntax, URLs, credential
+  exclusion, and broader generated/fuzz coverage.
+- **Distinct safety modes:** generation/review now have zero-I/O
+  `validate_only`; extend it across remaining writes while keeping
+  observational planning and confirmed execution explicit with every current
+  review, ownership, exact-plan, confirmation, journal, and verification gate.
 - **Context-safe output:** schema-checked field masks, limits/cursors, NDJSON,
   explicit truncation, stable error envelopes, and sanitization/quarantine for
   provider-controlled free text.
@@ -301,8 +306,8 @@ The raw structured path represents a full rules-engine command, not an
 arbitrary provider API payload. Neutral reliability intent and reviewed
 provider artifacts remain authoritative. Catalog Agent JSON examples and their
 strict schemas are introspectable contracts; only entries advertising
-`structured_invocation: true` are executable, and Datadog reads plus every
-write command remain gated.
+`structured_invocation: true` are executable. Datadog reads and write commands
+other than confined `generate`/`manifest-review` remain gated.
 
 ## Change
 

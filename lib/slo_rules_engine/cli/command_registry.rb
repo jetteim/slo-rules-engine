@@ -4,6 +4,7 @@ require_relative 'command_schemas'
 require_relative 'command_contract'
 require_relative 'command_contracts/catalog'
 require_relative 'command_contracts/analysis'
+require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 
 module SloRulesEngine
@@ -238,8 +239,6 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'generate' => 'bin/rules-ctl generate --provider=prometheus_stack --output-dir=./generated ./service.rb',
-        'manifest-review' => 'bin/rules-ctl manifest-review --provider=prometheus_stack --manifest=./manifest.json',
         'status' => 'bin/rules-ctl status --provider=sloth --manifest=./manifest.json --evidence=./sloth-evidence.json --base-url=http://localhost:9090',
         'sloth-evidence.capture' => 'bin/rules-ctl sloth-evidence capture --manifest=./manifest.json --input=./sloth.yaml --generated-rules=./rules.yaml --reviewer=reviewer@example.com --reviewed-at=2026-08-04T12:00:00Z --output=./sloth-evidence.json',
         'sloth-evidence.status' => 'bin/rules-ctl sloth-evidence status ./sloth-evidence.json',
@@ -270,8 +269,6 @@ module SloRulesEngine
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'generate' => { provider: 'prometheus_stack', definition_files: ['./service.rb'], output_dir: './generated' },
-        'manifest-review' => { provider: 'prometheus_stack', manifest_files: ['./manifest.json'] },
         'status' => { provider: 'sloth', manifest_file: './manifest.json', evidence_file: './sloth-evidence.json', base_url: 'http://localhost:9090' },
         'sloth-evidence.capture' => { manifest_file: './manifest.json', input_files: ['./sloth.yaml'], generated_rules_file: './rules.yaml', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T12:00:00Z', output_file: './sloth-evidence.json' },
         'sloth-evidence.status' => { evidence_file: './sloth-evidence.json' },
@@ -326,14 +323,7 @@ module SloRulesEngine
           command('validate-handoff', handler: :validate_handoff, side_effect: 'local_read',
                   io: io(local_reads: %w[handoff_packet]),
                   gates: %w[strict_arguments handoff_schema reviewed_provenance]),
-          command('generate', side_effect: 'local_write',
-                  io: io(local_reads: %w[definitions handoff_packets],
-                         local_writes: %w[provider_manifests manifest_review_report]),
-                  gates: %w[strict_arguments neutral_model_validation provider_validation manifest_schema]),
-          command('manifest-review', handler: :manifest_review, side_effect: 'local_write',
-                  io: io(local_reads: %w[definitions provider_manifests handoff_packets saved_review_report],
-                         local_writes: %w[manifest_review_report]),
-                  gates: %w[strict_arguments manifest_schema reviewed_provenance evidence_freshness]),
+          *CommandContracts::Generation.definitions,
           *CommandContracts::ProviderState.definitions,
           command('status', side_effect: 'provider_read',
                   io: io(local_reads: %w[provider_manifest release_bundle live_status_portfolio sloth_downstream_evidence sloth_evidence_sources],

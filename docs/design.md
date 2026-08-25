@@ -5,7 +5,7 @@
 The engine is a local Ruby application with explicit boundaries around neutral
 reliability intent, provider translation, reviewed evidence, state execution,
 and read-only status. Phase 14 now includes Human dispatch, Agent runtime
-introspection, and typed structured invocation for seven commands; later Agent
+introspection, and typed structured invocation for nine commands; later Agent
 commands and MCP must reuse the same application behavior.
 
 ```text
@@ -49,13 +49,15 @@ through the focused `AgentCommands` adapter.
 
 The Human CLI adapter preserves existing positional/convenience syntax. The
 Agent adapter validates complete JSON requests and returns stable result/error
-envelopes for seven registry-mapped application commands. Analysis commands
+envelopes for nine registry-mapped application commands. Analysis commands
 use bounded workspace-contained `.rb` inputs; file-backed `diff` additionally
 uses a reviewed `.json` manifest and confined managed root, with no provider
-network or writes. Application stdout/stderr and direct exits are quarantined.
-Field projection, collection limits, remaining output/URL/ID hardening,
-validation-only behavior, sanitization, skill guidance, and MCP schemas must
-derive from this foundation.
+network or writes. `generate` and `manifest-review` additionally use confined
+output roots/files, preflight derived artifact children, and share zero-I/O
+`validate_only` between Human and Agent adapters. Application stdout/stderr and
+direct exits are quarantined. Field projection, collection limits, URL/ID
+hardening, validation-only coverage for later write families, sanitization,
+skill guidance, and MCP schemas must derive from this foundation.
 
 The registry is an orchestration contract, not a second policy layer. It cannot
 override neutral intent, provider validation, reviewed evidence, ownership,
@@ -210,8 +212,9 @@ reviewed Prometheus Stack manifest or reviewed Sloth manifest + fresh evidence
   validation, size limits, and side-effect classification precede handlers.
 - Agent output is bounded, projectable, explicitly truncated or streamed, and
   sanitizes provider-controlled free text before exposure.
-- `validate_only` performs no file/provider I/O; observational plans that read
-  state remain separately declared.
+- Generation/review `validate_only` performs no file/provider I/O; the same
+  contract must cover later writes, while observational plans that read state
+  remain separately declared.
 - Public-safe terminology and fixtures are enforced by the verification suite.
 
 ## Architecture Traceability

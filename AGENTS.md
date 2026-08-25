@@ -8,9 +8,9 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Extend AICLI-F3 from the validated read boundary into confined output paths
-   and zero-I/O `validate_only` for the first local-write command family before
-   expanding Agent mutation reach
+1. Extend AICLI-F3 with URL/host/resource-ID policy before the first Agent
+   provider-read family, and carry confined output plus zero-I/O
+   `validate_only` into each next local-write family before expanding reach
 2. Continue STR-1 through STR-7 only through their named preservation and
    dependency-removal gates
 3. Production-grade Datadog reconciliation only when isolated backend evidence
@@ -55,7 +55,7 @@ missing sources, and source drift.
 
 Current architecture-fitness status: STR-0 is complete without production-code
 changes. `scripts/structure-report` deterministically inventories the current
-94 production/executable files, 64 root requires, 40 registered commands, 11
+96 production/executable files, 64 root requires, 40 registered commands, 11
 command modules, 21 unique literal artifact schema IDs, all 120 per-command
 schema references, 19 engineering use cases, and
 the current hotspot set. `config/architecture_dependencies.json` assigns every
@@ -181,7 +181,7 @@ packets live in
 `docs/housekeeping/project-structure-refactoring-plan.md`.
 
 Current agent-interface status: AICLI-F1, AICLI-F2 runtime introspection, and
-two executable AICLI-F2 vertical slices are implemented. A validated
+three executable AICLI-F2 vertical slices are implemented. A validated
 immutable registry covers all 40 current commands and drives Human top-level
 and grouped subcommand dispatch. The separate
 `slo-rules-engine/cli-command-catalog/v1` entity pairs each executable Human CLI
@@ -191,14 +191,19 @@ side-effect/I/O/safety metadata with JSON-only errors. Strict inline JSON,
 workspace-file, and stdin invocation now shares typed application commands with
 the Human CLI for `providers.list`, `integrations.list`,
 `recommend-calculation-basis`, `validate`, `migration-report`, `model-report`,
-and file-backed `diff`. Agent reads are workspace-confined and bounded, reject
+file-backed `diff`, `generate`, and `manifest-review`. Agent reads are
+workspace-confined and bounded, reject
 traversal/control/pre-encoding/symlink escape, retain Human result/exit parity,
 and quarantine application stdout/stderr. Agent `diff` is limited to local
 Prometheus Stack/Sloth managed-state reads with no provider network or writes.
+Agent generation/review requires explicit workspace-relative destinations,
+confines roots/files and derived service/provider children after symlink
+resolution, and supports zero-I/O `validate_only` without opening sources,
+creating parents, calling providers, or loading credentials.
 Malformed, ambiguous, unsafe, unknown, unsupported, or gated requests return
 JSON-only errors before disallowed I/O. Missing/duplicate metadata fails closed,
 and current Human behavior remains characterized. Remaining command invocation,
-output/URL/identifier hardening, validation-only write gates,
+URL/identifier hardening, validation-only gates for other writes,
 bounded/sanitized output, versioned skill, and MCP adapter remain planned.
 
 ## Non-Negotiable Working Rules
@@ -330,24 +335,29 @@ Implemented by the latest feature slices:
   catalog pagination, exact command descriptions, strict resolved request
   schemas for all 40 commands, and stable JSON-only introspection errors
 - AICLI-F2 structured invocation now accepts exactly one complete inline JSON,
-  workspace-file, or stdin request for seven commands, validates it
+  workspace-file, or stdin request for nine commands, validates it
   against the registered strict schema, applies explicit/environment/default
   JSON format precedence, and returns deterministic result/error envelopes
 - Human and Agent provider/integration listing, calculation-basis
-  recommendation, definition validation, migration/model reporting, and
-  file-backed diff now share typed application commands that return values
-  without printing or exiting; other registered commands fail with
-  `agent_command_not_executable` before their handlers run
+  recommendation, definition validation, migration/model reporting,
+  file-backed diff, generation, and manifest review now share typed application
+  commands that return values without printing or exiting; other registered
+  commands fail with `agent_command_not_executable` before their handlers run
 - AICLI-F3 read safety now confines Agent file inputs and managed roots to the
   workspace, rejects traversal, absolute/pre-encoded/control-character paths,
   checks symlink containment and `.rb`/`.json` types, bounds count/bytes,
   validates all diff paths before manifest content, and quarantines direct
   application output/exit attempts
+- AICLI-F3 local-write safety now confines Agent `generate` output roots,
+  `manifest-review` output files, and derived service/provider artifact paths;
+  both commands validate all paths before source reads and support zero-I/O
+  `validate_only` without creating output parents, calling providers, or
+  loading credentials
 - The STR-3 catalog contract family now authors `providers.list`,
   `integrations.list`, and `generate-routes` once with Human usage, Agent
-  examples, and explicit request schemas; the analysis and provider-state
-  families now do the same, while remaining families retain the compatibility
-  assembly
+  examples, and explicit request schemas; the analysis, generation/review, and
+  provider-state families now do the same, while remaining families retain the
+  compatibility assembly
 - A repository-wide structure audit maps all 19 use cases, 40 commands, the
   original 20 literal versioned production schema identifiers, dependency cycles, duplicated
   artifact policy, responsibility hotspots, freeze zones, and eight reversible
@@ -571,7 +581,10 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: workspace-confined Agent validation/reporting and
+- latest checkpoint: workspace-confined Agent generation/manifest-review,
+  derived artifact path safety, zero-I/O `validate_only`, Human result/exit
+  parity, and explicit STR-3 generation/review contracts
+- previous checkpoint: workspace-confined Agent validation/reporting and
   file-backed state diff with Human result/exit parity and explicit STR-3
   analysis/provider-state contracts
 - previous checkpoint: strict zero-I/O Agent JSON/file/stdin invocation with
@@ -679,9 +692,9 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Extend AICLI-F3 to output-root confinement and zero-I/O `validate_only`
-   before enabling the first Agent local-write command family; add URL/host and
-   resource-ID rules before provider-read commands that need them
+1. Add URL/host/resource-ID rules before provider-read commands that need them,
+   and extend the proven confined-output plus zero-I/O `validate_only` contract
+   to the next Agent local-write family
 2. Continue STR-3 one command family at a time until every command owns its
    Human usage, Agent example, explicit schema, side effects, I/O, safety,
    contract references, and MCP metadata in one declaration
@@ -707,10 +720,10 @@ Secondary gaps:
 
 Next recommended slice:
 
-- add confined output-root validation and a zero-I/O `validate_only` contract
-  for the first local-write generation/review command family
-- migrate that affected command family to explicit STR-3 declarations in the
-  same slice; do not reconstruct Human `argv` in the Agent adapter
+- add field-specific URL/host/resource-ID validation before enabling the first
+  Agent provider-read family
+- migrate that affected family to explicit STR-3 declarations in the same
+  slice; do not reconstruct Human `argv` in the Agent adapter
 
 Rationale:
 
@@ -734,13 +747,13 @@ Rationale:
 
 ## Next Session Handoff
 
-Prepared on 2026-08-15 for a restart-and-`proceed` workflow.
+Prepared on 2026-08-25 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `feat: harden agent read commands`
-- previous pushed checkpoint: `9cb5056 feat: add strict agent invocation`
+- latest pushed checkpoint: `feat: confine agent generation writes`
+- previous pushed checkpoint: `193585c feat: harden agent read commands`
 - expected startup state: `git status --short --branch` should show clean
 - last full verification before handoff:
   `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh` exited 0 with
@@ -748,19 +761,21 @@ Current safe boundary:
 
 Verification evidence:
 
-- target: workspace-confined Agent read commands, file-backed state diff, and
-  explicit analysis/provider-state STR-3 contract families
+- target: workspace-confined Agent generation/review writes, zero-I/O
+  `validate_only`, Human/Agent parity, and explicit generation/review STR-3
+  contracts
 - command: `PATH=/opt/homebrew/opt/ruby/bin:$PATH ./scripts/verify.sh`
-- recorded date: `2026-08-15`
+- recorded date: `2026-08-25`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 513 tests, 7,025 assertions, 0 failures,
+- result: exit 0, `verification ok`, 520 tests, 7,126 assertions, 0 failures,
   0 errors, 0 skips
 - focused result: Agent invocation passed with 7 tests and 116 assertions;
   Agent read/path safety passed with 9 tests and 105 assertions;
-  registry/contracts passed with 8 tests and 2,670 assertions; introspection
+  Agent write/path safety passed with 6 tests and 82 assertions;
+  registry/contracts passed with 9 tests and 2,689 assertions; introspection
   passed with 5 tests and 378 assertions; architecture fitness passed with 5
   tests and 26 assertions; all had zero failures, errors, and skips
-- structural evidence: `scripts/structure-report --check` passed with 94
+- structural evidence: `scripts/structure-report --check` passed with 96
   production files, 40 commands, 21 unique literal artifact schemas, 120
   per-command schema references, 19 use cases, complete
   single-boundary file ownership, and exact dependency-debt references
@@ -773,19 +788,24 @@ Verification evidence:
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
 - offline verification: Human/Agent parity covers validation, migration/model
-  reports, and Prometheus Stack file-backed diff; traversal, absolute,
-  pre-encoded, control-character, symlink-escape, oversized, and unsafe
-  multi-path inputs fail as JSON before content/provider access; direct
-  application stdout/stderr is quarantined
+  reports, Prometheus Stack file-backed diff, generation, and manifest review.
+  Traversal, absolute, pre-encoded, control-character, symlink-escape,
+  oversized, unsafe multi-path, output-root/file, and derived-child inputs fail
+  as JSON before disallowed content/provider/write access. Injected spies prove
+  `validate_only` does not load sources, call provider methods, invoke writers,
+  or create output parents; direct application stdout/stderr remains
+  quarantined.
 - live verification: no tagged Sloth binary contains MCP, so a full comparison
   against a released server and real Prometheus data could not be run. Latest
   observed release `v0.16.0` is intentionally rejected. Datadog live testing
   remains postponed.
-- blast radius: Agent input/path validation and envelopes, four additional
-  typed read commands, analysis/provider-state declarations, Human adapter
-  delegation, architecture snapshots, tests, and usage. No provider artifact,
-  network call, local/provider mutation, or external dependency was added.
-- rollback path: revert `feat: harden agent read commands`
+- blast radius: Agent output-path validation and envelopes, two typed
+  local-write commands, generation/review declarations, Human adapter
+  delegation, architecture snapshots, tests, and usage. Normal execution writes
+  only the existing provider-manifest/review artifacts under confined Agent
+  destinations; no provider network call, credential access, provider mutation,
+  schema version, or external dependency was added.
+- rollback path: revert `feat: confine agent generation writes`
 
 When the user types `proceed` in a fresh session:
 
@@ -818,6 +838,7 @@ ruby -Ilib test/architecture_fitness_test.rb
 ruby -Ilib test/agent_introspection_test.rb
 ruby -Ilib test/agent_invocation_test.rb
 ruby -Ilib test/agent_read_commands_test.rb
+ruby -Ilib test/agent_write_commands_test.rb
 ruby -Ilib test/agent_interface_roadmap_test.rb
 ruby -Ilib test/cli_command_registry_test.rb
 ruby -Ilib test/sloth_mcp_client_test.rb
@@ -878,15 +899,15 @@ If a new session needs to resume quickly:
    `lib/slo_rules_engine/cli/command_registry.rb`,
    `lib/slo_rules_engine/cli/agent_introspection.rb`, and
    `lib/slo_rules_engine/cli/agent_invocation.rb`, plus
-   `test/agent_invocation_test.rb` and `test/agent_read_commands_test.rb` before
-   changing any CLI surface
+   `test/agent_invocation_test.rb`, `test/agent_read_commands_test.rb`, and
+   `test/agent_write_commands_test.rb` before changing any CLI surface
 7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
-8. If the user says `proceed`, add output-root/validation-only safety and expand
-   AICLI-F2 through the next typed STR-3 command family; the supported Sloth
-   comparison boundary is implemented and a tagged-runtime parity test is
-   externally gated
+8. If the user says `proceed`, add URL/host/resource-ID safety and expand
+   AICLI-F2 through the next typed STR-3 provider-read family; the supported
+   Sloth comparison boundary is implemented and a tagged-runtime parity test
+   is externally gated
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
 10. Keep the official Sloth MCP adapter comparison-only; the current

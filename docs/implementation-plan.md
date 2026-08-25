@@ -242,18 +242,19 @@ and article revalidation live in
   Offline bounded `agent catalog`, exact `agent describe`, JSON-only
   introspection errors, and strict resolved request schemas for all 40 current
   registry commands are complete. Strict inline JSON, workspace-file, and stdin
-  invocation plus deterministic result/error envelopes are complete for seven
+  invocation plus deterministic result/error envelopes are complete for nine
   commands: `providers.list`, `integrations.list`,
   `recommend-calculation-basis`, `validate`, `migration-report`,
-  `model-report`, and file-backed `diff`. Datadog reads and write-capable
-  commands remain gated.
+  `model-report`, file-backed `diff`, `generate`, and `manifest-review`.
+  Datadog reads and other write-capable commands remain gated.
 - [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz
   coverage, and zero-I/O `validate_only` for every write-capable command.
   Workspace read confinement, traversal/control/pre-encoding rejection,
   symlink containment, extension/count/byte bounds, parsed-error request IDs,
-  and application-output quarantine are complete for the seven executable
-  commands. Output-root, URL/ID, credential-key, broader fuzz, and write-command
-  validation-only gates remain open.
+  and application-output quarantine are complete for the nine executable
+  commands. Confined generation/review outputs, derived child paths, and their
+  zero-I/O `validate_only` are complete. URL/ID, credential-key, broader fuzz,
+  and validation-only gates for remaining writes stay open.
 - [ ] **AICLI-F4:** add schema-checked field masks, declared limits/cursors,
   NDJSON streaming, explicit truncation, and response sanitization/quarantine.
 - [ ] **AICLI-F5:** ship a versioned `SKILL.md` and compact agent context whose

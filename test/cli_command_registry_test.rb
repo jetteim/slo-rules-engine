@@ -68,6 +68,8 @@ class CliCommandRegistryTest < Minitest::Test
         agent.catalog
         agent.describe
         validate
+        generate
+        manifest-review
         diff
         providers.list
         integrations.list
@@ -78,7 +80,7 @@ class CliCommandRegistryTest < Minitest::Test
       expected_agent_status = executable_agent_commands.include?(definition.id) ? 'implemented' : 'planned'
       assert_equal expected_agent_status, definition.agent.fetch(:status)
       application_command = definition.agent.fetch(:application_command)
-      if %w[validate diff providers.list integrations.list recommend-calculation-basis migration-report model-report].include?(definition.id)
+      if %w[validate generate manifest-review diff providers.list integrations.list recommend-calculation-basis migration-report model-report].include?(definition.id)
         assert_match(/\ASloRulesEngine::Application::/, application_command)
       else
         assert_nil application_command
@@ -255,6 +257,21 @@ class CliCommandRegistryTest < Minitest::Test
     end
     assert_equal %w[prometheus_stack sloth],
                  state.fetch(1).request_schema.dig(:properties, :arguments, :properties, :provider, :enum)
+  end
+
+  def test_generation_family_is_authored_once_with_explicit_write_safety_contracts
+    definitions = SloRulesEngine::CLI::CommandContracts::Generation.definitions
+
+    assert_equal %w[generate manifest-review], definitions.map(&:id)
+    definitions.each { |definition| assert_equal 'explicit', definition.request_schema_source }
+    definitions.each do |definition|
+      refute SloRulesEngine::CLI::CommandCatalog::HUMAN_USAGE.key?(definition.id)
+      refute SloRulesEngine::CLI::CommandCatalog::AGENT_ARGUMENT_EXAMPLES.key?(definition.id)
+      assert_equal 'implemented', definition.agent.fetch(:status)
+      assert_includes definition.safety_gates, 'zero_io_validate_only'
+    end
+    assert_includes definitions.fetch(0).request_schema.dig(:properties, :arguments, :required), 'output_dir'
+    assert_includes definitions.fetch(1).request_schema.dig(:properties, :arguments, :required), 'output_file'
   end
 
   def test_invalid_or_duplicate_metadata_fails_closed

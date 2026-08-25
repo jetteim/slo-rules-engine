@@ -217,7 +217,7 @@ module SloRulesEngine
             'application command did not return a typed result'
           )
         end
-        unless result.side_effect == definition.side_effect
+        unless valid_side_effect_evidence?(definition, request, result)
           raise AgentIntrospection::ContractError.new(
             'application_side_effect_mismatch',
             'application command side-effect evidence does not match its declaration',
@@ -262,6 +262,14 @@ module SloRulesEngine
       end
 
       private
+
+      def valid_side_effect_evidence?(definition, request, result)
+        return true if result.side_effect == definition.side_effect
+
+        request.dig('arguments', 'validate_only') == true &&
+          definition.safety_gates.include?('zero_io_validate_only') &&
+          result.side_effect == 'none'
+      end
 
       def fetch_definition(command_id)
         @registry.fetch(command_id)

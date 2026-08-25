@@ -283,7 +283,7 @@ terms, and `./scripts/verify.sh`.
 
 **Completion evidence:** `scripts/structure-report` now emits the deterministic
 `structure-report/v1` inventory and `scripts/structure-report --check` is part
-of full verification. `config/architecture_dependencies.json` assigns all 94
+of full verification. `config/architecture_dependencies.json` assigns all 96
 current production/executable files to one boundary and records each current
 forbidden reference with its removal packet. `config/architecture_contracts.json`
 locks the 40-command registry/catalog digests (including 120 per-command schema
@@ -363,14 +363,16 @@ equivalence, no-I/O spies, use-case documentation, and full verification.
 **Rollback:** migrate one command family per commit behind the unchanged
 registry and RulesCtl facade.
 
-**Current progress (2026-08-15):** the complete catalog, analysis, and
-provider-state families now own Human usage, Agent examples, and explicit
-argument schemas in bounded declaration modules. `providers.list`,
+**Current progress (2026-08-25):** the complete catalog, analysis, and
+provider-state families, plus generation/review, now own Human usage, Agent
+examples, and explicit argument schemas in bounded declaration modules. `providers.list`,
 `integrations.list`, `recommend-calculation-basis`, `validate`,
-`migration-report`, `model-report`, and file-backed `diff` normalize Human
-flags or Agent JSON into typed application commands that return values without
-printing or exiting. Remaining command families still use the compatibility
-assembly and keep STR-3 open.
+`migration-report`, `model-report`, file-backed `diff`, `generate`, and
+`manifest-review` normalize Human flags or Agent JSON into typed application
+commands that return values without printing or exiting. Generation/review
+also enforce confined Agent destinations and zero-I/O `validate_only`.
+Remaining command families still use the compatibility assembly and keep STR-3
+open.
 
 ### STR-4: Provider-State File Boundaries And Release Inversion
 

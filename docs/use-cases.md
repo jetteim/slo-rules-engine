@@ -1201,13 +1201,15 @@ security, and promotion gates are in
 **Delivery status:** partially implemented. AICLI-F1 provides the shared
 registry/catalog, and AICLI-F2 provides offline `agent catalog` and `agent
 describe` with strict resolved request schemas. Strict JSON/file/stdin
-invocation and versioned result/error envelopes now cover seven commands: the
+invocation and versioned result/error envelopes now cover nine commands: the
 three zero-I/O commands `providers.list`, `integrations.list`, and
 `recommend-calculation-basis`; the workspace-reading `validate`,
 `migration-report`, and `model-report`; and file-backed `diff` for
-`prometheus_stack`/`sloth`. The applicable AICLI-F3 read-path gates are
-implemented. Writes, Datadog state reads, projections, full validation-only,
-skills, and MCP remain planned.
+`prometheus_stack`/`sloth`; plus workspace-confined `generate` and
+`manifest-review`. The applicable AICLI-F3 read-path gates, confined generated
+output paths, and zero-I/O `validate_only` for this first local-write family
+are implemented. Other write families, Datadog state reads, projections, full
+validation-only coverage, skills, and MCP remain planned.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
@@ -1257,7 +1259,27 @@ bin/rules-ctl agent invoke diff \
   --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"diff","command_version":1,"arguments":{"provider":"prometheus_stack","manifest_file":"work/generated/checkout-api/prometheus_stack/manifest.json","output_dir":"work/managed"}}'
 ```
 
-Planned write-capable invocation after output-path and validation-only gates:
+Implemented validation-only and confined local generation/review:
+
+```bash
+bin/rules-ctl agent invoke generate \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"generate","command_version":1,"arguments":{"provider":"prometheus_stack","definition_files":["examples/services/checkout.rb"],"output_dir":"work/generated","validate_only":true}}'
+
+bin/rules-ctl agent invoke manifest-review \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"manifest-review","command_version":1,"arguments":{"provider":"prometheus_stack","manifest_files":["work/generated/checkout-api/prometheus_stack/manifest.json"],"output_file":"work/reports/prometheus-stack-review.json","validate_only":true}}'
+```
+
+`validate_only` deliberately does not prove that the referenced source files
+exist or that their contents generate valid provider artifacts, because doing
+so would require file reads. It proves the strict request shape, registered
+provider, exactly-one input form for review, lexical input policy, and confined
+destination policy with explicit zero-I/O evidence. A normal invocation omits
+`validate_only`, rechecks destination ancestors and derived service/provider
+child paths against workspace and symlink containment, then uses the same
+typed application command as the Human CLI. `generate` requires `output_dir`;
+`manifest-review` requires `output_file` on the Agent surface.
+
+Planned write-capable invocation after the same gates reach later families:
 
 ```bash
 bin/rules-ctl agent invoke bundle.verify \
@@ -1304,14 +1326,16 @@ backend state.
 
 The implemented request carries the complete versioned rules-engine command
 request and no credentials. A JSON request file must resolve inside the current
-workspace. Referenced `.rb`/`.json` inputs and file-backed diff roots are also
-workspace-confined for the Agent surface, even though compatible Human commands
-may still read explicit paths outside the current directory. Agent paths are
-bounded and canonicalized; traversal, absolute paths, pre-encoding, controls,
-unexpected extensions, symlink escape, and oversized inputs fail before file
-content is loaded. Datadog reads and every write-capable command remain
-non-executable through `agent invoke`; arbitrary provider mutation payloads
-remain unsupported.
+workspace. Referenced `.rb`/`.json` inputs, file-backed diff roots, and
+generation/review destinations are also workspace-confined for the Agent
+surface, even though compatible Human commands may still read explicit paths
+outside the current directory. Agent paths are bounded and canonicalized;
+traversal, absolute paths, pre-encoding, controls, unexpected extensions,
+symlink escape, and oversized inputs fail before file content is loaded.
+Generated service/provider child paths are checked before the first artifact
+write. Datadog reads and write-capable commands other than
+`generate`/`manifest-review` remain non-executable through `agent invoke`;
+arbitrary provider mutation payloads remain unsupported.
 
 **What to expect:**
 
@@ -1333,7 +1357,8 @@ remain unsupported.
   secret values, and performs no filesystem or provider I/O.
 - Catalog entries expose `structured_invocation`; it is currently true for
   `providers.list`, `integrations.list`, `recommend-calculation-basis`,
-  `validate`, `migration-report`, `model-report`, and `diff`.
+  `validate`, `migration-report`, `model-report`, `diff`, `generate`, and
+  `manifest-review`.
 - Each implemented invocation prints one
   `slo-rules-engine/agent-command-result/v1` object containing a deterministic
   request ID, command ID/version, `outcome`, `exit_status`, declared/exercised
@@ -1351,6 +1376,15 @@ remain unsupported.
   files, creates no directory, performs no provider network call, and writes
   nothing. Datadog `diff` remains available only through the Human CLI while
   live Agent-read contracts are postponed.
+- Agent `generate` and `manifest-review` require explicit workspace-relative
+  destinations. Normal execution returns Human-equivalent results and exact
+  artifact references; traversal, absolute/pre-encoded paths, wrong output
+  extensions, symlink escape, and unsafe generated child segments return
+  `unsafe_agent_output_path` before a write.
+- Human and Agent `validate_only` for these two commands returns
+  `side_effect.exercised: none` on the Agent surface and explicit false values
+  for local reads, local writes, provider calls, and credential loading.
+  Missing source files are not opened and no output parent is created.
 - Inline JSON, a workspace-contained JSON file, and stdin are mutually
   exclusive. Explicit `--format=json` overrides `RULES_CTL_OUTPUT_FORMAT`; JSON
   is the default, while unsupported formats fail closed.
@@ -1373,13 +1407,14 @@ remain unsupported.
 
 **What to expect after the remaining Agent slices:**
 
-- Output-root, URL, host, resource-ID, query/fragment, exactly-once encoding,
-  and credential-key safety will extend the current request/path policy before
+- URL, host, resource-ID, query/fragment, exactly-once encoding, and
+  credential-key safety will extend the current request/path policy before
   commands with those fields become executable.
-- `validate_only` performs no file read/write, provider call, or credential
-  loading. Observational planning declares any state reads. Confirmed mutation
-  still requires current reviewed provenance, ownership, exact-plan evidence
-  where supported, explicit confirmation, durable journal, and verification.
+- Zero-I/O `validate_only` will expand from generation/review to every other
+  write-capable family. Observational planning declares any state reads.
+  Confirmed mutation still requires current reviewed provenance, ownership,
+  exact-plan evidence where supported, explicit confirmation, durable journal,
+  and verification.
 - Large collection results apply declared limits and cursors; eligible flows
   can emit NDJSON. Field masks are schema-checked, and truncation is explicit.
 - Provider-controlled free text is sanitized before Agent CLI or MCP output.
