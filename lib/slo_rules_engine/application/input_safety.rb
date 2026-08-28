@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'pathname'
+require 'uri'
 
 module SloRulesEngine
   module Application
@@ -256,6 +257,194 @@ module SloRulesEngine
           raise Error.new(
             output ? 'unsafe_agent_output_path' : 'unsafe_agent_input_path',
             output ? 'agent output path is not allowed' : 'agent input path is not allowed',
+            field: field,
+            reason: reason
+          )
+        end
+      end
+
+      class NetworkPolicy
+        MAX_HOSTS = 20
+        MAX_HOST_BYTES = 253
+        HOST_LABEL = /\A[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\z/
+
+        def self.agent
+          new(confined: true)
+        end
+
+        def self.human
+          new(confined: false)
+        end
+
+        def initialize(confined:)
+          @confined = confined
+        end
+
+        def confined?
+          @confined
+        end
+
+        def validate_base_url!(value, field:, allowed_hosts: [])
+          unsafe_url!(field, 'not_a_string') unless value.is_a?(String)
+          unsafe_url!(field, 'control_character') if value.match?(PathPolicy::CONTROL_CHARACTERS)
+          unsafe_url!(field, 'pre_encoded_url') if value.match?(PathPolicy::PREENCODED_SEGMENT)
+
+          uri = URI.parse(value)
+          unsafe_url!(field, 'unsupported_scheme') unless %w[http https].include?(uri.scheme)
+          unsafe_url!(field, 'missing_host') if uri.host.to_s.empty?
+          unsafe_url!(field, 'credentials_in_url') if uri.user || uri.password
+          unsafe_url!(field, 'query_not_allowed') if uri.query
+          unsafe_url!(field, 'fragment_not_allowed') if uri.fragment
+          unsafe_url!(field, 'base_path_not_allowed') unless uri.path.to_s.empty? || uri.path == '/'
+          uri.port
+
+          hosts = validate_allowed_hosts!(allowed_hosts, field: 'allowed_hosts')
+          if confined? && !hosts.include?(uri.host.downcase)
+            unsafe_url!(field, 'host_not_allowlisted')
+          end
+
+          uri.to_s.sub(%r{/\z}, '')
+        rescue URI::InvalidURIError, URI::InvalidComponentError
+          unsafe_url!(field, 'invalid_url')
+        end
+
+        def validate_allowed_hosts!(values, field:)
+          hosts = Array(values)
+          if confined? && !hosts.length.between?(1, MAX_HOSTS)
+            raise Error.new(
+              'invalid_agent_host_allowlist',
+              "#{field} must contain between 1 and #{MAX_HOSTS} exact hosts",
+              field: field,
+              minimum: 1,
+              maximum: MAX_HOSTS
+            )
+          end
+
+          hosts.map do |host|
+            invalid_host!(field) unless valid_host?(host)
+            invalid_host!(field) if host.include?('*') || host.match?(PathPolicy::PREENCODED_SEGMENT)
+
+            host.downcase
+          end.uniq
+        end
+
+        private
+
+        def valid_host?(host)
+          host.is_a?(String) && !host.empty? && host.bytesize <= MAX_HOST_BYTES &&
+            host.split('.').all? { |label| label.match?(HOST_LABEL) }
+        end
+
+        def unsafe_url!(field, reason)
+          raise Error.new(
+            'unsafe_agent_endpoint',
+            'agent provider endpoint is not allowed',
+            field: field,
+            reason: reason
+          )
+        end
+
+        def invalid_host!(field)
+          raise Error.new(
+            'invalid_agent_host_allowlist',
+            'agent host allowlist must contain exact DNS names or IPv4 literals without wildcards',
+            field: field
+          )
+        end
+      end
+
+      class ResourcePolicy
+        KINDS = %w[unknown latency errors availability traffic freshness user_journey saturation].freeze
+        PROMETHEUS_METRIC = /\A[a-zA-Z_:][a-zA-Z0-9_:]*\z/
+        DATADOG_METRIC = /\A[a-zA-Z][a-zA-Z0-9_.]*\z/
+        SCOPE_KEY = /\A[a-zA-Z_][a-zA-Z0-9_.-]*\z/
+        PROMETHEUS_SCOPE_KEY = /\A[a-zA-Z_][a-zA-Z0-9_]*\z/
+        SCOPE_VALUE = /\A[a-zA-Z0-9_.:-]+\z/
+        HOST = /\A[a-zA-Z0-9][a-zA-Z0-9.:-]*\z/
+        MAX_RESOURCE_BYTES = 512
+        MAX_QUERY_BYTES = 16_384
+        MAX_SELECTORS = 20
+        MAX_WINDOW_SECONDS = 31 * 24 * 60 * 60
+
+        def validate_metric!(value, provider:, field: 'metric')
+          pattern = provider == 'datadog' ? DATADOG_METRIC : PROMETHEUS_METRIC
+          validate_resource!(value, field: field, pattern: pattern)
+        end
+
+        def valid_metric?(value, provider:)
+          validate_metric!(value, provider: provider)
+          true
+        rescue Error
+          false
+        end
+
+        def validate_kind!(value)
+          return value if KINDS.include?(value)
+
+          invalid_resource!('kind', 'unsupported_value')
+        end
+
+        def validate_query!(value, field: 'query')
+          return nil if value.nil?
+
+          invalid_resource!(field, 'not_a_string') unless value.is_a?(String)
+          invalid_resource!(field, 'empty') if value.empty?
+          invalid_resource!(field, 'too_long') if value.bytesize > MAX_QUERY_BYTES
+          invalid_resource!(field, 'control_character') if value.match?(PathPolicy::CONTROL_CHARACTERS)
+          value
+        end
+
+        def validate_scope!(service:, selectors:, host:, provider:)
+          validate_resource!(service, field: 'service', pattern: SCOPE_VALUE) unless service.to_s.empty?
+          validate_resource!(host, field: 'host', pattern: HOST) unless host.to_s.empty?
+          unless selectors.is_a?(Hash) && selectors.length <= MAX_SELECTORS
+            invalid_resource!('selectors', 'too_many_entries')
+          end
+          selectors.each do |key, value|
+            key_pattern = provider == 'datadog' ? SCOPE_KEY : PROMETHEUS_SCOPE_KEY
+            validate_resource!(key, field: 'selector_key', pattern: key_pattern)
+            validate_resource!(value, field: 'selector_value', pattern: SCOPE_VALUE)
+          end
+          if service.to_s.empty? && selectors.empty? && host.to_s.empty?
+            invalid_resource!('scope', 'missing')
+          end
+          if provider == 'datadog' && !host.to_s.empty? && (!service.to_s.empty? || !selectors.empty?)
+            invalid_resource!('scope', 'datadog_host_scope_conflict')
+          end
+          if provider != 'datadog' && !host.to_s.empty?
+            invalid_resource!('host', 'unsupported_for_provider')
+          end
+          true
+        end
+
+        def validate_window!(from:, to:)
+          [[:from, from], [:to, to]].each do |field, value|
+            next if value.nil?
+            invalid_resource!(field.to_s, 'not_nonnegative_integer') unless value.is_a?(Integer) && value >= 0
+          end
+          return true if from.nil? || to.nil?
+
+          invalid_resource!('window', 'reversed') if from > to
+          invalid_resource!('window', 'too_large') if to - from > MAX_WINDOW_SECONDS
+          true
+        end
+
+        private
+
+        def validate_resource!(value, field:, pattern:)
+          invalid_resource!(field, 'not_a_string') unless value.is_a?(String)
+          invalid_resource!(field, 'empty') if value.empty?
+          invalid_resource!(field, 'too_long') if value.bytesize > MAX_RESOURCE_BYTES
+          invalid_resource!(field, 'control_character') if value.match?(PathPolicy::CONTROL_CHARACTERS)
+          invalid_resource!(field, 'pre_encoded_value') if value.match?(PathPolicy::PREENCODED_SEGMENT)
+          invalid_resource!(field, 'invalid_characters') unless value.match?(pattern)
+          value
+        end
+
+        def invalid_resource!(field, reason)
+          raise Error.new(
+            'unsafe_agent_resource_identifier',
+            'agent resource identifier is not allowed',
             field: field,
             reason: reason
           )

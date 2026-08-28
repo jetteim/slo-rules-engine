@@ -66,6 +66,13 @@ When telemetry evidence is supported:
 - `lookup-telemetry` returns normalized evidence for one explicit metric or query.
 - `discover-telemetry` returns normalized evidence for a documented service, selector, host, or backend-specific scope.
 - `discover-telemetry --scope-file` may orchestrate repeated provider `discover(...)` calls for one provider run and must preserve the same normalized evidence shape in each saved per-scope result file.
+- Telemetry endpoints, exact allowed hosts, provider metric identifiers,
+  selector keys/values, and time windows must pass shared validation before a
+  provider client or credential is constructed. Transport parameters are
+  encoded exactly once.
+- Agent discovery is explicitly limited per scope. Unsafe provider-controlled
+  metric names are omitted behind content fingerprints; truncation is
+  declared; raw provider errors are not persisted in results or batch indexes.
 - results must normalize to `provider`, `signals`, and `findings` so onboarding and reality-check flows can reuse them without backend-specific parsing.
 - saved batch-discovery evidence must remain reusable by later onboarding stages without provider-specific transformation.
 - unsupported scopes or filters must fail explicitly.

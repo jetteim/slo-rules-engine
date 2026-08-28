@@ -242,21 +242,28 @@ and article revalidation live in
   Offline bounded `agent catalog`, exact `agent describe`, JSON-only
   introspection errors, and strict resolved request schemas for all 40 current
   registry commands are complete. Strict inline JSON, workspace-file, and stdin
-  invocation plus deterministic result/error envelopes are complete for nine
+  invocation plus deterministic result/error envelopes are complete for eleven
   commands: `providers.list`, `integrations.list`,
   `recommend-calculation-basis`, `validate`, `migration-report`,
-  `model-report`, file-backed `diff`, `generate`, and `manifest-review`.
+  `model-report`, file-backed `diff`, `generate`, `manifest-review`,
+  `lookup-telemetry`, and single/batch `discover-telemetry`.
   Datadog reads and other write-capable commands remain gated.
 - [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz
   coverage, and zero-I/O `validate_only` for every write-capable command.
   Workspace read confinement, traversal/control/pre-encoding rejection,
   symlink containment, extension/count/byte bounds, parsed-error request IDs,
-  and application-output quarantine are complete for the nine executable
+  and application-output quarantine are complete for the eleven executable
   commands. Confined generation/review outputs, derived child paths, and their
-  zero-I/O `validate_only` are complete. URL/ID, credential-key, broader fuzz,
-  and validation-only gates for remaining writes stay open.
+  zero-I/O `validate_only` are complete. Telemetry now adds HTTP(S) exact-host
+  allowlists, resource-ID/selector/window validation, confined batch output,
+  and pre-client zero-I/O validation. Credential-key, other-family URL/ID,
+  broader fuzz, and validation-only gates for remaining writes stay open.
 - [ ] **AICLI-F4:** add schema-checked field masks, declared limits/cursors,
   NDJSON streaming, explicit truncation, and response sanitization/quarantine.
+  Telemetry discovery now has required Agent limits, explicit truncation,
+  provider-metric fingerprint quarantine, byte-bounded Prometheus bodies, and
+  sanitized batch/provider errors; projection, cursors, streaming, and other
+  families remain open.
 - [ ] **AICLI-F5:** ship a versioned `SKILL.md` and compact agent context whose
   invariants are checked against the registry.
 - [ ] **AICLI-F6:** expose eligible commands through an allowlisted MCP stdio

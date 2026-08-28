@@ -753,8 +753,8 @@ module RulesCtl
         bin/rules-ctl plan status <approved-plan.json>
         bin/rules-ctl plan apply <approved-plan.json> --confirm --journal-dir=<dir>
         bin/rules-ctl plan resume <approved-plan.json> --confirm --journal-dir=<dir>
-        bin/rules-ctl lookup-telemetry --provider=<provider> --metric=<metric> [--kind=<kind>] [--query=<query>] [--user-visible=<true|false>] [--base-url=<url>] [--from=<timestamp>] [--to=<timestamp>]
-        bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>])
+        bin/rules-ctl lookup-telemetry --provider=<provider> --metric=<metric> [--kind=<kind>] [--query=<query>] [--user-visible=<true|false>] [--base-url=<url>] [--allow-host=<host>] [--from=<timestamp>] [--to=<timestamp>] [--validate-only]
+        bin/rules-ctl discover-telemetry --provider=<provider> ([--service=<service>] [--selector=key=value] [--host=<host>] [--base-url=<url>] | --scope-file=<scopes.json> --output-dir=<dir> [--base-url=<url>]) [--allow-host=<host>] [--limit=<count>] [--validate-only]
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>

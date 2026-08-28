@@ -8,19 +8,21 @@
 
 **Outcome:** an AI agent can discover, validate, invoke, bound, and safely interpret every supported rules-engine workflow without shell guesswork, stale prompt documentation, unbounded output, or a path around reviewed reliability intent.
 
-**Delivery status:** AICLI-F1, AICLI-F2 introspection, and three executable
+**Delivery status:** AICLI-F1, AICLI-F2 introspection, and four executable
 AICLI-F2 vertical slices are implemented. The Human CLI dispatches through a
 validated 40-command registry; a separate versioned command catalog pairs every
 Human example with its Agent JSON request; and bounded offline `agent catalog`
 plus exact `agent describe` expose strict resolved request schemas and safety
 metadata. Strict JSON/file/stdin invocation with versioned envelopes is enabled
-for nine commands, including workspace-confined validation/report reads,
-file-backed state diff, and confined provider generation/manifest review.
+for eleven commands, including workspace-confined validation/report reads,
+file-backed state diff, confined provider generation/manifest review, and
+bounded read-only telemetry lookup/discovery.
 AICLI-F3 read-path/control/size hardening, generated-output containment,
 zero-I/O `validate_only` for the first local-write family, and handler output
-quarantine are implemented. Remaining command invocation, URL/identifier
-hardening, validation-only gates for other write families, agent skill,
-response sanitizer, and MCP adapter remain planned.
+quarantine are implemented. Telemetry adds URL/host/resource-ID safety,
+confined batch output, and the first bounded/sanitized provider response.
+Remaining command invocation, validation-only gates for other write families,
+general projection/sanitization, agent skill, and MCP adapter remain planned.
 
 ## Article Summary And Intent
 
@@ -97,8 +99,9 @@ Human form is executable now. Every Agent JSON form has a strict runtime-
 introspectable request schema. Catalog entries expose
 `structured_invocation`; it is true for `providers.list`, `integrations.list`,
 `recommend-calculation-basis`, `validate`, `migration-report`, `model-report`,
-file-backed `diff`, `generate`, and `manifest-review`, whose Human and Agent
-adapters share typed application commands.
+file-backed `diff`, `generate`, `manifest-review`, `lookup-telemetry`, and
+`discover-telemetry`, whose Human and Agent adapters share typed application
+commands.
 
 Adapters only parse or render. They do not reimplement review policy, provider translation, state planning, or mutation logic.
 
@@ -283,7 +286,7 @@ instead of contaminating machine output.
 
 ### AICLI-F3: Adversarial Input And Validation-Only Boundary
 
-**AICLI-F3 status:** partially implemented. The nine executable commands
+**AICLI-F3 status:** partially implemented. The eleven executable commands
 reject control characters before dispatch. Agent file inputs are
 workspace-confined and bounded, reject absolute/traversal/pre-encoded paths,
 enforce expected extensions, canonicalize symlinks, and reject escape or
@@ -293,8 +296,14 @@ write. Generation/review validate every input and destination lexically before
 content reads; normal execution confines output roots/files and derived
 service/provider children after symlink resolution; `validate_only` returns
 explicit zero-I/O evidence without opening missing sources or creating output
-parents. IDs, URLs/hosts, credential-like keys, broader generated fuzzing, and
-zero-I/O `validate_only` for the remaining write commands remain open.
+parents. Credential-like keys, URL/ID coverage for other command families,
+broader generated fuzzing, and zero-I/O `validate_only` for the remaining write
+commands remain open.
+Telemetry IDs and selectors now reject controls, injection syntax, invalid
+provider grammars, and pre-encoded values. Prometheus-compatible URLs require
+HTTP(S), no embedded credentials/query/fragment/base path, and an exact Agent
+host allowlist. Direct and scope-file requests validate before provider client
+or credential construction, and telemetry `validate_only` is zero-I/O.
 
 **Value:** machine-generated mistakes fail before file access, credentials, backend reads, or writes.
 
@@ -303,6 +312,13 @@ zero-I/O `validate_only` for the remaining write commands remain open.
 **Architecture impact:** input safety policy and filesystem/URL/identifier value types shared by both adapters and MCP.
 
 ### AICLI-F4: Context-Bounded And Sanitized Output
+
+**AICLI-F4 status:** partially implemented for telemetry discovery. Agent
+requests require a per-scope limit up to 500, result envelopes report explicit
+truncation, unsafe provider metric identifiers are omitted behind SHA-256
+fingerprints, Prometheus bodies are byte-bounded, and raw provider/batch error
+text is not returned. General field masks, cursors, NDJSON, and other command
+families remain open.
 
 **Value:** agents receive only the evidence needed for the current decision and do not ingest unsafe provider-controlled text by default.
 
@@ -382,11 +398,13 @@ After drafting this roadmap, every recommendation in the source article was chec
 
 No article theme remains orphaned at roadmap level. AICLI-F1, AICLI-F2 runtime
 introspection, the zero-I/O slice, the first workspace-read/state-plan slice,
-and the first confined local-write slice are implemented. AICLI-F3 is proven
-for the enabled read fields and generation/review outputs; remaining structured
-invocation and AICLI-F3 through F7 stay open and must progress through the
-feature gates above. This revalidation does not claim full Agent CLI parity or
-that the rules-engine MCP exists.
+the first confined local-write slice, and the first provider-read family are
+implemented. AICLI-F3 is proven for the enabled paths, telemetry endpoint/ID
+fields, and generation/review/batch outputs; AICLI-F4 is proven only for the
+telemetry limit/truncation/sanitization subset. Remaining structured invocation
+and AICLI-F3 through F7 stay open and must progress through the feature gates
+above. This revalidation does not claim full Agent CLI parity or that the
+rules-engine MCP exists.
 
 ## Accepted Deferrals
 

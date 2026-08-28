@@ -13,8 +13,10 @@ module SloRulesEngine
         query = nil
         user_visible = true
         base_url = nil
+        allowed_hosts = []
         from = nil
         to = nil
+        validate_only = false
         parser = OptionParser.new do |opts|
           opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
           opts.on('--metric=METRIC', 'Metric name to look up') { |value| metric = value }
@@ -24,20 +26,32 @@ module SloRulesEngine
             user_visible = SloRulesEngine::TelemetryLookup.truthy?(value)
           end
           opts.on('--base-url=URL', 'Prometheus-compatible base URL') { |value| base_url = value }
+          opts.on('--allow-host=HOST', 'Exact allowed endpoint host; repeat for Agent parity') { |value| allowed_hosts << value }
           opts.on('--from=TIMESTAMP', Integer, 'Lookup window start') { |value| from = value }
           opts.on('--to=TIMESTAMP', Integer, 'Lookup window end') { |value| to = value }
+          opts.on('--validate-only', 'Validate request safety without credentials or provider I/O') { validate_only = true }
         end
         parser.parse!(argv)
         abort_usage('missing --provider') unless provider_key
         abort_usage('missing --metric') unless metric
 
-        result = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to).lookup(
-          metric: metric,
-          kind: kind,
-          query: query,
-          user_visible: user_visible
+        result = SloRulesEngine::Application::LookupTelemetry.new.call(
+          {
+            'provider' => provider_key,
+            'metric' => metric,
+            'kind' => kind,
+            'query' => query,
+            'user_visible' => user_visible,
+            'base_url' => base_url,
+            'allowed_hosts' => allowed_hosts.empty? ? nil : allowed_hosts,
+            'from' => from,
+            'to' => to,
+            'validate_only' => validate_only
+          }.compact,
+          context: application_context
         )
-        puts JSON.pretty_generate(result.to_h)
+        puts JSON.pretty_generate(result.value)
+        exit result.exit_status unless result.exit_status.zero?
       rescue SloRulesEngine::Datadog::MissingCredentials => error
         puts JSON.pretty_generate(
           valid: false,
@@ -48,6 +62,9 @@ module SloRulesEngine
           }
         )
         exit 1
+      rescue SloRulesEngine::Application::InputSafety::Error,
+             SloRulesEngine::Application::CommandError => error
+        render_telemetry_command_error(provider_key, error)
       end
 
       def telemetry_lookup_adapter(provider_key, base_url:, from:, to:)
@@ -175,8 +192,11 @@ module SloRulesEngine
         host = nil
         selector_values = []
         base_url = nil
+        allowed_hosts = []
         from = nil
         to = nil
+        limit = nil
+        validate_only = false
         parser = OptionParser.new do |opts|
           opts.on('--provider=PROVIDER', 'Provider key') { |value| provider_key = value }
           opts.on('--scope-file=FILE', 'JSON file containing discovery scopes') { |value| scope_file = value }
@@ -185,8 +205,11 @@ module SloRulesEngine
           opts.on('--host=HOST', 'Host scope for Datadog discovery') { |value| host = value }
           opts.on('--selector=KEY=VALUE', 'Additional selector scope') { |value| selector_values << value }
           opts.on('--base-url=URL', 'Prometheus-compatible base URL') { |value| base_url = value }
+          opts.on('--allow-host=HOST', 'Exact allowed endpoint host; repeat for Agent parity') { |value| allowed_hosts << value }
           opts.on('--from=TIMESTAMP', Integer, 'Discovery lookback start') { |value| from = value }
           opts.on('--to=TIMESTAMP', Integer, 'Discovery lookback end') { |value| to = value }
+          opts.on('--limit=COUNT', Integer, 'Maximum returned signals per scope') { |value| limit = value }
+          opts.on('--validate-only', 'Validate request safety without file, credential, or provider I/O') { validate_only = true }
         end
         parser.parse!(argv)
         abort_usage('missing --provider') unless provider_key
@@ -196,15 +219,22 @@ module SloRulesEngine
           end
           abort_usage('missing --output-dir') if output_dir.to_s.empty?
 
-          scopes = SloRulesEngine::TelemetryBatchDiscovery.load_scopes(scope_file, provider: provider_key)
-          adapter = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to)
-          result = SloRulesEngine::TelemetryBatchDiscovery::Runner.new(
-            provider: provider_key,
-            adapter: adapter,
-            output_dir: output_dir
-          ).run(scopes)
-          puts JSON.pretty_generate(result)
-          exit 1 unless result[:failed_scopes].zero?
+          result = SloRulesEngine::Application::DiscoverTelemetry.new.call(
+            {
+              'provider' => provider_key,
+              'scope_file' => scope_file,
+              'output_dir' => output_dir,
+              'base_url' => base_url,
+              'allowed_hosts' => allowed_hosts.empty? ? nil : allowed_hosts,
+              'from' => from,
+              'to' => to,
+              'limit' => limit,
+              'validate_only' => validate_only
+            }.compact,
+            context: application_context
+          )
+          puts JSON.pretty_generate(result.value)
+          exit result.exit_status unless result.exit_status.zero?
           return
         end
 
@@ -215,12 +245,23 @@ module SloRulesEngine
         end
         abort_usage('--host is only supported for datadog discovery') if provider_key != 'datadog' && !host.to_s.empty?
 
-        result = telemetry_lookup_adapter(provider_key, base_url: base_url, from: from, to: to).discover(
-          service: service,
-          selectors: selectors,
-          host: host
+        result = SloRulesEngine::Application::DiscoverTelemetry.new.call(
+          {
+            'provider' => provider_key,
+            'service' => service,
+            'selectors' => selectors.empty? ? nil : selectors,
+            'host' => host,
+            'base_url' => base_url,
+            'allowed_hosts' => allowed_hosts.empty? ? nil : allowed_hosts,
+            'from' => from,
+            'to' => to,
+            'limit' => limit,
+            'validate_only' => validate_only
+          }.compact,
+          context: application_context
         )
-        puts JSON.pretty_generate(result.to_h)
+        puts JSON.pretty_generate(result.value)
+        exit result.exit_status unless result.exit_status.zero?
       rescue SloRulesEngine::Datadog::MissingCredentials => error
         puts JSON.pretty_generate(
           valid: false,
@@ -231,6 +272,9 @@ module SloRulesEngine
           }
         )
         exit 1
+      rescue SloRulesEngine::Application::InputSafety::Error,
+             SloRulesEngine::Application::CommandError => error
+        render_telemetry_command_error(provider_key, error)
       end
 
       def online_lookup_results(definitions, provider_key, base_url:, from:, to:)
@@ -270,6 +314,19 @@ module SloRulesEngine
 
           parsed[key] = value
         end
+      end
+
+      def render_telemetry_command_error(provider_key, error)
+        puts JSON.pretty_generate(
+          valid: false,
+          provider: provider_key,
+          error: {
+            code: error.code,
+            message: error.message,
+            details: error.details
+          }
+        )
+        exit 1
       end
     end
   end

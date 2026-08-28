@@ -6,6 +6,7 @@ require_relative 'command_contracts/catalog'
 require_relative 'command_contracts/analysis'
 require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
+require_relative 'command_contracts/telemetry'
 
 module SloRulesEngine
   module CLI
@@ -256,8 +257,6 @@ module SloRulesEngine
         'plan.status' => 'bin/rules-ctl plan status ./approved-plan.json',
         'plan.apply' => 'bin/rules-ctl plan apply ./approved-plan.json --confirm --journal-dir=./journals',
         'plan.resume' => 'bin/rules-ctl plan resume ./approved-plan.json --confirm --journal-dir=./journals',
-        'lookup-telemetry' => 'bin/rules-ctl lookup-telemetry --provider=prometheus_stack --metric=http_requests_total --base-url=http://localhost:9090',
-        'discover-telemetry' => 'bin/rules-ctl discover-telemetry --provider=prometheus_stack --service=checkout --base-url=http://localhost:9090',
         'candidates' => 'bin/rules-ctl candidates ./telemetry.json',
         'draft-definition' => 'bin/rules-ctl draft-definition --service=checkout --owner=platform ./telemetry.json',
         'draft-from-handoff' => 'bin/rules-ctl draft-from-handoff --service=checkout --owner=platform ./handoff.json',
@@ -286,8 +285,6 @@ module SloRulesEngine
         'plan.status' => { approved_plan_file: './approved-plan.json' },
         'plan.apply' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
         'plan.resume' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
-        'lookup-telemetry' => { provider: 'prometheus_stack', metric: 'http_requests_total', base_url: 'http://localhost:9090' },
-        'discover-telemetry' => { provider: 'prometheus_stack', service: 'checkout', base_url: 'http://localhost:9090' },
         'candidates' => { telemetry_file: './telemetry.json' },
         'draft-definition' => { service: 'checkout', owner: 'platform', telemetry_file: './telemetry.json' },
         'draft-from-handoff' => { service: 'checkout', owner: 'platform', handoff_file: './handoff.json' },
@@ -402,15 +399,7 @@ module SloRulesEngine
                          provider_reads: %w[managed_files], provider_writes: %w[managed_files]),
                   gates: %w[strict_arguments approved_exact_plan resumable_journal state_recheck explicit_confirmation scope_lock post_apply_verification]),
 
-          command('lookup-telemetry', handler: :lookup_telemetry, side_effect: 'provider_read',
-                  io: io(provider_reads: %w[telemetry_backend],
-                         credentials: %w[provider_environment_when_required]),
-                  gates: %w[strict_arguments explicit_metric read_only]),
-          command('discover-telemetry', handler: :discover_telemetry, side_effect: 'provider_read',
-                  io: io(local_reads: %w[scope_file], local_writes: %w[discovery_evidence discovery_index],
-                         provider_reads: %w[telemetry_backend],
-                         credentials: %w[provider_environment_when_required]),
-                  gates: %w[strict_arguments bounded_scope one_provider_per_run read_only_backend]),
+          *CommandContracts::Telemetry.definitions,
           *CommandContracts::Catalog.definitions,
           command('candidates', side_effect: 'local_read',
                   io: io(local_reads: %w[telemetry_evidence]),

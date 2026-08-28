@@ -47,4 +47,21 @@ class DatadogRequestTransportTest < Minitest::Test
     assert_equal 'api-key', http.requests.fetch(0)['DD-API-KEY']
     assert_equal '{"name":"test"}', http.requests.fetch(0).body
   end
+
+  def test_rejects_oversized_response_before_json_parsing
+    http = RetryHttp.new([FakeResponse.new('200', '{"secret":"provider text"}')])
+    transport = SloRulesEngine::Datadog::RequestTransport.new(
+      api_key: 'api-key',
+      app_key: 'app-key',
+      http: http,
+      sleep_fn: ->(_seconds) {}
+    )
+
+    error = assert_raises(SloRulesEngine::Datadog::ApiError) do
+      transport.request('GET', '/api/v1/metrics', max_response_bytes: 8)
+    end
+
+    assert_equal 'Datadog response exceeded the byte limit', error.message
+    refute_includes error.message, 'provider text'
+  end
 end

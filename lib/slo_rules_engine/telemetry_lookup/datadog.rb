@@ -6,6 +6,7 @@ module SloRulesEngine
   module TelemetryLookup
     class Datadog
       DEFAULT_LOOKBACK_SECONDS = 300
+      MAX_RESPONSE_BYTES = 2_097_152
 
       def initialize(client: SloRulesEngine::Datadog::Client.new, from: nil, to: nil, time_fn: -> { Time.now.to_i })
         @client = client
@@ -16,7 +17,7 @@ module SloRulesEngine
 
       def lookup(metric:, kind: 'unknown', user_visible: true, query: nil)
         expression = query || metric
-        response = @client.request('GET', query_path(expression))
+        response = @client.request('GET', query_path(expression), max_response_bytes: MAX_RESPONSE_BYTES)
         series = fetch_value(response, :series, [])
 
         if series.empty?
@@ -46,7 +47,11 @@ module SloRulesEngine
           raise ArgumentError, 'Datadog discovery cannot combine host with service or selector filters'
         end
 
-        response = @client.request('GET', metrics_path(service: service, selectors: selectors, host: host))
+        response = @client.request(
+          'GET',
+          metrics_path(service: service, selectors: selectors, host: host),
+          max_response_bytes: MAX_RESPONSE_BYTES
+        )
         metrics = Array(fetch_value(response, :metrics, [])).sort
 
         Result.new(

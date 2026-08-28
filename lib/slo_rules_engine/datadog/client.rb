@@ -65,10 +65,17 @@ module SloRulesEngine
         @state_reader.managed_state(service: service)
       end
 
-      def request(method, path, payload: nil, retries: 3, not_found_ok: false)
+      def request(method, path, payload: nil, retries: 3, not_found_ok: false, max_response_bytes: nil)
         validate_credentials!
 
-        @request_transport.request(method, path, payload: payload, retries: retries, not_found_ok: not_found_ok)
+        @request_transport.request(
+          method,
+          path,
+          payload: payload,
+          retries: retries,
+          not_found_ok: not_found_ok,
+          max_response_bytes: max_response_bytes
+        )
       end
 
       def delete_slo(id, force: false)

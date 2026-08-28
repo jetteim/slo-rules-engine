@@ -98,6 +98,38 @@ class TelemetryLookupTest < Minitest::Test
     assert_equal ['{service="checkout-api"}'], client.label_value_matchers
   end
 
+  def test_prometheus_client_encodes_query_parameters_exactly_once
+    http = CapturingPrometheusHttp.new
+    client = SloRulesEngine::TelemetryLookup::Prometheus::Client.new(
+      base_url: 'http://prometheus.test:9090',
+      http: http
+    )
+    expression = 'sum(rate(http_requests_total{service="checkout"}[5m]))'
+
+    client.query(expression)
+
+    uri = http.uris.fetch(0)
+    assert_equal '/api/v1/query', uri.path
+    assert_equal [['query', expression]], URI.decode_www_form(uri.query)
+    assert_includes uri.query, '%5B5m%5D'
+    refute_includes uri.query, '%255B5m%255D'
+  end
+
+  def test_prometheus_client_rejects_unsafe_dynamic_label_path_segments_before_http
+    http = CapturingPrometheusHttp.new
+    client = SloRulesEngine::TelemetryLookup::Prometheus::Client.new(
+      base_url: 'http://prometheus.test:9090',
+      http: http
+    )
+
+    error = assert_raises(ArgumentError) do
+      client.label_values('__name__%2Fvalues')
+    end
+
+    assert_includes error.message, 'unsafe Prometheus label name'
+    assert_empty http.uris
+  end
+
   private
 
   class FakeDatadogLookupClient
@@ -108,9 +140,10 @@ class TelemetryLookupTest < Minitest::Test
       @paths = []
     end
 
-    def request(method, path, payload: nil)
+    def request(method, path, payload: nil, max_response_bytes: nil)
       raise "unexpected payload #{payload.inspect}" if payload
       raise "unexpected method #{method}" unless method == 'GET'
+      raise "missing response bound" unless max_response_bytes == 2_097_152
 
       @paths << path
       @responses.fetch(path)
@@ -144,6 +177,20 @@ class TelemetryLookupTest < Minitest::Test
 
       @label_value_matchers.concat(matchers)
       @label_values
+    end
+  end
+
+  class CapturingPrometheusHttp
+    Response = Struct.new(:body)
+    attr_reader :uris
+
+    def initialize
+      @uris = []
+    end
+
+    def get_response(uri)
+      @uris << uri
+      Response.new(JSON.generate(status: 'success', data: { result: [] }))
     end
   end
 end

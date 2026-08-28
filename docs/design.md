@@ -5,7 +5,7 @@
 The engine is a local Ruby application with explicit boundaries around neutral
 reliability intent, provider translation, reviewed evidence, state execution,
 and read-only status. Phase 14 now includes Human dispatch, Agent runtime
-introspection, and typed structured invocation for nine commands; later Agent
+introspection, and typed structured invocation for eleven commands; later Agent
 commands and MCP must reuse the same application behavior.
 
 ```text
@@ -49,15 +49,18 @@ through the focused `AgentCommands` adapter.
 
 The Human CLI adapter preserves existing positional/convenience syntax. The
 Agent adapter validates complete JSON requests and returns stable result/error
-envelopes for nine registry-mapped application commands. Analysis commands
+envelopes for eleven registry-mapped application commands. Analysis commands
 use bounded workspace-contained `.rb` inputs; file-backed `diff` additionally
 uses a reviewed `.json` manifest and confined managed root, with no provider
 network or writes. `generate` and `manifest-review` additionally use confined
 output roots/files, preflight derived artifact children, and share zero-I/O
 `validate_only` between Human and Agent adapters. Application stdout/stderr and
-direct exits are quarantined. Field projection, collection limits, URL/ID
-hardening, validation-only coverage for later write families, sanitization,
-skill guidance, and MCP schemas must derive from this foundation.
+direct exits are quarantined. Telemetry lookup/discovery adds shared HTTP(S)
+endpoint and exact-host policy, provider-specific resource identifiers,
+once-only transport encoding, bounded/sanitized Agent results, confined batch
+outputs, and zero-I/O validation before client construction. General field
+projection, collection limits for other families, validation-only coverage for
+later writes, skill guidance, and MCP schemas must derive from this foundation.
 
 The registry is an orchestration contract, not a second policy layer. It cannot
 override neutral intent, provider validation, reviewed evidence, ownership,

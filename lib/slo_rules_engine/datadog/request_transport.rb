@@ -24,7 +24,7 @@ module SloRulesEngine
         @sleep_fn = sleep_fn
       end
 
-      def request(method, path, payload: nil, retries: 3, not_found_ok: false)
+      def request(method, path, payload: nil, retries: 3, not_found_ok: false, max_response_bytes: nil)
         uri = uri_for(path)
         attempt = 0
         transport_attempt = 0
@@ -32,11 +32,15 @@ module SloRulesEngine
         loop do
           response = perform(method.to_s.upcase, uri, payload)
           transport_attempt = 0
-          return parse_body(response.body) if SUCCESS_CODES.include?(response.code)
+          body = response.body.to_s
+          if max_response_bytes && body.bytesize > max_response_bytes
+            raise ApiError.new('Datadog response exceeded the byte limit', response: response)
+          end
+          return parse_body(body) if SUCCESS_CODES.include?(response.code)
           return nil if not_found_ok && response.code == '404'
 
           attempt += 1
-          raise ApiError.new("Datadog #{method} #{path} failed with #{response.code}: #{response.body}", response: response) unless transient?(response, attempt, retries)
+          raise ApiError.new("Datadog #{method} #{path} failed with #{response.code}: #{body}", response: response) unless transient?(response, attempt, retries)
 
           @sleep_fn.call(retry_after(response))
         end

@@ -76,6 +76,7 @@ Datadog:
 bin/rules-ctl discover-telemetry \
   --provider=datadog \
   --service=checkout-api \
+  --limit=100 \
   > ./work/checkout-datadog-evidence.json
 ```
 
@@ -86,6 +87,8 @@ bin/rules-ctl discover-telemetry \
   --provider=prometheus_stack \
   --service=checkout-api \
   --base-url=http://localhost:9090 \
+  --allow-host=localhost \
+  --limit=100 \
   > ./work/checkout-prometheus-evidence.json
 ```
 
@@ -96,6 +99,8 @@ bin/rules-ctl discover-telemetry \
   --provider=sloth \
   --service=checkout-api \
   --base-url=http://localhost:9090 \
+  --allow-host=localhost \
+  --limit=100 \
   > ./work/checkout-sloth-evidence.json
 ```
 
@@ -111,6 +116,13 @@ bin/rules-ctl candidates ./work/checkout-datadog-evidence.json \
 - `discover-telemetry` writes one normalized JSON envelope to stdout; the shell redirection above creates the evidence file.
 - `candidates` writes ranked proposal JSON to stdout with candidate UID, calculation basis, confidence, reasons, caveats, explanation, and rejected-signal findings.
 - Datadog evidence comes from Datadog APIs. Prometheus Stack and Sloth evidence comes from a Prometheus-compatible API and retains the selected provider label.
+- Metric identifiers, selectors, endpoint hosts, and windows are validated
+  before client construction. Prometheus-compatible Agent requests require an
+  explicit HTTP(S) base URL and exact host allowlist. Query parameters are
+  encoded once by the transport.
+- Discovery returns at most `--limit` signals. Unsafe provider-controlled
+  metric names are omitted with SHA-256 fingerprints, and raw backend error
+  text is never copied into Agent results or saved batch errors.
 - No definition, provider manifest, alert, dashboard, or backend resource is created.
 
 **Intent preserved:** telemetry can support or reject a candidate, but it does not choose the objective, user journey, or operational response.
@@ -123,7 +135,8 @@ bin/rules-ctl candidates ./work/checkout-datadog-evidence.json \
 bin/rules-ctl discover-telemetry \
   --provider=datadog \
   --scope-file=./examples/telemetry/scopes.json \
-  --output-dir=./work/discovery
+  --output-dir=./work/discovery \
+  --limit=100
 
 bin/rules-ctl onboarding-summary \
   --handoff-dir=./work/handoff \
@@ -1201,15 +1214,20 @@ security, and promotion gates are in
 **Delivery status:** partially implemented. AICLI-F1 provides the shared
 registry/catalog, and AICLI-F2 provides offline `agent catalog` and `agent
 describe` with strict resolved request schemas. Strict JSON/file/stdin
-invocation and versioned result/error envelopes now cover nine commands: the
+invocation and versioned result/error envelopes now cover eleven commands: the
 three zero-I/O commands `providers.list`, `integrations.list`, and
 `recommend-calculation-basis`; the workspace-reading `validate`,
 `migration-report`, and `model-report`; and file-backed `diff` for
-`prometheus_stack`/`sloth`; plus workspace-confined `generate` and
-`manifest-review`. The applicable AICLI-F3 read-path gates, confined generated
+`prometheus_stack`/`sloth`; plus workspace-confined `generate`,
+`manifest-review`, `lookup-telemetry`, and single/batch
+`discover-telemetry`. The applicable AICLI-F3 read-path gates, confined generated
 output paths, and zero-I/O `validate_only` for this first local-write family
-are implemented. Other write families, Datadog state reads, projections, full
-validation-only coverage, skills, and MCP remain planned.
+are implemented. Telemetry additionally proves exact endpoint-host allowlists,
+resource-ID and selector hardening before client construction, bounded and
+sanitized discovery output, confined batch files, and zero-I/O
+`validate_only`. Other write families, Datadog state reads outside telemetry,
+general projections, full validation-only coverage, skills, and MCP remain
+planned.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
@@ -1279,6 +1297,22 @@ child paths against workspace and symlink containment, then uses the same
 typed application command as the Human CLI. `generate` requires `output_dir`;
 `manifest-review` requires `output_file` on the Agent surface.
 
+Implemented read-only telemetry lookup and bounded discovery:
+
+```bash
+bin/rules-ctl agent invoke lookup-telemetry \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"lookup-telemetry","command_version":1,"arguments":{"provider":"prometheus_stack","metric":"http_requests_total","base_url":"http://localhost:9090","allowed_hosts":["localhost"]}}'
+
+bin/rules-ctl agent invoke discover-telemetry \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"discover-telemetry","command_version":1,"arguments":{"provider":"prometheus_stack","service":"checkout-api","base_url":"http://localhost:9090","allowed_hosts":["localhost"],"limit":100}}'
+```
+
+For a zero-I/O preflight, add `"validate_only":true`. Batch discovery replaces
+`service` with workspace-relative `scope_file` and `output_dir`; validation-only
+does not open the scope file or create the destination. Normal execution
+validates every scope before client or credential construction, writes only
+confined per-scope JSON plus `index.json`, and reports explicit truncation.
+
 Planned write-capable invocation after the same gates reach later families:
 
 ```bash
@@ -1333,7 +1367,9 @@ outside the current directory. Agent paths are bounded and canonicalized;
 traversal, absolute paths, pre-encoding, controls, unexpected extensions,
 symlink escape, and oversized inputs fail before file content is loaded.
 Generated service/provider child paths are checked before the first artifact
-write. Datadog reads and write-capable commands other than
+write. Telemetry URLs, exact allowed hosts, metric/scope identifiers, selector
+maps, time windows, and response limits are validated before provider client
+construction. Write-capable commands other than
 `generate`/`manifest-review` remain non-executable through `agent invoke`;
 arbitrary provider mutation payloads remain unsupported.
 
@@ -1358,7 +1394,7 @@ arbitrary provider mutation payloads remain unsupported.
 - Catalog entries expose `structured_invocation`; it is currently true for
   `providers.list`, `integrations.list`, `recommend-calculation-basis`,
   `validate`, `migration-report`, `model-report`, `diff`, `generate`, and
-  `manifest-review`.
+  `manifest-review`, `lookup-telemetry`, and `discover-telemetry`.
 - Each implemented invocation prints one
   `slo-rules-engine/agent-command-result/v1` object containing a deterministic
   request ID, command ID/version, `outcome`, `exit_status`, declared/exercised
@@ -1385,6 +1421,11 @@ arbitrary provider mutation payloads remain unsupported.
   `side_effect.exercised: none` on the Agent surface and explicit false values
   for local reads, local writes, provider calls, and credential loading.
   Missing source files are not opened and no output parent is created.
+- Agent telemetry result envelopes declare `provider_read` when executed and
+  `none` under `validate_only`. Discovery includes `returned`, `limit`, and
+  `truncated`; unsafe remote metric names and raw provider error text are not
+  returned. Batch output paths are workspace-confined and created only after
+  every scope identifier has passed pre-client validation.
 - Inline JSON, a workspace-contained JSON file, and stdin are mutually
   exclusive. Explicit `--format=json` overrides `RULES_CTL_OUTPUT_FORMAT`; JSON
   is the default, while unsupported formats fail closed.

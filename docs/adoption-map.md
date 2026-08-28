@@ -106,8 +106,11 @@ gates; MCP later projects the same registry.
 - strict raw command-request JSON invocation and result/error envelopes
 - implemented workspace-confined adversarial file-input validation for
   validation/reporting and local file-backed diff, plus confined
-  generation/review outputs and zero-I/O `validate_only`; followed by remaining
-  URL/identifier rules and validation-only coverage for other writes
+  generation/review outputs and zero-I/O `validate_only`
+- implemented URL/host/resource-ID safety for Agent telemetry lookup and
+  single/batch discovery, including bounded/sanitized output, confined batch
+  files, and pre-client zero-I/O validation; followed by validation-only
+  coverage for other writes
 - field masks, limits/cursors, NDJSON, explicit truncation, and response
   sanitization
 - versioned agent skill/context plus headless credential rules
@@ -123,12 +126,12 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. extend AICLI-F3 with URL/host/resource-ID policy before enabling the first
-   Agent provider-read family, and carry the proven confined-output plus
-   zero-I/O `validate_only` contract into the next local-write family
+1. carry the proven confined-output plus zero-I/O `validate_only` contract into
+   the next local-write family, and extend bounded/sanitized AICLI-F4 output
+   from telemetry into the next high-volume read family
 2. continue STR-3 command-family declarations only alongside the Agent feature
    that consumes them; catalog, analysis, generation/review, and provider-state
-   families are already explicit
+   and telemetry families are already explicit
 3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
 4. revalidate the Sloth MCP comparison against a tagged binary only after an

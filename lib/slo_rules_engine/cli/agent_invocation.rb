@@ -43,19 +43,25 @@ module SloRulesEngine
 
         properties = schema_value(schema, :properties) || {}
         required = schema_value(schema, :required) || []
+        minimum = schema_value(schema, :minProperties)
+        maximum = schema_value(schema, :maxProperties)
+        add_error(errors, path, 'too_few_properties', "must contain at least #{minimum} properties") if minimum && value.length < minimum
+        add_error(errors, path, 'too_many_properties', "must contain at most #{maximum} properties") if maximum && value.length > maximum
+        property_names = schema_value(schema, :propertyNames)
+        value.each_key { |name| validate_node(name.to_s, property_names, "#{path}.<property>", errors) } if property_names
         required.each do |name|
           add_error(errors, "#{path}.#{name}", 'required', 'required property is missing') unless value.key?(name.to_s)
         end
-        if schema_value(schema, :additionalProperties) == false
-          value.each_key do |name|
-            next if properties.key?(name.to_sym) || properties.key?(name.to_s)
-
-            add_error(errors, "#{path}.#{name}", 'unknown_property', 'property is not allowed')
-          end
-        end
+        additional_properties = schema_value(schema, :additionalProperties)
         value.each do |name, item|
           property_schema = properties[name.to_sym] || properties[name.to_s]
-          validate_node(item, property_schema, "#{path}.#{name}", errors) if property_schema
+          if property_schema
+            validate_node(item, property_schema, "#{path}.#{name}", errors)
+          elsif additional_properties == false
+            add_error(errors, "#{path}.#{name}", 'unknown_property', 'property is not allowed')
+          elsif additional_properties.is_a?(Hash)
+            validate_node(item, additional_properties, "#{path}.#{name}", errors)
+          end
         end
       end
 
@@ -374,12 +380,7 @@ module SloRulesEngine
           result: result.value,
           findings: result.findings,
           artifacts: result.artifacts,
-          truncation: {
-            truncated: false,
-            returned: result.value.is_a?(Array) ? result.value.length : nil,
-            limit: nil,
-            cursor: nil
-          }
+          truncation: result.truncation
         }
       end
     end

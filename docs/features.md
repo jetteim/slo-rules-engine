@@ -275,6 +275,11 @@ Implemented foundation:
   typed commands with the Human CLI, require explicit confined Agent
   destinations, validate derived service/provider child paths, and expose
   `validate_only` with explicit zero file/provider/credential I/O evidence.
+- **First Agent provider-read family:** `lookup-telemetry` and single/batch
+  `discover-telemetry` share typed Human/Agent commands, enforce HTTP(S) exact
+  host allowlists and provider-specific resource identifiers before client
+  construction, bound and sanitize Agent discovery results, confine batch
+  outputs, and expose zero-I/O `validate_only`.
 
 Planned features:
 
@@ -283,11 +288,11 @@ Planned features:
   Human CLI mapping, Agent CLI mapping, skill reference, and later MCP tool.
 - **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
   convenience flags and compatibility; a new Agent CLI accepts complete strict
-  JSON requests. Nine commands currently normalize into the same typed
+  JSON requests. Eleven commands currently normalize into the same typed
   application boundary; remaining commands are gated.
-- **Remaining Agent input hardening:** extend the implemented read/output-path
-  policy to unsafe IDs, embedded query/fragment syntax, URLs, credential
-  exclusion, and broader generated/fuzz coverage.
+- **Remaining Agent input hardening:** extend the implemented path and
+  telemetry URL/ID policy to credential-key exclusion, other provider-read
+  families, and broader generated/fuzz coverage.
 - **Distinct safety modes:** generation/review now have zero-I/O
   `validate_only`; extend it across remaining writes while keeping
   observational planning and confirmed execution explicit with every current
@@ -306,8 +311,9 @@ The raw structured path represents a full rules-engine command, not an
 arbitrary provider API payload. Neutral reliability intent and reviewed
 provider artifacts remain authoritative. Catalog Agent JSON examples and their
 strict schemas are introspectable contracts; only entries advertising
-`structured_invocation: true` are executable. Datadog reads and write commands
-other than confined `generate`/`manifest-review` remain gated.
+`structured_invocation: true` are executable. Datadog telemetry reads are
+enabled through their fixed configured site; other Datadog state reads and
+write commands beyond confined `generate`/`manifest-review` remain gated.
 
 ## Change
 
