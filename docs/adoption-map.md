@@ -129,13 +129,10 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. carry the proven confined-output plus zero-I/O `validate_only` contract from
-   generation/review and handoff review into the portfolio onboarding write
-   family, and extend bounded/sanitized AICLI-F4 output into the next
-   release/status collection
-2. continue STR-3 command-family declarations only alongside the Agent feature
-   that consumes them; catalog, analysis, generation/review, provider-state,
-   telemetry, and onboarding families are already explicit
+1. follow the [maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue):
+   trustworthy test discovery, a short code map, and candidate output safety
+2. remove repeated artifact policy and command metadata before enabling more
+   Agent commands; reassess feature growth after the first housekeeping tranche
 3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
 4. revalidate the Sloth MCP comparison against a tagged binary only after an
@@ -154,9 +151,7 @@ Completed recommendation reviews:
 1. Test suite dependency and compaction review: `docs/housekeeping/test-suite-compaction-review.md`
 2. Abstraction layer placement and compaction review: `docs/housekeeping/abstraction-layer-review.md`
 
-Recommended housekeeping sequence:
-
-Completed guardrails:
+Historical completed guardrails:
 
 1. CLI helper pilot: `test/support/cli_helpers.rb`
 2. Public-safe onboarding handoff and discovery fixtures: `test/support/onboarding_fixtures.rb`
@@ -178,7 +173,6 @@ Completed guardrails:
 
 Recommended remaining housekeeping sequence:
 
-1. Treat the atomic housekeeping checkpoint as complete.
-2. Make no further structural change unless a feature exposes a focused,
-   behavior-tested responsibility.
-3. Preserve the thin executable and library orchestration boundary.
+Follow the current HK queue linked above. The earlier feature-triggered-only
+housekeeping pause is superseded by the 2026-09-05 maintainer review. Preserve
+the completed atomic checkpoint's thin executable and safety boundaries.

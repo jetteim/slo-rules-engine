@@ -1,10 +1,284 @@
 # Project Structure Refactoring Plan
 
-Date: 2026-08-15
+Original audit: 2026-08-15. Maintainer review: 2026-09-05.
 
-Status: active; STR-0 completed, STR-3 started
+Status: housekeeping first; STR-0 completed, STR-3 partially implemented.
 
 Baseline commit: `6dc0ffb`
+
+## Start Here: Make The Project Understandable Again
+
+Reader: the repository maintainer who needs to understand a change before
+approving it. This is the active task queue, not another feature roadmap.
+The STR packets below retain their technical acceptance and preservation gates.
+HK tasks are smaller execution slices of that work or newly discovered gaps;
+they do not create a competing refactoring program.
+
+**Recommendation:** pause additional Agent command coverage, MCP/skill work,
+and provider features while the first housekeeping tranche is completed.
+Keep existing behavior supported. Do not rewrite the engine or split files just
+to make them shorter. The immediate problem is too many places to consult and
+too little evidence that cleanup is reducing that burden.
+
+### Current Audit Evidence
+
+Inspected revision: `df5303e` (clean `main` before this documentation change).
+
+| Measure | Original audit | Rechecked 2026-09-05 |
+| --- | ---: | ---: |
+| Production Ruby/executable files | 82 | 100 |
+| Production lines | 21,467 | 24,649 (+14.8%) |
+| Test Ruby files, including support/aggregate files | 71 | 78 |
+| Test lines | 16,092 | 17,732 |
+| Root requires | 63 | 64 |
+| Registered commands | 40 | 40 |
+| Allowed forbidden-reference occurrences | not recorded here | 15 |
+
+The command surface has not grown, but its interface machinery has. That is
+not automatically waste: Agent confinement and parity need real code. However,
+the dependency-removal packets remain open and the largest existing workflow
+files remain large: downstream evidence 1,167 lines, journal execution 884,
+release verification 828, and the CLI facade 774. STR-3 progress alone is not
+evidence that the codebase is easier to understand.
+
+Verified findings, ordered by practical impact:
+
+1. **The aggregate test baseline is incomplete.** Loading `test/all_test.rb`
+   and comparing `$LOADED_FEATURES` with `test/**/*_test.rb` identifies three
+   omitted suites: `agent_telemetry_commands_test.rb`,
+   `sloth_live_status_test.rb`, and `telemetry_batch_discovery_test.rb`.
+   The aggregate passes 532 tests / 7,282 assertions; those suites separately
+   pass another 17 tests / 158 assertions. Passing `scripts/verify.sh` therefore
+   does not currently mean every test file ran. This is test discovery evidence,
+   not a line-coverage measurement.
+2. **There is no short, reliable maintainer entry point.** `AGENTS.md` was 974
+   lines, this plan 581, and current priorities are repeated in implementation,
+   Agent, adoption, and handoff documents. The implementation plan's STR-3
+   summary still said seven shared commands while Phase 14 said thirteen.
+   The latest two-command checkpoint touched 21 files, including nine Markdown
+   files. Reading more historical status is not a substitute for a code map.
+3. **Output safety is still field-by-field and incomplete.** In
+   `application/onboarding_commands.rb`, `sanitize_signals` removes some
+   untrusted text but passes `calculation_basis` through. `CandidateGenerator`
+   copies it into `proposed_slo`. An in-memory application probe with confined
+   Agent policy returned `{ "unexpected_text": "audit_canary" }` unchanged
+   when supplied as that field. No source file or provider was accessed by the
+   probe. This proves the application-boundary defect, not an end-to-end CLI
+   exploit. Treat correction as a safety fix, not behavior-preserving cleanup.
+4. **The architecture checks prove less than their prose suggests.**
+   `StructureInventory#dependency_evaluation` evaluates configured regex rules;
+   boundary `allowed_dependencies` are reported but not used to derive all
+   forbidden edges. Use-case mapping checks file existence, not suite loading.
+   Some removal ownership also disagrees: shared fingerprint edges are marked
+   STR-2 in configuration but assigned to STR-1 here. The check is useful, but
+   it is not a complete Ruby dependency graph or coverage proof.
+5. **Repeated policy and parallel command declarations remain.** The new
+   onboarding support adds another canonical JSON fingerprint implementation
+   while STR-1 remains open. Command-family declarations coexist with legacy
+   usage/example/schema assembly. This creates multiple maintenance paths even
+   though the final runtime registry is validated.
+
+### Ordered Housekeeping Queue
+
+Audit verification (canonical Homebrew Ruby, 2026-09-05):
+
+- `./scripts/verify.sh`: passed, including 532 tests / 7,282 assertions and
+  architecture checks; its deliberately refused live apply printed expected
+  usage text. No live provider verification was attempted.
+- `ruby -Ilib -e 'Dir.glob("test/**/*_test.rb").sort.each { |path| require_relative path }'`:
+  passed 549 tests / 7,440 assertions, zero failures/errors/skips. This audit
+  command covers the omitted suites but does not repair the canonical runner.
+- Focused housekeeping/Agent-roadmap/use-case/public-safety tests: 13 tests /
+  653 assertions passed. `git diff --check` passed. Current suite success does
+  not invalidate the separately reproduced, not-yet-regression-tested output
+  defect above.
+
+All tasks below are **open**. Sizes indicate review scope, not time estimates:
+S = one narrow checkpoint; M = several explicitly separated checkpoints.
+One task/checkpoint at a time. Each code checkpoint runs its focused tests,
+`scripts/structure-report --check`, `git diff --check`, and full verification.
+Do not update snapshot hashes merely to make a check pass: explain the exact
+contract change, or show that the old contract remains identical.
+
+| Order | Task | Size | Existing packet / prerequisite |
+| --- | --- | --- | --- |
+| 1 | HK-01: Make “all tests” actually include all tests | S | early test-discovery part of STR-7; no domain dependency |
+| 2 | HK-02: Give the maintainer one map and one current queue | M | documentation; after HK-01 baseline |
+| 3 | HK-03: Close candidate output-policy gaps | S | AICLI-F3/F4 safety repair; after HK-01 |
+| 4 | HK-04: Give artifact identity and credential policy one owner | M | STR-1; after HK-01 and HK-03 |
+| 5 | HK-05: Finish command declarations without enabling commands | M | bounded STR-3 work; after HK-02 |
+| 6 | HK-06: Make fitness checks match their advertised scope | S | STR-0 follow-up; before dependency moves in HK-07/08 |
+| 7 | HK-07: Let Sloth evidence own evidence preflight | M | STR-2; after HK-04 and HK-06 |
+| 8 | HK-08: Separate journal storage from execution policy | M | STR-4; after HK-04 and HK-06 |
+
+### HK-01: Make “All Tests” Actually Include All Tests
+
+**Work:** repair `test/all_test.rb` discovery and add a regression check that
+compares eligible test files with loaded suites, allowing only named exclusions
+with reasons. Preserve intentional transitive Datadog test loading. Keep this
+separate from splitting `cli_test.rb` or changing application code.
+
+**Acceptance:** all three omitted suites run through `scripts/verify.sh`; a
+new unregistered test causes a failure or is automatically included exactly
+once. Record loaded files and named test identities, not just assertion totals.
+The present combined count is expected to start at 549 tests / 7,440 assertions
+before adding the discovery regression; verify it rather than hardcoding it.
+
+**Verification:** run individual omitted suites, the aggregate, and full verify;
+use a temporary unregistered test to prove the discovery check catches it.
+**Rollback:** revert test-runner/check changes only; no runtime behavior changes.
+
+### HK-02: Give The Maintainer One Map And One Current Queue
+
+**Work:** first add a short maintainer explanation, linked prominently from
+README: intent → reviewed artifacts → plan → journaled execution → verification;
+live status is a read-only observation path, not execution. Map these concepts
+to actual files, public facades, focused tests, and one file-backed walkthrough.
+Show one Human and Agent command reaching the same application command, and
+explicitly identify legacy commands that have not moved to that seam.
+Second, trim `AGENTS.md` to operating rules, evidence gates, and links; move
+historical checkpoint detail to an archive. Keep current execution order here,
+feature scope in the Agent roadmap, contracts in their existing references,
+and procedures in use cases/walkthroughs. Remove repeated progress inventories.
+
+**Acceptance:** the maintainer can trace a generated file to its definition,
+locate the shared command handler and its tests, and explain why apply is
+refused without reading the historical roadmap. Aim for a map readable in ten
+minutes and `AGENTS.md` under 200 lines; these are readability targets, not CI
+line-count laws. Ask the maintainer to try the three navigation tasks; until
+then record human comprehension as unverified. Preserve old links/anchors or
+provide explicit replacement links; adapt prose-pinning tests without dropping
+contract coverage.
+
+**Verification:** follow every code/test link and the existing offline
+Prometheus walkthrough; run documentation tests. **Rollback:** revert each
+documentation move independently; preserve the archive and original content.
+
+### HK-03: Close Candidate Output-Policy Gaps
+
+**Work:** characterize every field copied from telemetry into Agent candidate
+results, including `calculation_basis`, IDs, numeric fields, and optional text.
+Define an explicit allowed output shape instead of assuming selected input
+fields cover every generator output. Keep generation semantics separate from
+Agent presentation; document intentional Human/Agent differences rather than
+silently replacing reviewed meaning. No new Agent commands or generic response
+framework in this task.
+
+**Acceptance:** the canary object above cannot pass as a calculation basis;
+unsupported types/text produce stable refusal or declared quarantine. Test
+nested values, controls, oversize strings and arrays, and supported enum values
+through the real Agent CLI. Preserve valid Human behavior and confined/zero-I/O
+gates. Update both interface contracts, parity tests, introspection and usage
+for the intentional safety correction.
+
+**Verification:** Agent onboarding/adversarial tests, Human onboarding tests,
+registry/introspection and full verify. **Rollback:** isolated safety-fix commit;
+if reverted, mark the defect open and keep command expansion paused.
+
+### HK-04: Give Artifact Identity And Credential Policy One Owner
+
+**Work:** execute STR-1 in two checkpoints: golden-vector characterization,
+then shared owner plus compatibility delegates and caller migration. Include
+the newly added `OnboardingCommandSupport#fingerprint` in the inventory.
+Compare implementations before consolidation: text hashing, JSON hashing,
+symbol values, duplicate string/symbol keys, error fallback, and finding paths
+are not assumed interchangeable.
+
+**Acceptance:** one owner for each proven identical policy; old public helpers
+delegate; supported artifact IDs and credential findings remain byte-identical.
+Preserve demonstrated differences explicitly instead of normalizing them away.
+Remove the exact migrated release-utility debt entries and record before/after.
+Do not extract unrelated `fetch_value` helpers or a generic artifact framework.
+
+**Verification:** STR-1 suites plus Agent onboarding fingerprint/quarantine
+tests and golden artifacts. **Rollback:** keep existing constants/load paths;
+revert migration independently from characterization.
+
+### HK-05: Finish Command Declarations Without Enabling Commands
+
+**Work:** finish the metadata half of STR-3 one remaining family at a time;
+remove each migrated family's legacy usage/examples/schema-inference source
+in the same checkpoint. Keep typed-handler extraction a separate checkpoint
+only where there is demonstrated duplicated orchestration. Record one worked
+example showing all files needed to maintain a command.
+
+**Acceptance:** all 40 commands have one explicit declaration owner; existing
+registry/catalog output and resolved schemas compare equal; command coverage
+stays at thirteen executable Agent commands. No handler discovery framework,
+new adapter, or newly enabled side effect. Docs link to runtime introspection
+for exhaustive metadata rather than reproducing it in multiple inventories.
+
+**Verification:** compare complete before/after registry, catalog and describe
+outputs; run Human/Agent parity and unsupported-command refusal tests.
+**Rollback:** one family per revertible commit behind the existing registry.
+
+### HK-06: Make Fitness Checks Match Their Advertised Scope
+
+**Work:** reconcile boundary declarations with the actual regex checks and
+label their limitations. Add negative fixtures for missing rule coverage and
+representative forbidden edges; do not build a general Ruby static analyzer.
+Align removal ownership for shared policy with STR-1, evidence preflight with
+STR-2, actual runtime status coordination with STR-5, and approved plans with
+STR-4. Hook use-case evidence into HK-01's suite inclusion check.
+
+**Acceptance:** every declared boundary restriction has a test or an explicit
+documented limitation; an allowed-dependency declaration cannot imply coverage
+that does not exist. No widened allowlist, removed debt finding, or snapshot
+refresh without the matching code/evidence change.
+
+**Verification:** architecture negative fixtures, deterministic report, suite
+inclusion, and unchanged runtime contract snapshots. **Rollback:** checker and
+policy edits only; keep recorded debt evidence for the restored policy.
+
+### HK-07: Let Sloth Evidence Own Evidence Preflight
+
+**Work:** execute STR-2 with two reviewable checkpoints: move existing evidence
+collaborators behind the old require path, then move exact-source preflight
+out of `LiveStatus::SlothReader`. Update release/status/MCP callers together.
+
+**Acceptance:** callers can validate evidence without reaching into a live
+reader. Remove preflight-only dependency edges; do not claim all runtime-status
+dependencies are removed. No external generator execution or schema changes.
+
+**Verification:** STR-2 suites, including the newly included Sloth live-status
+suite; preserve fail-before-client/read order and exact artifacts/findings.
+**Rollback:** stable evidence facade and independently revertible moves.
+
+### HK-08: Separate Journal Storage From Execution Policy
+
+**Work:** execute STR-4 as distinct checkpoints for existing journal classes,
+approved-plan status dependency inversion, and executor/result responsibilities.
+Keep the current storage format and constructor compatibility; do not redesign
+the state machine while moving it.
+
+**Acceptance:** a reader can find transition rules, atomic storage, retry
+eligibility, and result construction separately; provider state no longer
+defaults internally to release orchestration. Exact plans, locks, attempts,
+resume behavior and final verification remain unchanged.
+
+**Verification:** STR-4 suites, failure injection, replay/resume and file-backed
+release apply/verify. **Rollback:** one responsibility per checkpoint behind
+the existing public constants and load paths.
+
+### Stop Conditions And Later Work
+
+Review the first tranche after HK-01 through HK-06. Resume feature expansion
+only after suite discovery is trustworthy, the known safety defect is closed,
+the maintainer has tried the code map, and repeated policy/metadata has actually
+been removed. The maintainer can then choose the next feature or HK-07/08;
+there is no requirement to fund an indefinite cleanup program.
+
+Keep STR-5 release phases, STR-6 MCP/applier internals, and the remaining STR-7
+CLI test split/composition-root work queued behind their existing dependency
+gates. The early HK-01 test-discovery repair does not authorize early root-loader
+rewrites. Stable DSL and Datadog freeze zones remain unchanged. Live Datadog
+and tagged Sloth MCP verification remain deferred; this review made no backend
+calls and did not establish any new live-provider evidence.
+
+This checkpoint creates tasks and adjusts sequencing only. It does not close
+any HK task, fix the discovered defects, or establish that comprehension has
+improved. The historical audit below explains the preserved STR design; where
+its feature-first sequence differs, this current queue takes precedence.
 
 ## Objective
 
@@ -257,11 +531,12 @@ STR-0 makes these rules executable before broad movement starts:
 
 ## Delivery Packets
 
-Packet numbers are stable identifiers, not a requirement to pause product work
-until every lower number ships. STR-0 is always first. STR-3 may then accompany
-the next AICLI-F2 invocation slice because it is the feature-aligned seam.
+Packet numbers are stable identifiers. The current HK queue above controls
+execution priority; STR-3 metadata cleanup need not enable another Agent
+command. STR-0 is already complete.
 Structural dependency order is STR-1 before STR-2/STR-4, STR-2 and STR-4 before
-STR-5/STR-6, and STR-7 last. Only one packet is active at a time.
+STR-5/STR-6, and STR-7 composition cleanup last. HK-01 brings only independent
+test-discovery repair forward. Only one packet is active at a time.
 
 ### STR-0: Architecture Fitness And Preservation Baseline (completed 2026-08-15)
 

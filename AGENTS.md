@@ -8,11 +8,12 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Carry confined output plus zero-I/O `validate_only` into the portfolio
-   onboarding write family, and extend the telemetry/candidate-proven
-   bounded/sanitized AICLI-F4 contract into the next release/status collection
-2. Continue STR-1 through STR-7 only through their named preservation and
-   dependency-removal gates
+1. Housekeeping first: follow the HK-01–HK-08 queue in
+   `docs/housekeeping/project-structure-refactoring-plan.md`. Start with test
+   suite discovery, then the maintainer code map and candidate output safety.
+2. Pause additional Agent command coverage and MCP/skill work during the first
+   housekeeping tranche. Continue STR packets through their preservation and
+   dependency-removal gates; reassess with the maintainer after HK-01–HK-06.
 3. Production-grade Datadog reconciliation only when isolated backend evidence
    is available
 4. Datadog exact-plan parity only after live recheck/idempotency semantics are
@@ -626,6 +627,15 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
+- 2026-09-05 maintainer review: created eight scoped housekeeping tasks in the
+  existing structure plan and made them the active queue. Rechecked baseline:
+  100 production files, 24,649 lines, 64 root requires, 15 allowed forbidden
+  references. Found three test suites omitted by the aggregate (17 tests / 158
+  assertions pass separately), candidate `calculation_basis` output passthrough,
+  and overbroad descriptions of architecture-check coverage. These are open
+  tasks, not fixes; no runtime code changed. Historical checkpoints below do
+  not override the new housekeeping priority.
+
 - latest checkpoint: bounded/sanitized Agent candidate reads plus confined
   handoff review, zero-I/O review `validate_only`, Human mutation/exit parity,
   and explicit STR-3 onboarding contracts
@@ -743,12 +753,10 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Extend the proven confined-output plus zero-I/O `validate_only` contract to
-   portfolio onboarding writes, and carry telemetry/candidate bounded and
-   sanitized result policy into the next release/status collection
-2. Continue STR-3 one command family at a time until every command owns its
-   Human usage, Agent example, explicit schema, side effects, I/O, safety,
-   contract references, and MCP metadata in one declaration
+1. Close HK-01 suite-discovery gaps, deliver the HK-02 maintainer map, and repair
+   the HK-03 candidate output-policy defect before expanding command coverage.
+2. Remove duplicated artifact policy and remaining parallel command metadata,
+   and align architecture checks with their stated scope (HK-04–HK-06).
 3. Run the Datadog sandbox probes and resume live provider-contract work only
    when the user makes credentials/evidence available
 4. Extend exact approval/apply/resume to Datadog only after verified backend
@@ -769,37 +777,18 @@ Secondary gaps:
 
 ## Recommended Next Slice
 
-Next recommended slice:
-
-- extend confined output and zero-I/O validation into portfolio onboarding
-  summary/artifact-index writes without weakening evidence or rerun-safety gates
-- extend bounded/sanitized result policy from telemetry/candidates into the
-  next release/status collection, migrating its affected declarations in the
-  same slice
-
-Rationale:
-
-- the supported Sloth boundary is complete through generation, file-state
-  planning/exact execution, downstream evidence, direct and aggregate neutral
-  status, release verification, and official MCP comparison
-- the MCP comparison detects provider identity/objective/period/budget drift
-  without weakening source freshness, exact-record, status, or mutation gates
-- remaining Sloth work is externally gated on a tagged MCP release and additional
-  upstream status evidence, not an unfinished engine feature
-- AICLI-F2 now has a complete 40-command registry/catalog/introspection
-  foundation plus proven zero-I/O and workspace-read/state-plan paths
-- file-reading validation/reporting, local file-backed diff, generation/review,
-  and telemetry provider reads now have shared field-specific safety; later
-  writes and provider mutation remain correctly gated on the rest of AICLI-F3
-- STR-0 now prevents new cross-layer debt and locks the current command, schema,
-  use-case, boundary, and command-module inventories before feature growth
-- the refactoring plan revalidated every hotspot against all 19 use cases and
-  explicitly freezes stable DSL, Datadog, onboarding, and validator code
-- Datadog work remains correctly evidence-gated and postponed
+HK-01: make the aggregate suite include every eligible test and guard against
+future omission. Follow the task's exact scope and verification in
+`docs/housekeeping/project-structure-refactoring-plan.md`, then HK-02's code map.
+The maintainer explicitly requested understandability and maintenance work;
+more Agent features are not the default next slice. All existing safety gates
+and postponed live-provider work remain unchanged.
 
 ## Next Session Handoff
 
-Prepared on 2026-09-05 for a restart-and-`proceed` workflow.
+Updated on 2026-09-05: `proceed` now starts HK-01, not another Agent feature.
+The implementation evidence below describes the previous feature checkpoint;
+the current housekeeping audit and task status live in the structure plan.
 
 Current safe boundary:
 
@@ -867,13 +856,12 @@ When the user types `proceed` in a fresh session:
 
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
-3. Read `docs/housekeeping/project-structure-refactoring-plan.md`; STR-0 is
-   complete, so preserve its checks while implementing the next vertical slice.
+3. Read the current housekeeping queue at the top of
+   `docs/housekeeping/project-structure-refactoring-plan.md`; begin HK-01.
 4. Treat the supported Sloth engine boundary as complete; do not invent more
    provider work while the tagged MCP release and status-parity fields are absent.
-5. Extend AICLI-F2 only with the AICLI-F3 field validation and AICLI-F4 output
-   bounds required by the next command; do not reconstruct Human `argv` inside
-   the Agent adapter.
+5. Keep Agent command expansion paused through the first housekeeping tranche;
+   do not combine refactoring with new command enablement.
 6. Preserve the completed AICLI-F1 registry/catalog parity and update both the
    Human CLI usage and target Agent JSON mapping for every CLI change.
 7. Keep the official Sloth MCP runtime comparison-only and do not claim status
@@ -960,11 +948,9 @@ If a new session needs to resume quickly:
 7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
-8. If the user says `proceed`, extend confined output and zero-I/O validation
-   through the next typed local-write family or extend telemetry-proven
-   bounded/sanitized output through the next high-volume read family; the
-   supported Sloth comparison boundary is implemented and a tagged-runtime
-   parity test is externally gated
+8. If the user says `proceed`, execute the first open housekeeping task, starting
+   with HK-01. Do not resume Agent feature growth automatically. The tagged
+   Sloth-runtime comparison remains externally gated.
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
 10. Keep the official Sloth MCP adapter comparison-only; the current

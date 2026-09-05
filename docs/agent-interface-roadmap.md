@@ -366,6 +366,13 @@ other command families remain open.
 
 ## Delivery Order
 
+Execution override (2026-09-05): complete the first
+[housekeeping tranche](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue)
+and reassess with the maintainer before expanding command coverage or shipping
+MCP/skill work. HK-03 repairs a known candidate output-policy gap; the existing
+bounded/sanitized slices must not be read as comprehensive output safety.
+The sequence below remains the feature dependency order after that checkpoint.
+
 1. AICLI-F1 delivered the architectural foundation and registered current commands without changing their behavior.
 2. Deliver AICLI-F2 first for read-only catalog, validation, reporting, and one state-planning vertical slice; expand only through registry-backed mappings.
 3. Complete AICLI-F3 before exposing any Agent CLI local write or provider mutation.

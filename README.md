@@ -642,6 +642,7 @@ The initial delivery integration is `notification_router`, which generates conte
 
 ## Documentation
 
+- [Maintainer Housekeeping: Findings And Next Tasks](docs/housekeeping/project-structure-refactoring-plan.md#start-here-make-the-project-understandable-again)
 - [Architecture](docs/design.md)
 - [Engineering Use Cases](docs/use-cases.md)
 - [Telemetry-First Walkthrough](docs/telemetry-first-walkthrough.md)

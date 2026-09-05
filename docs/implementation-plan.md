@@ -2,6 +2,12 @@
 
 This is the running plan for the long refactor.
 
+Current execution priority (2026-09-05): the
+[maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
+Start HK-01 test discovery, then HK-02's code map and HK-03's safety repair.
+Additional Agent coverage and MCP/skill work are paused for the first tranche;
+the phases below describe scope and history, not permission to skip that queue.
+
 ## Phase 1: Public Skeleton
 
 - [x] Create public-safe repository scaffold.
@@ -121,7 +127,8 @@ This is the running plan for the long refactor.
 - [x] Extract report CLI command module after command-family coverage exists.
 - [x] Extract Datadog request transport and retry behavior from the Datadog client.
 - [x] Pause incremental housekeeping unless a future behavior change exposes a
-  clean seam without reducing readability.
+  clean seam without reducing readability. Historical decision, superseded by
+  the 2026-09-05 maintainer housekeeping queue above.
 - [x] Move CLI orchestration into the library boundary, retain a thin
   executable, consolidate command-ownership coverage, and centralize duplicated
   public-safe manifest fixtures through the atomic coherence checkpoint.
@@ -313,9 +320,10 @@ and revalidation are in
   its existing collaborators without changing public constants.
 - [ ] **STR-3:** replace parallel command metadata with bounded-context contract
   declarations and introduce typed application commands before Agent invocation
-  expands. Catalog, analysis, and provider-state command families now use
-  single explicit declarations, and seven Human/Agent commands share typed
-  application commands; remaining families are open.
+  expands. Catalog, analysis, generation/review, provider-state, telemetry, and
+  onboarding families now have explicit declarations; thirteen Human/Agent
+  commands share typed application commands. HK-05 finishes declarations
+  without enabling additional commands; remaining families are open.
 - [ ] **STR-4:** split provider-state journal/approved-plan classes by existing
   boundaries and invert the provider-state to release default dependency.
 - [ ] **STR-5:** split release verification/application by workflow phase and
