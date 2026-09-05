@@ -42,8 +42,8 @@
     "migration-report",
     "model-report"
   ],
-  "command_registry_sha256": "d46b1ca84fcc880f2c280d99ac0ad53333347290baec169ed16ff5d35b755b18",
-  "command_catalog_sha256": "fd118935dff68145320db38e3940c773a94ee8965713e4ac9491c29400f66e23",
+  "command_registry_sha256": "9b469042cf17fb7724262156addbcbc4faeb051df55ad682ccfecc914d583f0f",
+  "command_catalog_sha256": "4678ffc0d1a0459299858ef84e63599e7d4efb61a2bf88436da05ddca0476699",
   "schema_ids": [
     "slo-rules-engine/agent-command-catalog/v1",
     "slo-rules-engine/agent-command-description/v1",

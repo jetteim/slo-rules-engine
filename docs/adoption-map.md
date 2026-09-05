@@ -109,8 +109,11 @@ gates; MCP later projects the same registry.
   generation/review outputs and zero-I/O `validate_only`
 - implemented URL/host/resource-ID safety for Agent telemetry lookup and
   single/batch discovery, including bounded/sanitized output, confined batch
-  files, and pre-client zero-I/O validation; followed by validation-only
-  coverage for other writes
+  files, and pre-client zero-I/O validation
+- implemented bounded/sanitized Agent candidate review plus confined in-place
+  handoff review with credential-text rejection, bounded result projection,
+  and zero-I/O `validate_only`; followed by validation-only coverage for other
+  writes
 - field masks, limits/cursors, NDJSON, explicit truncation, and response
   sanitization
 - versioned agent skill/context plus headless credential rules
@@ -126,12 +129,13 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. carry the proven confined-output plus zero-I/O `validate_only` contract into
-   the next local-write family, and extend bounded/sanitized AICLI-F4 output
-   from telemetry into the next high-volume read family
+1. carry the proven confined-output plus zero-I/O `validate_only` contract from
+   generation/review and handoff review into the portfolio onboarding write
+   family, and extend bounded/sanitized AICLI-F4 output into the next
+   release/status collection
 2. continue STR-3 command-family declarations only alongside the Agent feature
-   that consumes them; catalog, analysis, generation/review, and provider-state
-   and telemetry families are already explicit
+   that consumes them; catalog, analysis, generation/review, provider-state,
+   telemetry, and onboarding families are already explicit
 3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
    live bundle verification postponed until isolated credentials are available
 4. revalidate the Sloth MCP comparison against a tagged binary only after an

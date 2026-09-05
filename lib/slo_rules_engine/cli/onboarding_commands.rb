@@ -101,32 +101,33 @@ module SloRulesEngine
         accepted_candidate_uids = []
         rejected_candidate_uids = []
         notes = []
+        validate_only = false
         parser = OptionParser.new do |opts|
           opts.on('--accept=UID', 'Accept a candidate SLI uid from the handoff packet') { |value| accepted_candidate_uids << value }
           opts.on('--reject=UID', 'Reject a candidate SLI uid from the handoff packet') { |value| rejected_candidate_uids << value }
           opts.on('--note=TEXT', 'Add a review note to the handoff packet') { |value| notes << value }
+          opts.on('--validate-only', 'Validate request safety without reading or writing the handoff packet') { validate_only = true }
         end
         parser.parse!(argv)
         handoff_path = argv.shift
         abort_usage('missing handoff packet path') if handoff_path.to_s.empty?
         abort_usage('unexpected arguments') unless argv.empty?
 
-        packet = SloRulesEngine::Onboarding::HandoffReviewer.new.review(
-          handoff_path,
-          accepted_candidate_uids: accepted_candidate_uids,
-          rejected_candidate_uids: rejected_candidate_uids,
-          notes: notes
+        result = SloRulesEngine::Application::ReviewOnboardingHandoff.new.call(
+          {
+            'handoff_file' => handoff_path,
+            'accept' => accepted_candidate_uids,
+            'reject' => rejected_candidate_uids,
+            'notes' => notes,
+            'validate_only' => validate_only
+          },
+          context: application_context
         )
-        puts JSON.pretty_generate(packet)
-      rescue SloRulesEngine::Onboarding::HandoffReviewer::ReviewError => error
-        puts JSON.pretty_generate(
-          valid: false,
-          handoff_file: handoff_path,
-          error: {
-            code: error.code,
-            message: error.message
-          }
-        )
+        puts JSON.pretty_generate(result.value)
+        exit result.exit_status unless result.exit_status.zero?
+      rescue SloRulesEngine::Application::InputSafety::Error,
+             SloRulesEngine::Application::CommandError => error
+        puts JSON.pretty_generate(valid: false, handoff_file: handoff_path, error: { code: error.code, message: error.message })
         exit 1
       end
     end

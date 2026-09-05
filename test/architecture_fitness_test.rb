@@ -88,7 +88,7 @@ class ArchitectureFitnessTest < Minitest::Test
 
     assert_equal JSON.generate(first), JSON.generate(second)
     assert_equal 'structure-report/v1', first.fetch(:schema_version)
-    assert_equal 98, first.dig(:production, :file_count)
+    assert_equal 100, first.dig(:production, :file_count)
     assert_equal 64, first.dig(:composition, :root_require_count)
     assert_equal 11, first.dig(:commands, :module_count)
     assert_equal 120, first.dig(:schema_contracts, :command_ref_count)

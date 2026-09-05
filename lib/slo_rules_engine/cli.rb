@@ -758,12 +758,12 @@ module RulesCtl
         bin/rules-ctl providers list
         bin/rules-ctl integrations list
         bin/rules-ctl generate-routes --integration=<integration> <definitionfile...>
-        bin/rules-ctl candidates <telemetry.json>
+        bin/rules-ctl candidates [--limit=<count>] <telemetry.json>
         bin/rules-ctl draft-definition --service=<name> --owner=<owner> [--environment=<env>] <telemetry.json>
         bin/rules-ctl draft-from-handoff --service=<name> --owner=<owner> [--environment=<env>] <handoff.json>
         bin/rules-ctl onboarding-summary [--handoff-dir=<dir>] <discovery-index.json>
         bin/rules-ctl onboarding-artifact-index [--handoff-dir=<dir>] [--draft-dir=<dir>] [--manifest-dir=<dir>] [--provider=<provider>] [--output=<file>] <discovery-index.json>
-        bin/rules-ctl review-handoff [--accept=<uid>] [--reject=<uid>] [--note=<text>] <handoff.json>
+        bin/rules-ctl review-handoff [--accept=<uid>] [--reject=<uid>] [--note=<text>] [--validate-only] <handoff.json>
         bin/rules-ctl recommend-calculation-basis --observations-per-second=N --failed-observations-to-alert=N
         bin/rules-ctl reality-check --provider=<provider> --telemetry=<telemetry.json> <definitionfile...>
         bin/rules-ctl migration-report <legacyfile...>

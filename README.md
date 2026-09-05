@@ -36,6 +36,8 @@ Use the toolkit to:
   versus managed-state diff through strict Agent JSON/file/stdin requests
 - validate and execute workspace-confined provider generation and manifest
   review through the same typed Human/Agent command boundary
+- rank bounded telemetry evidence and record a confined handoff review through
+  strict Agent requests without echoing untrusted evidence text
 
 The detailed commands, expected files, and safety boundaries are in [Engineering Use Cases](docs/use-cases.md).
 
@@ -43,11 +45,12 @@ Phase 14 now has a validated 40-command catalog and registry. It pairs each
 Human CLI example with an Agent CLI JSON request, owns Human command dispatch,
 and exposes bounded offline `agent catalog` plus exact `agent describe`
 introspection with a strict resolved request schema for every command. Strict
-`agent invoke` is implemented for eleven commands: `providers.list`,
+`agent invoke` is implemented for thirteen commands: `providers.list`,
 `integrations.list`, `recommend-calculation-basis`, `validate`,
 `migration-report`, `model-report`, and file-backed `diff` for
 `prometheus_stack`/`sloth`, plus `generate`, `manifest-review`,
-`lookup-telemetry`, and single/batch `discover-telemetry`.
+`lookup-telemetry`, single/batch `discover-telemetry`, bounded `candidates`,
+and confined `review-handoff`.
 Agent-referenced files must be regular,
 workspace-contained, bounded `.rb`/`.json` inputs; traversal, absolute,
 pre-encoded, control-character, symlink-escape, and oversized paths fail before
@@ -63,7 +66,13 @@ client construction. Discovery returns at most the requested limit, omits
 unsafe provider metric names behind SHA-256 evidence, and sanitizes provider
 failures. Batch discovery confines the scope file and every output beneath the
 workspace. Both telemetry commands support `validate_only` without file I/O,
-provider calls, or credential loading. The
+provider calls, or credential loading. Agent `candidates` processes 100
+confined telemetry signals by default and at most 500, reports truncation, and
+quarantines unsafe identifiers and optional text behind SHA-256 fingerprints.
+Agent `review-handoff` confines the existing JSON target, rejects
+credential-like note assignments, returns a bounded summary plus packet
+fingerprint, and supports zero-I/O `validate_only` without opening the target.
+The
 [Agent Interface Roadmap](docs/agent-interface-roadmap.md) defines the
 remaining command expansion, validation-only gates for other write families,
 broader bounded/sanitized output, versioned agent skill, and later MCP
@@ -84,6 +93,12 @@ bin/rules-ctl agent invoke generate \
 
 bin/rules-ctl agent invoke discover-telemetry \
   --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"discover-telemetry","command_version":1,"arguments":{"provider":"prometheus_stack","service":"checkout-api","base_url":"http://localhost:9090","allowed_hosts":["localhost"],"limit":100}}'
+
+bin/rules-ctl agent invoke candidates \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"candidates","command_version":1,"arguments":{"telemetry_file":"work/discovery/checkout.json","limit":100}}'
+
+bin/rules-ctl agent invoke review-handoff \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"review-handoff","command_version":1,"arguments":{"handoff_file":"work/handoff/checkout.handoff.json","accept":["request-latency"],"notes":["Reviewed"],"validate_only":true}}'
 ```
 
 After the validation-only request succeeds, omit `validate_only` (or set it to

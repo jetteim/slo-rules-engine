@@ -264,7 +264,7 @@ Implemented foundation:
   request schemas, side effects, provider I/O, credential categories, safety
   gates, and output/MCP metadata without loading files or providers.
 - **Structured Agent invocation:** strict inline JSON, workspace request files,
-  or stdin drive nine typed application commands with versioned result/error
+  or stdin drive thirteen typed application commands with versioned result/error
   envelopes and Human result/exit parity.
 - **Agent read boundary:** provider/integration listing and calculation advice
   remain zero-I/O; validation/migration/model reports use bounded
@@ -280,6 +280,11 @@ Implemented foundation:
   host allowlists and provider-specific resource identifiers before client
   construction, bound and sanitize Agent discovery results, confine batch
   outputs, and expose zero-I/O `validate_only`.
+- **First bounded onboarding pair:** `candidates` processes at most 100 signals
+  by default (500 maximum), reports truncation, and quarantines unsafe metric
+  and optional evidence text behind fingerprints. `review-handoff` confines
+  its in-place packet update, rejects credential-like note assignments, returns
+  a bounded summary, and exposes zero-I/O `validate_only`.
 
 Planned features:
 
@@ -288,7 +293,7 @@ Planned features:
   Human CLI mapping, Agent CLI mapping, skill reference, and later MCP tool.
 - **Two feature-parity CLI sub-interfaces:** the existing Human CLI retains
   convenience flags and compatibility; a new Agent CLI accepts complete strict
-  JSON requests. Eleven commands currently normalize into the same typed
+  JSON requests. Thirteen commands currently normalize into the same typed
   application boundary; remaining commands are gated.
 - **Remaining Agent input hardening:** extend the implemented path and
   telemetry URL/ID policy to credential-key exclusion, other provider-read

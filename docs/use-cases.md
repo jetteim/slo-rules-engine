@@ -107,14 +107,14 @@ bin/rules-ctl discover-telemetry \
 Rank one saved evidence file:
 
 ```bash
-bin/rules-ctl candidates ./work/checkout-datadog-evidence.json \
+bin/rules-ctl candidates --limit=100 ./work/checkout-datadog-evidence.json \
   > ./work/checkout-datadog-candidates.json
 ```
 
 **What to expect:**
 
 - `discover-telemetry` writes one normalized JSON envelope to stdout; the shell redirection above creates the evidence file.
-- `candidates` writes ranked proposal JSON to stdout with candidate UID, calculation basis, confidence, reasons, caveats, explanation, and rejected-signal findings.
+- `candidates` writes ranked proposal JSON to stdout with candidate UID, calculation basis, confidence, reasons, caveats, explanation, and rejected-signal findings. The optional Human `--limit` bounds processed signals; Agent requests default to 100 and allow at most 500.
 - Datadog evidence comes from Datadog APIs. Prometheus Stack and Sloth evidence comes from a Prometheus-compatible API and retains the selected provider label.
 - Metric identifiers, selectors, endpoint hosts, and windows are validated
   before client construction. Prometheus-compatible Agent requests require an
@@ -1214,20 +1214,21 @@ security, and promotion gates are in
 **Delivery status:** partially implemented. AICLI-F1 provides the shared
 registry/catalog, and AICLI-F2 provides offline `agent catalog` and `agent
 describe` with strict resolved request schemas. Strict JSON/file/stdin
-invocation and versioned result/error envelopes now cover eleven commands: the
+invocation and versioned result/error envelopes now cover thirteen commands: the
 three zero-I/O commands `providers.list`, `integrations.list`, and
 `recommend-calculation-basis`; the workspace-reading `validate`,
 `migration-report`, and `model-report`; and file-backed `diff` for
 `prometheus_stack`/`sloth`; plus workspace-confined `generate`,
 `manifest-review`, `lookup-telemetry`, and single/batch
-`discover-telemetry`. The applicable AICLI-F3 read-path gates, confined generated
-output paths, and zero-I/O `validate_only` for this first local-write family
+`discover-telemetry`; plus bounded `candidates` and confined
+`review-handoff`. The applicable AICLI-F3 read-path gates, confined generated
+output paths, and zero-I/O `validate_only` for generation/review and handoff review
 are implemented. Telemetry additionally proves exact endpoint-host allowlists,
 resource-ID and selector hardening before client construction, bounded and
 sanitized discovery output, confined batch files, and zero-I/O
 `validate_only`. Other write families, Datadog state reads outside telemetry,
-general projections, full validation-only coverage, skills, and MCP remain
-planned.
+general projections, validation-only coverage for remaining writes, skills,
+and MCP remain planned.
 
 **Task:** let an AI agent discover and invoke the same reviewed onboarding,
 release, provider-state, and live-status behavior as an engineer without
@@ -1313,6 +1314,27 @@ does not open the scope file or create the destination. Normal execution
 validates every scope before client or credential construction, writes only
 confined per-scope JSON plus `index.json`, and reports explicit truncation.
 
+Implemented bounded candidate review and confined handoff review:
+
+```bash
+bin/rules-ctl agent invoke candidates \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"candidates","command_version":1,"arguments":{"telemetry_file":"work/discovery/checkout.json","limit":100}}'
+
+bin/rules-ctl agent invoke review-handoff \
+  --json='{"schema_version":"slo-rules-engine/agent-command-request/v1","command_id":"review-handoff","command_version":1,"arguments":{"handoff_file":"work/handoff/checkout.handoff.json","accept":["request-latency"],"notes":["Reviewed"],"validate_only":true}}'
+```
+
+Agent `candidates` reads one bounded workspace JSON file and processes 100
+signals by default, up to 500. Unsafe metric identifiers are omitted and
+optional rationale/success text is quarantined behind SHA-256 fingerprints;
+truncation is explicit. Agent `review-handoff` validates decisions and the
+lexical target before I/O. Normal execution rechecks input/output identity and
+symlink containment, updates only that packet, and returns a bounded decision
+summary plus the packet fingerprint. It does not echo notes or the full
+discovery/candidate packet. Its `validate_only` mode cannot prove candidate
+membership because it does not open the packet; normal execution retains the
+existing handoff schema and candidate-identity gates.
+
 Planned write-capable invocation after the same gates reach later families:
 
 ```bash
@@ -1394,7 +1416,8 @@ arbitrary provider mutation payloads remain unsupported.
 - Catalog entries expose `structured_invocation`; it is currently true for
   `providers.list`, `integrations.list`, `recommend-calculation-basis`,
   `validate`, `migration-report`, `model-report`, `diff`, `generate`, and
-  `manifest-review`, `lookup-telemetry`, and `discover-telemetry`.
+  `manifest-review`, `lookup-telemetry`, `discover-telemetry`, `candidates`,
+  and `review-handoff`.
 - Each implemented invocation prints one
   `slo-rules-engine/agent-command-result/v1` object containing a deterministic
   request ID, command ID/version, `outcome`, `exit_status`, declared/exercised
@@ -1426,6 +1449,11 @@ arbitrary provider mutation payloads remain unsupported.
   `truncated`; unsafe remote metric names and raw provider error text are not
   returned. Batch output paths are workspace-confined and created only after
   every scope identifier has passed pre-client validation.
+- Agent candidate results declare `local_read`, expose the applied limit and
+  truncation state, and never include rejected unsafe metric or optional free
+  text. Agent handoff review declares `local_write` only on execution and
+  `none` under `validate_only`; the returned projection stays bounded while
+  the confined packet preserves the full reviewed evidence.
 - Inline JSON, a workspace-contained JSON file, and stdin are mutually
   exclusive. Explicit `--format=json` overrides `RULES_CTL_OUTPUT_FORMAT`; JSON
   is the default, while unsupported formats fail closed.

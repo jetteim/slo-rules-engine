@@ -73,6 +73,8 @@ class CliCommandRegistryTest < Minitest::Test
         diff
         lookup-telemetry
         discover-telemetry
+        candidates
+        review-handoff
         providers.list
         integrations.list
         recommend-calculation-basis
@@ -82,7 +84,7 @@ class CliCommandRegistryTest < Minitest::Test
       expected_agent_status = executable_agent_commands.include?(definition.id) ? 'implemented' : 'planned'
       assert_equal expected_agent_status, definition.agent.fetch(:status)
       application_command = definition.agent.fetch(:application_command)
-      if %w[validate generate manifest-review diff lookup-telemetry discover-telemetry providers.list integrations.list recommend-calculation-basis migration-report model-report].include?(definition.id)
+      if %w[validate generate manifest-review diff lookup-telemetry discover-telemetry candidates review-handoff providers.list integrations.list recommend-calculation-basis migration-report model-report].include?(definition.id)
         assert_match(/\ASloRulesEngine::Application::/, application_command)
       else
         assert_nil application_command
@@ -293,6 +295,30 @@ class CliCommandRegistryTest < Minitest::Test
     discover_arguments = definitions.fetch(1).request_schema.dig(:properties, :arguments)
     assert_includes discover_arguments.fetch(:required), 'limit'
     assert_equal 20, discover_arguments.dig(:properties, :selectors, :maxProperties)
+  end
+
+  def test_onboarding_family_owns_explicit_contracts_and_safe_executable_slices
+    definitions = SloRulesEngine::CLI::CommandContracts::Onboarding.definitions
+
+    assert_equal %w[candidates draft-definition draft-from-handoff onboarding-summary onboarding-artifact-index review-handoff],
+                 definitions.map(&:id)
+    definitions.each do |definition|
+      assert_equal 'explicit', definition.request_schema_source
+      refute SloRulesEngine::CLI::CommandCatalog::HUMAN_USAGE.key?(definition.id)
+      refute SloRulesEngine::CLI::CommandCatalog::AGENT_ARGUMENT_EXAMPLES.key?(definition.id)
+    end
+
+    candidates = definitions.fetch(0)
+    assert_equal 'implemented', candidates.agent.fetch(:status)
+    assert_includes candidates.safety_gates, 'bounded_response'
+    assert_includes candidates.safety_gates, 'untrusted_text_quarantine'
+    assert_equal 500, candidates.request_schema.dig(:properties, :arguments, :properties, :limit, :maximum)
+
+    review = definitions.fetch(5)
+    assert_equal 'implemented', review.agent.fetch(:status)
+    assert_includes review.safety_gates, 'confined_output_file'
+    assert_includes review.safety_gates, 'zero_io_validate_only'
+    assert_includes review.safety_gates, 'credential_text_rejection'
   end
 
   def test_invalid_or_duplicate_metadata_fails_closed

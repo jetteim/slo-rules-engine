@@ -8,9 +8,9 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 ## Current Priority Order
 
-1. Carry confined output plus zero-I/O `validate_only` into the next Agent
-   local-write family, and extend the telemetry-proven bounded/sanitized
-   AICLI-F4 contract into the next high-volume read family
+1. Carry confined output plus zero-I/O `validate_only` into the portfolio
+   onboarding write family, and extend the telemetry/candidate-proven
+   bounded/sanitized AICLI-F4 contract into the next release/status collection
 2. Continue STR-1 through STR-7 only through their named preservation and
    dependency-removal gates
 3. Production-grade Datadog reconciliation only when isolated backend evidence
@@ -55,7 +55,7 @@ missing sources, and source drift.
 
 Current architecture-fitness status: STR-0 is complete without production-code
 changes. `scripts/structure-report` deterministically inventories the current
-98 production/executable files, 64 root requires, 40 registered commands, 11
+100 production/executable files, 64 root requires, 40 registered commands, 11
 command modules, 21 unique literal artifact schema IDs, all 120 per-command
 schema references, 19 engineering use cases, and
 the current hotspot set. `config/architecture_dependencies.json` assigns every
@@ -191,8 +191,9 @@ side-effect/I/O/safety metadata with JSON-only errors. Strict inline JSON,
 workspace-file, and stdin invocation now shares typed application commands with
 the Human CLI for `providers.list`, `integrations.list`,
 `recommend-calculation-basis`, `validate`, `migration-report`, `model-report`,
-file-backed `diff`, `generate`, `manifest-review`, `lookup-telemetry`, and
-`discover-telemetry`. Agent reads are
+file-backed `diff`, `generate`, `manifest-review`, `lookup-telemetry`,
+`discover-telemetry`, bounded `candidates`, and confined `review-handoff`.
+Agent reads are
 workspace-confined and bounded, reject
 traversal/control/pre-encoding/symlink escape, retain Human result/exit parity,
 and quarantine application stdout/stderr. Agent `diff` is limited to local
@@ -207,7 +208,12 @@ HTTP(S) endpoints and exact Agent host allowlists; provider metric IDs,
 selectors, scope values, and windows fail before client/credential
 construction. Agent discovery is limited, declares truncation, fingerprints
 omitted unsafe remote metrics, sanitizes errors, and confines batch outputs.
-Both commands support zero-I/O `validate_only`.
+Both commands support zero-I/O `validate_only`. Agent candidates process 100
+signals by default and at most 500, report truncation, and quarantine unsafe
+identifiers and optional telemetry text behind fingerprints. Agent handoff
+review confines the in-place packet target, rejects credential-like note
+assignments, returns a bounded summary instead of the full evidence packet,
+and supports zero-I/O `validate_only`.
 Malformed, ambiguous, unsafe, unknown, unsupported, or gated requests return
 JSON-only errors before disallowed I/O. Missing/duplicate metadata fails closed,
 and current Human behavior remains characterized. Remaining command invocation,
@@ -271,6 +277,22 @@ Implemented and already pushed:
 
 Implemented by the latest feature slices:
 
+- Agent `candidates` and `review-handoff` now share typed Human/Agent
+  application commands; `candidates` adds a Human `--limit` while preserving
+  unbounded compatibility when omitted, and handoff review preserves the same
+  packet mutation and exit behavior
+- Confined candidate reads process 100 signals by default and at most 500,
+  report truncation, omit unsafe telemetry identifiers, and quarantine optional
+  rationale/success text behind SHA-256 fingerprints and stable findings
+- Confined handoff review proves input/output identity and symlink containment,
+  rejects credential-like note assignments, and returns a bounded review
+  summary plus packet fingerprint rather than echoing full evidence or notes
+- Handoff `validate_only` checks strict decisions and lexical target safety
+  without reading or writing the packet; missing-path and injected-dependency
+  tests prove zero file/provider/credential I/O
+- All six onboarding commands now own Human usage, Agent examples, explicit
+  request schemas, side effects, I/O, safety gates, and MCP metadata in the
+  STR-3 onboarding contract family
 - Release bundles can package one optional exact current Sloth downstream
   evidence artifact per target, and portfolio targets can reference the same
   evidence contract
@@ -343,13 +365,14 @@ Implemented by the latest feature slices:
   catalog pagination, exact command descriptions, strict resolved request
   schemas for all 40 commands, and stable JSON-only introspection errors
 - AICLI-F2 structured invocation now accepts exactly one complete inline JSON,
-  workspace-file, or stdin request for eleven commands, validates it
+  workspace-file, or stdin request for thirteen commands, validates it
   against the registered strict schema, applies explicit/environment/default
   JSON format precedence, and returns deterministic result/error envelopes
 - Human and Agent provider/integration listing, calculation-basis
   recommendation, definition validation, migration/model reporting,
-  file-backed diff, generation, manifest review, telemetry lookup, and
-  single/batch telemetry discovery now share typed application
+  file-backed diff, generation, manifest review, telemetry lookup,
+  single/batch telemetry discovery, bounded candidates, and confined handoff
+  review now share typed application
   commands that return values without printing or exiting; other registered
   commands fail with `agent_command_not_executable` before their handlers run
 - AICLI-F3 read safety now confines Agent file inputs and managed roots to the
@@ -370,10 +393,15 @@ Implemented by the latest feature slices:
   truncation, omits unsafe remote metric identifiers behind SHA-256
   fingerprints, sanitizes provider/batch failures, and confines every batch
   artifact under the workspace output root
+- Agent candidates default to 100 signals with a 500 maximum, report explicit
+  truncation, and quarantine unsafe metric identifiers and optional evidence
+  text behind SHA-256 fingerprints. Agent handoff review confines one existing
+  packet, rejects credential-like notes, returns only a bounded summary, and
+  proves zero-I/O `validate_only` with missing-path and dependency spies
 - The STR-3 catalog contract family now authors `providers.list`,
   `integrations.list`, and `generate-routes` once with Human usage, Agent
-  examples, and explicit request schemas; the analysis, generation/review, and
-  provider-state, and telemetry families now do the same, while remaining families retain the
+  examples, and explicit request schemas; the analysis, generation/review,
+  provider-state, telemetry, and onboarding families now do the same, while remaining families retain the
   compatibility assembly
 - A repository-wide structure audit maps all 19 use cases, 40 commands, the
   original 20 literal versioned production schema identifiers, dependency cycles, duplicated
@@ -598,7 +626,13 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
-- latest checkpoint: workspace-confined Agent generation/manifest-review,
+- latest checkpoint: bounded/sanitized Agent candidate reads plus confined
+  handoff review, zero-I/O review `validate_only`, Human mutation/exit parity,
+  and explicit STR-3 onboarding contracts
+- previous checkpoint: Agent telemetry lookup/discovery endpoint and identifier
+  safety, bounded/sanitized provider results, confined batch writes, and
+  zero-I/O `validate_only`
+- previous checkpoint: workspace-confined Agent generation/manifest-review,
   derived artifact path safety, zero-I/O `validate_only`, Human result/exit
   parity, and explicit STR-3 generation/review contracts
 - previous checkpoint: workspace-confined Agent validation/reporting and
@@ -710,8 +744,8 @@ Implemented by the latest feature slices:
 Highest-value remaining gaps:
 
 1. Extend the proven confined-output plus zero-I/O `validate_only` contract to
-   the next Agent local-write family, and carry telemetry's bounded/sanitized
-   result policy into the next high-volume read family
+   portfolio onboarding writes, and carry telemetry/candidate bounded and
+   sanitized result policy into the next release/status collection
 2. Continue STR-3 one command family at a time until every command owns its
    Human usage, Agent example, explicit schema, side effects, I/O, safety,
    contract references, and MCP metadata in one declaration
@@ -737,10 +771,11 @@ Secondary gaps:
 
 Next recommended slice:
 
-- extend confined output and zero-I/O validation into the next local-write
-  family without weakening its evidence gates
-- extend bounded/sanitized result policy beyond telemetry, migrating the
-  affected family to explicit STR-3 declarations in the same slice
+- extend confined output and zero-I/O validation into portfolio onboarding
+  summary/artifact-index writes without weakening evidence or rerun-safety gates
+- extend bounded/sanitized result policy from telemetry/candidates into the
+  next release/status collection, migrating its affected declarations in the
+  same slice
 
 Rationale:
 
@@ -764,59 +799,56 @@ Rationale:
 
 ## Next Session Handoff
 
-Prepared on 2026-08-28 for a restart-and-`proceed` workflow.
+Prepared on 2026-09-05 for a restart-and-`proceed` workflow.
 
 Current safe boundary:
 
 - branch: `main`
-- latest pushed checkpoint: `feat: enable agent telemetry reads`, providing
-  confined batch discovery and bounded/sanitized results
-- previous pushed checkpoint: `50fe890 feat: confine agent generation writes`
+- latest pushed checkpoint: `feat: bound agent onboarding review`, providing
+  bounded/sanitized candidate reads and confined zero-I/O handoff review
+- previous pushed checkpoint: `a73d35b feat: enable agent telemetry reads`
 - expected startup state: `git status --short --branch` should show clean
 - last full verification before handoff: `./scripts/verify.sh` exited 0 with
   `verification ok`
 
 Verification evidence:
 
-- target: Agent-safe telemetry lookup and single/batch discovery, exact
-  endpoint/host/resource-ID preflight, confined batch files, zero-I/O
-  `validate_only`, bounded/sanitized results, Human/Agent parity, and explicit
-  telemetry STR-3 contracts
+- target: Agent-safe bounded candidate reads, confined in-place handoff review,
+  zero-I/O `validate_only`, bounded/sanitized results, Human mutation/exit
+  parity, and explicit onboarding STR-3 contracts
 - command: `./scripts/verify.sh`
-- recorded date: `2026-08-28`
+- recorded date: `2026-09-05`
 - output path: agent terminal transcript; no separate repository artifact persisted
-- result: exit 0, `verification ok`, 524 tests, 7,171 assertions, 0 failures,
+- result: exit 0, `verification ok`, 532 tests, 7,282 assertions, 0 failures,
   0 errors, 0 skips
-- focused result: Agent telemetry safety passed with 9 tests and 98 assertions;
-  telemetry lookup/transport passed with 8 tests and 38 assertions; Datadog
-  response-bound transport passed with 2 tests and 10 assertions;
-  registry/contracts passed with 10 tests and 2,719 assertions; architecture
-  fitness passed with 5 tests and 26 assertions; all had zero failures, errors,
-  and skips
-- structural evidence: `scripts/structure-report --check` passed with 98
+- focused result: Agent onboarding safety passed with 7 tests and 77
+  assertions; registry/contracts passed with 11 tests and 2,753 assertions;
+  Human onboarding CLI passed with 14 tests and 67 assertions; telemetry-first
+  walkthrough passed with 1 test and 22 assertions; architecture fitness
+  passed with 5 tests and 26 assertions; all had zero failures, errors, and
+  skips
+- structural evidence: `scripts/structure-report --check` passed with 100
   production files, 40 commands, 21 unique literal artifact schemas, 120
   per-command schema references, 19 use cases, complete
   single-boundary file ownership, and exact dependency-debt references
 - parity evidence: SHA-256 snapshots cover the full registry and Human/Agent
-  catalog, all 40 command IDs are unchanged, and all 11 focused CLI command
-  modules own at least one registered adapter
+  catalog, all 40 command IDs are unchanged, 13 commands are executable through
+  Agent invocation, and all 11 focused CLI command modules own at least one
+  registered adapter
 - runtime note: macOS system Ruby 2.6.10 lacks `Array#filter_map`, already used
   throughout the repository; the canonical suite passed with installed Ruby
   4.0.1. No runtime compatibility code was changed in this implementation slice.
 - metric/log/trace names: none; verification used local files and fake backend
   clients only
-- offline verification: Human/Agent parity covers validation, migration/model
-  reports, Prometheus Stack file-backed diff, generation, manifest review, and
-  telemetry lookup/discovery.
-  Traversal, absolute, pre-encoded, control-character, symlink-escape,
-  oversized, unsafe multi-path, output-root/file, and derived-child inputs fail
-  as JSON before disallowed content/provider/write access. Endpoint userinfo,
-  query, fragment, base path, pre-encoding, non-allowlisted hosts, unsafe metric
-  IDs/selectors, oversized selector maps, and unsafe scope-file identifiers
-  also fail before client construction. Injected spies prove `validate_only`
-  does not load sources, call provider methods, invoke writers, load
-  credentials, or create output parents; hostile provider text is omitted or
-  sanitized and direct application stdout/stderr remains quarantined.
+- offline verification: Human/Agent parity covers safe candidate results and
+  identical persisted handoff mutation/exit behavior. Candidate inputs enforce
+  workspace, extension, byte, identifier, and default/maximum result bounds;
+  hostile metrics and optional free text are omitted behind SHA-256 findings.
+  Handoff traversal, symlink escape, conflicting decisions, unknown candidates,
+  and credential-like notes fail without mutation. Injected reviewer and
+  missing-path tests prove `validate_only` performs no read, write, provider
+  call, or credential loading. Canonical input/output identity handles path
+  aliases such as `/var` and `/private/var` without weakening containment.
 - live verification: no tagged Sloth binary contains MCP, so a full comparison
   against a released server and real Prometheus data could not be run. Latest
   observed release `v0.16.0` is intentionally rejected. Datadog live testing
@@ -829,7 +861,7 @@ Verification evidence:
   evidence/index artifacts under the confined output root. No provider
   mutation, schema version, credential persistence, or external dependency was
   added.
-- rollback path: revert `feat: enable agent telemetry reads`
+- rollback path: revert `feat: bound agent onboarding review`
 
 When the user types `proceed` in a fresh session:
 

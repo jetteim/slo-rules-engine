@@ -84,10 +84,27 @@ module SloRulesEngine
       end
 
       def candidates(argv)
-        abort_usage('missing telemetry JSON file') if argv.empty?
+        limit = nil
+        parser = OptionParser.new do |opts|
+          opts.on('--limit=COUNT', Integer, 'Maximum telemetry signals to process') { |value| limit = value }
+        end
+        parser.parse!(argv)
+        telemetry_file = argv.shift
+        abort_usage('missing telemetry JSON file') if telemetry_file.to_s.empty?
 
-        signals = telemetry_signals_from_file(argv.fetch(0))
-        puts JSON.pretty_generate(SloRulesEngine::Onboarding::CandidateGenerator.new.review(signals))
+        result = SloRulesEngine::Application::ReviewTelemetryCandidates.new.call(
+          { 'telemetry_file' => telemetry_file, 'limit' => limit }.compact,
+          context: application_context
+        )
+        puts JSON.pretty_generate(result.value)
+        exit result.exit_status unless result.exit_status.zero?
+      rescue SloRulesEngine::Application::InputSafety::Error,
+             SloRulesEngine::Application::CommandError => error
+        puts JSON.pretty_generate(
+          valid: false,
+          error: { code: error.code, message: error.message, details: error.details }
+        )
+        exit 1
       end
 
       def draft_definition(argv)

@@ -7,6 +7,7 @@ require_relative 'command_contracts/analysis'
 require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
+require_relative 'command_contracts/onboarding'
 
 module SloRulesEngine
   module CLI
@@ -257,12 +258,6 @@ module SloRulesEngine
         'plan.status' => 'bin/rules-ctl plan status ./approved-plan.json',
         'plan.apply' => 'bin/rules-ctl plan apply ./approved-plan.json --confirm --journal-dir=./journals',
         'plan.resume' => 'bin/rules-ctl plan resume ./approved-plan.json --confirm --journal-dir=./journals',
-        'candidates' => 'bin/rules-ctl candidates ./telemetry.json',
-        'draft-definition' => 'bin/rules-ctl draft-definition --service=checkout --owner=platform ./telemetry.json',
-        'draft-from-handoff' => 'bin/rules-ctl draft-from-handoff --service=checkout --owner=platform ./handoff.json',
-        'onboarding-summary' => 'bin/rules-ctl onboarding-summary --handoff-dir=./handoffs ./discovery/index.json',
-        'onboarding-artifact-index' => 'bin/rules-ctl onboarding-artifact-index --handoff-dir=./handoffs --manifest-dir=./generated --output=./artifact-index.json ./discovery/index.json',
-        'review-handoff' => 'bin/rules-ctl review-handoff --accept=request-availability --note=Reviewed ./handoff.json',
         'recommend-calculation-basis' => 'bin/rules-ctl recommend-calculation-basis --observations-per-second=1 --failed-observations-to-alert=5',
         'reality-check' => 'bin/rules-ctl reality-check --provider=prometheus_stack --telemetry=./telemetry.json ./service.rb',
       }.freeze
@@ -285,12 +280,6 @@ module SloRulesEngine
         'plan.status' => { approved_plan_file: './approved-plan.json' },
         'plan.apply' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
         'plan.resume' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
-        'candidates' => { telemetry_file: './telemetry.json' },
-        'draft-definition' => { service: 'checkout', owner: 'platform', telemetry_file: './telemetry.json' },
-        'draft-from-handoff' => { service: 'checkout', owner: 'platform', handoff_file: './handoff.json' },
-        'onboarding-summary' => { discovery_index_file: './discovery/index.json', handoff_dir: './handoffs' },
-        'onboarding-artifact-index' => { discovery_index_file: './discovery/index.json', handoff_dir: './handoffs', manifest_dir: './generated', output_file: './artifact-index.json' },
-        'review-handoff' => { handoff_file: './handoff.json', accept: ['request-availability'], notes: ['Reviewed'] },
         'recommend-calculation-basis' => { observations_per_second: 1.0, failed_observations_to_alert: 5.0 },
         'reality-check' => { provider: 'prometheus_stack', telemetry_file: './telemetry.json', definition_files: ['./service.rb'] },
       }.freeze
@@ -401,28 +390,7 @@ module SloRulesEngine
 
           *CommandContracts::Telemetry.definitions,
           *CommandContracts::Catalog.definitions,
-          command('candidates', side_effect: 'local_read',
-                  io: io(local_reads: %w[telemetry_evidence]),
-                  gates: %w[strict_arguments normalized_telemetry conservative_classification]),
-          command('draft-definition', handler: :draft_definition, side_effect: 'local_read',
-                  io: io(local_reads: %w[telemetry_evidence]),
-                  gates: %w[strict_arguments normalized_telemetry review_required],
-                  output: output(stdout: 'ruby', streaming: 'not_applicable')),
-          command('draft-from-handoff', handler: :draft_from_handoff, side_effect: 'local_read',
-                  io: io(local_reads: %w[handoff_packet]),
-                  gates: %w[strict_arguments handoff_schema accepted_candidates reviewed_provenance],
-                  output: output(stdout: 'ruby', streaming: 'not_applicable')),
-          command('onboarding-summary', handler: :onboarding_summary, side_effect: 'local_write',
-                  io: io(local_reads: %w[discovery_index discovery_evidence handoff_packets],
-                         local_writes: %w[handoff_packets]),
-                  gates: %w[strict_arguments discovery_schema rerun_safe_review_state]),
-          command('onboarding-artifact-index', handler: :onboarding_artifact_index, side_effect: 'local_write',
-                  io: io(local_reads: %w[discovery_index discovery_evidence handoff_packets reviewed_definitions provider_manifests manifest_review_reports],
-                         local_writes: %w[onboarding_artifact_index]),
-                  gates: %w[strict_arguments artifact_schema evidence_freshness deterministic_index]),
-          command('review-handoff', handler: :review_handoff, side_effect: 'local_write',
-                  io: io(local_reads: %w[handoff_packet], local_writes: %w[handoff_packet]),
-                  gates: %w[strict_arguments handoff_schema explicit_review_decision preserve_discovery_evidence]),
+          *CommandContracts::Onboarding.definitions,
           command('recommend-calculation-basis', handler: :recommend_calculation_basis, side_effect: 'none',
                   io: io, gates: %w[strict_arguments numeric_bounds], output: output(streaming: 'not_applicable'),
                   agent_status: 'implemented',

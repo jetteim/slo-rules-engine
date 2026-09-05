@@ -283,7 +283,7 @@ terms, and `./scripts/verify.sh`.
 
 **Completion evidence:** `scripts/structure-report` now emits the deterministic
 `structure-report/v1` inventory and `scripts/structure-report --check` is part
-of full verification. `config/architecture_dependencies.json` assigns all 96
+of full verification. `config/architecture_dependencies.json` assigns all 100
 current production/executable files to one boundary and records each current
 forbidden reference with its removal packet. `config/architecture_contracts.json`
 locks the 40-command registry/catalog digests (including 120 per-command schema
@@ -363,14 +363,17 @@ equivalence, no-I/O spies, use-case documentation, and full verification.
 **Rollback:** migrate one command family per commit behind the unchanged
 registry and RulesCtl facade.
 
-**Current progress (2026-08-25):** the complete catalog, analysis, and
-provider-state families, plus generation/review, now own Human usage, Agent
+**Current progress (2026-09-05):** the complete catalog, analysis, and
+provider-state families; telemetry and onboarding families; plus
+generation/review now own Human usage, Agent
 examples, and explicit argument schemas in bounded declaration modules. `providers.list`,
 `integrations.list`, `recommend-calculation-basis`, `validate`,
 `migration-report`, `model-report`, file-backed `diff`, `generate`, and
-`manifest-review` normalize Human flags or Agent JSON into typed application
+`manifest-review`, telemetry lookup/discovery, bounded candidates, and confined
+handoff review normalize Human flags or Agent JSON into typed application
 commands that return values without printing or exiting. Generation/review
-also enforce confined Agent destinations and zero-I/O `validate_only`.
+and handoff review also enforce confined Agent destinations and zero-I/O
+`validate_only`.
 Remaining command families still use the compatibility assembly and keep STR-3
 open.
 
