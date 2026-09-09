@@ -69,6 +69,11 @@ workspace. Both telemetry commands support `validate_only` without file I/O,
 provider calls, or credential loading. Agent `candidates` processes 100
 confined telemetry signals by default and at most 500, reports truncation, and
 quarantines unsafe identifiers and optional text behind SHA-256 fingerprints.
+Candidate results expose an explicit field allowlist. `calculation_basis` accepts
+only `observations` or `time_slice`; other values are fingerprinted with
+`candidate_text_quarantined` and replaced by the traffic-based recommendation
+or the `observations` default. Human candidate output retains its existing
+custom-text behavior.
 Agent `review-handoff` confines the existing JSON target, rejects
 credential-like note assignments, returns a bounded summary plus packet
 fingerprint, and supports zero-I/O `validate_only` without opening the target.
@@ -671,5 +676,8 @@ bin/rules-ctl validate examples/services/checkout.rb
 Run `scripts/structure-report` without `--check` for the deterministic JSON
 inventory of code hotspots, command modules, schema contracts, use cases,
 boundary coverage, and explicitly allowlisted dependency debt.
+
+The aggregate discovers every `test/**/*_test.rb` suite automatically, including
+nested suites, and preserves transitive loading exactly once.
 
 No external Ruby dependencies are required.

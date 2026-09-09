@@ -2,7 +2,8 @@
 
 Original audit: 2026-08-15. Maintainer review: 2026-09-05.
 
-Status: housekeeping first; STR-0 completed, STR-3 partially implemented.
+Status: housekeeping first; HK-01 and HK-03 complete; HK-02 next.
+STR-0 completed, STR-3 partially implemented.
 
 Baseline commit: `6dc0ffb`
 
@@ -22,7 +23,9 @@ too little evidence that cleanup is reducing that burden.
 
 ### Current Audit Evidence
 
-Inspected revision: `df5303e` (clean `main` before this documentation change).
+Inspected revision: `df5303e` (clean `main` before the original audit documentation).
+Findings below describe that baseline; current task status and correction
+evidence are recorded in the queue and task sections.
 
 | Measure | Original audit | Rechecked 2026-09-05 |
 | --- | ---: | ---: |
@@ -93,7 +96,8 @@ Audit verification (canonical Homebrew Ruby, 2026-09-05):
   not invalidate the separately reproduced, not-yet-regression-tested output
   defect above.
 
-HK-01 is complete; HK-02–HK-08 remain open. Sizes indicate review scope, not time estimates:
+HK-01 and HK-03 are complete; HK-02 and HK-04–HK-08 remain open.
+Sizes indicate review scope, not time estimates:
 S = one narrow checkpoint; M = several explicitly separated checkpoints.
 One task/checkpoint at a time. Each code checkpoint runs its focused tests,
 `scripts/structure-report --check`, `git diff --check`, and full verification.
@@ -103,8 +107,8 @@ contract change, or show that the old contract remains identical.
 | Order | Task | Size | Existing packet / prerequisite |
 | --- | --- | --- | --- |
 | 1 | HK-01: Make “all tests” actually include all tests (complete) | S | early test-discovery part of STR-7; no domain dependency |
-| 2 | HK-02: Give the maintainer one map and one current queue | M | documentation; after HK-01 baseline |
-| 3 | HK-03: Close candidate output-policy gaps | S | AICLI-F3/F4 safety repair; after HK-01 |
+| 2 | HK-03: Close candidate output-policy gaps (complete) | S | AICLI-F3/F4 safety repair; after HK-01 |
+| 3 | HK-02: Give the maintainer one map and one current queue | M | documentation; after HK-01 and HK-03 |
 | 4 | HK-04: Give artifact identity and credential policy one owner | M | STR-1; after HK-01 and HK-03 |
 | 5 | HK-05: Finish command declarations without enabling commands | M | bounded STR-3 work; after HK-02 |
 | 6 | HK-06: Make fitness checks match their advertised scope | S | STR-0 follow-up; before dependency moves in HK-07/08 |
@@ -170,6 +174,37 @@ Prometheus walkthrough; run documentation tests. **Rollback:** revert each
 documentation move independently; preserve the archive and original content.
 
 ### HK-03: Close Candidate Output-Policy Gaps
+
+**Status (2026-09-09):** complete ahead of HK-02 because the real Agent CLI
+reproduced the arbitrary-object calculation-basis leak. Supported enum values
+are preserved; other values produce `candidate_text_quarantined` fingerprints
+and fall back to the traffic recommendation or `observations`. Candidate input,
+output, and nested output fields now have explicit allowlists. Numeric evidence
+must also be representable as finite floats. Human generation semantics remain
+unchanged; supported Human/Agent results and intentional text differences have
+process-CLI regression coverage. The command's registry/introspection metadata
+now declares `candidate_output_allowlist`, `calculation_basis_enum`, and
+`explicit_candidate_shape_with_quarantine`; request schemas and artifact IDs
+are unchanged. Reversing exactly those candidate metadata edits reproduces
+the prior registry digest; the catalog digest and all other fields are unchanged.
+The application file retains the same two commands and support module; the
+new lines enforce this existing presentation boundary rather than adding a
+new command or generic response framework.
+
+**Verification evidence (2026-09-09 UTC, local file-backed repository):**
+`./scripts/verify.sh` passed 558 tests / 7,550 assertions, with no failures,
+errors, or skips, plus architecture checks and CLI smokes. Candidate and
+introspection suites passed 19 tests / 557 assertions. Process-CLI tests cover
+nested values, controls, oversized strings/arrays/integers, malformed core
+fields, numeric limits, both supported basis values, traffic-derived fallback,
+and intentional Human/Agent presentation differences. Existing confinement,
+handoff zero-I/O, Human onboarding, and public-safety suites remain included.
+Evidence: `/tmp/slo-hk03-20260909-focused.log`,
+`/tmp/slo-hk03-20260909-verify.log`, and the exact registry migration proof in
+`/tmp/slo-hk03-20260909-contract-migration.log`. No live provider or telemetry
+queries were performed. Rollback: revert this isolated safety checkpoint and
+its metadata digest together; if reverted, mark HK-03 open and retain the
+Agent expansion pause.
 
 **Work:** characterize every field copied from telemetry into Agent candidate
 results, including `calculation_basis`, IDs, numeric fields, and optional text.
@@ -290,9 +325,9 @@ rewrites. Stable DSL and Datadog freeze zones remain unchanged. Live Datadog
 and tagged Sloth MCP verification remain deferred; this review made no backend
 calls and did not establish any new live-provider evidence.
 
-This checkpoint creates tasks and adjusts sequencing only. It does not close
-any HK task, fix the discovered defects, or establish that comprehension has
-improved. The historical audit below explains the preserved STR design; where
+The original audit created tasks and adjusted sequencing only. HK-01 and
+HK-03 now have implementation evidence above; maintainer comprehension remains
+unverified until HK-02's navigation exercise. The historical audit below explains the preserved STR design; where
 its feature-first sequence differs, this current queue takes precedence.
 
 ## Objective

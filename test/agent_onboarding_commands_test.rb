@@ -4,6 +4,8 @@ require 'fileutils'
 require 'json'
 require 'minitest/autorun'
 require 'pathname'
+require 'open3'
+require 'rbconfig'
 require 'tmpdir'
 load File.expand_path('../bin/rules-ctl', __dir__)
 require_relative 'support/onboarding_fixtures'
@@ -92,6 +94,125 @@ class AgentOnboardingCommandsTest < Minitest::Test
     error, status = invoke_agent('candidates', telemetry_file: relative_path(oversized), limit: 100)
     assert_equal 1, status
     assert_equal 'agent_input_file_too_large', error.dig('error', 'code')
+  end
+
+  def test_candidate_calculation_basis_is_quarantined_through_process_cli
+    invalid = [
+      { unexpected_text: 'audit_canary' }, ['audit_canary'],
+      "observations\n audit_canary", 'audit_canary' * 1_000,
+      Array.new(1_000, 'audit_canary'), 42, true, nil, 'unsupported'
+    ]
+    signals = invalid.map do |basis|
+      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true,
+        calculation_basis: basis, observations_per_second: 0.01, failed_observations_to_alert: 1 }
+    end
+    path = write_json('basis.json', signals)
+    payload, status = invoke_agent_process('candidates', telemetry_file: relative_path(path))
+
+    assert_equal 0, status
+    assert_equal invalid.length, payload.dig('result', 'candidates').length
+    payload.dig('result', 'candidates').each do |candidate|
+      assert_equal 'time_slice', candidate.dig('proposed_slo', 'calculation_basis')
+    end
+    serialized = JSON.generate(payload)
+    refute_includes serialized, 'audit_canary'
+    refute_includes serialized, 'unexpected_text'
+    finding = payload.dig('result', 'findings').find { |entry| entry['code'] == 'candidate_text_quarantined' }
+    assert_equal invalid.length, finding.dig('details', 'count')
+    assert_equal invalid.length, finding.dig('details', 'fingerprints').uniq.length
+  end
+
+  def test_supported_candidate_fields_keep_human_agent_parity_and_explicit_shape
+    signals = %w[observations time_slice].map do |basis|
+      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true,
+        sli_uid: 'checkout-latency', slo_uid: 'fast-enough', source: 'prometheus_stack',
+        objective: 0.98, observations_per_second: 10, failed_observations_to_alert: 3,
+        calculation_basis: basis, unknown_field: { text: 'audit_canary' } }
+    end
+    path = relative_path(write_json('valid-shape.json', signals))
+    human, human_status = invoke_human('candidates', path)
+    agent, agent_status = invoke_agent_process('candidates', telemetry_file: path)
+    assert_equal 0, human_status
+    assert_equal human_status, agent_status
+    assert_equal human, agent.fetch('result')
+    assert_equal %w[observations time_slice], agent.dig('result', 'candidates').map { |c| c.dig('proposed_slo', 'calculation_basis') }
+    agent.dig('result', 'candidates').each do |candidate|
+      assert_equal %w[calculation_basis_recommendation confidence evidence explanation metric proposed_slo rationale signal sli_uid], candidate.keys.sort
+      assert_equal %w[caveats level reasons score], candidate.fetch('confidence').keys.sort
+      assert_equal %w[failed_observations_to_alert observations_per_second source], candidate.fetch('evidence').keys.sort
+      assert_equal %w[basis confidence reason], candidate.fetch('calculation_basis_recommendation').keys.sort
+      assert_equal %w[calculation_basis objective success_condition uid], candidate.fetch('proposed_slo').keys.sort
+    end
+    refute_includes JSON.generate(agent), 'audit_canary'
+  end
+
+  def test_candidate_optional_fields_quarantine_nested_controls_and_oversize_values
+    fields = %i[sli_uid slo_uid source rationale success_condition objective observations_per_second failed_observations_to_alert]
+    values = [{ nested: ['audit_canary'] }, ['audit_canary'], "audit_canary\e[31m", 'audit_canary' * 1_000]
+    signals = fields.product(values).map do |field, value|
+      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true, field => value }
+    end
+    signals << { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true, observations_per_second: 10**400 }
+    path = relative_path(write_json('optional-shape.json', signals))
+    payload, status = invoke_agent_process('candidates', telemetry_file: path)
+    assert_equal 0, status
+    assert_equal signals.length, payload.dig('result', 'candidates').length
+    refute_includes JSON.generate(payload), 'audit_canary'
+    assert_empty payload.dig('result', 'candidates').last.fetch('evidence')
+    assert_includes payload.dig('result', 'findings').map { |entry| entry['code'] }, 'candidate_text_quarantined'
+  end
+
+  def test_human_candidate_custom_text_is_preserved_while_agent_declares_quarantine
+    path = relative_path(write_json('custom-text.json', [
+      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true,
+        rationale: 'Reviewed latency evidence.', success_condition: 'Reviewed threshold.',
+        calculation_basis: 'time_slice' }
+    ]))
+    human, status = invoke_human('candidates', path)
+    assert_equal 0, status
+    assert_equal 'Reviewed latency evidence.', human.fetch('candidates').first.fetch('rationale')
+    assert_equal 'Reviewed threshold.', human.fetch('candidates').first.dig('proposed_slo', 'success_condition')
+    agent, status = invoke_agent_process('candidates', telemetry_file: path)
+    assert_equal 0, status
+    refute_includes JSON.generate(agent), 'Reviewed threshold.'
+    assert_equal 'time_slice', agent.dig('result', 'candidates').first.dig('proposed_slo', 'calculation_basis')
+    assert_includes agent.dig('result', 'findings').map { |entry| entry['code'] }, 'candidate_text_quarantined'
+  end
+
+  def test_candidate_core_fields_reject_non_identifiers_and_non_booleans
+    invalid = [{ nested: 'audit_canary' }, ['audit_canary'], "audit_canary\n", 'audit_canary' * 1_000]
+    signals = %i[kind metric user_visible].product(invalid).map do |field, value|
+      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true, field => value }
+    end
+    path = relative_path(write_json('core-shape.json', signals))
+    payload, status = invoke_agent_process('candidates', telemetry_file: path)
+    assert_equal 0, status
+    assert_empty payload.dig('result', 'candidates')
+    refute_includes JSON.generate(payload), 'audit_canary'
+    assert_equal 'unsafe_candidate_signals_omitted', payload.dig('result', 'findings', 0, 'code')
+    assert_equal signals.length, payload.dig('result', 'findings', 0, 'details', 'count')
+  end
+
+  def test_candidate_numeric_ranges_preserve_valid_values_and_quarantine_invalid_ones
+    invalid = [[:objective, 0], [:objective, -1], [:objective, 1.01],
+               [:observations_per_second, -1], [:failed_observations_to_alert, -1]]
+    signals = invalid.map do |field, value|
+      { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true, field => value }
+    end
+    signals << { kind: 'latency', metric: 'http_request_duration_seconds', user_visible: true,
+                 objective: 1, observations_per_second: 0, failed_observations_to_alert: 0 }
+    path = relative_path(write_json('numeric-shape.json', signals))
+    payload, status = invoke_agent_process('candidates', telemetry_file: path)
+    assert_equal 0, status
+    candidates = payload.dig('result', 'candidates')
+    candidates.first(5).each do |candidate|
+      assert_equal 0.99, candidate.dig('proposed_slo', 'objective')
+      assert_empty candidate.fetch('evidence')
+    end
+    assert_equal 1, candidates.last.dig('proposed_slo', 'objective')
+    assert_equal({ 'observations_per_second' => 0, 'failed_observations_to_alert' => 0 }, candidates.last.fetch('evidence'))
+    assert_equal 'time_slice', candidates.last.dig('proposed_slo', 'calculation_basis')
+    assert_equal 5, payload.dig('result', 'findings', 0, 'details', 'count')
   end
 
   def test_review_handoff_preserves_human_mutation_with_a_bounded_agent_result
@@ -202,6 +323,17 @@ class AgentOnboardingCommandsTest < Minitest::Test
   end
 
   private
+
+  def invoke_agent_process(command_id, **arguments)
+    request = JSON.parse(JSON.generate(SloRulesEngine::CLI::CommandRegistry.default.fetch(command_id).agent.fetch(:request_example)))
+    request['arguments'] = arguments.transform_keys(&:to_s)
+    stdout, stderr, status = Open3.capture3(
+      RbConfig.ruby, File.join(ROOT, 'bin/rules-ctl'), 'agent', 'invoke', command_id,
+      "--json=#{JSON.generate(request)}", chdir: ROOT
+    )
+    assert_empty stderr
+    [JSON.parse(stdout), status.exitstatus]
+  end
 
   def write_json(name, payload)
     path = File.join(@temporary_root, name)

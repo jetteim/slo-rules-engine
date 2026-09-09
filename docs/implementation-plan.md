@@ -2,9 +2,10 @@
 
 This is the running plan for the long refactor.
 
-Current execution priority (2026-09-05): the
+Current execution priority (2026-09-09): the
 [maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
-Start HK-01 test discovery, then HK-02's code map and HK-03's safety repair.
+HK-01 test discovery is complete; HK-03's safety repair is complete ahead
+of HK-02's code map, which is the next open task.
 Additional Agent coverage and MCP/skill work are paused for the first tranche;
 the phases below describe scope and history, not permission to skip that queue.
 
@@ -274,7 +275,9 @@ and article revalidation live in
   provider-metric fingerprint quarantine, byte-bounded Prometheus bodies, and
   sanitized batch/provider errors. Candidates now add default/maximum limits,
   truncation, and fingerprint quarantine; handoff review returns a bounded
-  summary. Projection, cursors, streaming, and other families remain open.
+  summary. Candidate output now has an explicit field allowlist, enum-only
+  calculation basis with declared quarantine/defaults, and finite numeric
+  evidence checks. Projection, cursors, streaming, and other families remain open.
 - [ ] **AICLI-F5:** ship a versioned `SKILL.md` and compact agent context whose
   invariants are checked against the registry.
 - [ ] **AICLI-F6:** expose eligible commands through an allowlisted MCP stdio

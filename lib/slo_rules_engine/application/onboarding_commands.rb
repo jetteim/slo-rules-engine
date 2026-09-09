@@ -90,6 +90,12 @@ module SloRulesEngine
     class ReviewTelemetryCandidates
       include OnboardingCommandSupport
 
+      SIGNAL_FIELDS = %i[
+        kind metric user_visible sli_uid slo_uid source rationale success_condition
+        objective observations_per_second failed_observations_to_alert calculation_basis
+      ].freeze
+      CALCULATION_BASES = %w[observations time_slice].freeze
+
       def call(arguments, context:)
         telemetry_file = arguments.fetch('telemetry_file')
         context.input_policy.validate_lexical_paths!([
@@ -113,6 +119,7 @@ module SloRulesEngine
           selected, quarantine_findings = sanitize_signals(selected, payload, context)
         end
         review = SloRulesEngine::Onboarding::CandidateGenerator.new.review(selected)
+        review = candidate_output(review) if context.input_policy.confined?
         review[:findings].concat(quarantine_findings)
         truncated = !limit.nil? && signals.length > limit
         if truncated
@@ -138,6 +145,23 @@ module SloRulesEngine
 
       private
 
+      # Only these fields cross the Agent boundary. Source values are checked
+      # before generation; prose, confidence and recommendations are generated
+      # from those checked values, never copied from arbitrary telemetry text.
+      def candidate_output(review)
+        {
+          candidates: review.fetch(:candidates).map do |candidate|
+            candidate.slice(:sli_uid, :signal, :metric, :rationale, :explanation).merge(
+              confidence: candidate.fetch(:confidence).slice(:level, :score, :reasons, :caveats),
+              evidence: candidate.fetch(:evidence).slice(:observations_per_second, :failed_observations_to_alert, :source),
+              calculation_basis_recommendation: candidate[:calculation_basis_recommendation]&.slice(:basis, :reason, :confidence),
+              proposed_slo: candidate.fetch(:proposed_slo).slice(:uid, :objective, :success_condition, :calculation_basis)
+            )
+          end,
+          findings: review.fetch(:findings).map { |finding| finding.slice(:code, :kind, :metric, :message) }
+        }
+      end
+
       def load_payload(path, context)
         resolved = context.input_policy.resolve_read_file(
           path,
@@ -159,7 +183,7 @@ module SloRulesEngine
         omitted_metrics = []
         quarantined_text = []
         safe = signals.filter_map do |signal|
-          normalized = signal.each_with_object({}) { |(key, value), result| result[key.to_sym] = value }
+          normalized = signal.slice(*SIGNAL_FIELDS)
           metric = normalized[:metric]
           unless metric.nil? || safe_metric?(metric, provider, context)
             omitted_metrics << fingerprint(metric)
@@ -180,6 +204,9 @@ module SloRulesEngine
             next unless normalized.key?(field)
 
             quarantined_text << fingerprint(field => normalized.delete(field))
+          end
+          if normalized.key?(:calculation_basis) && !CALCULATION_BASES.include?(normalized[:calculation_basis])
+            quarantined_text << fingerprint(calculation_basis: normalized.delete(:calculation_basis))
           end
           %i[objective observations_per_second failed_observations_to_alert].each do |field|
             next unless normalized.key?(field)
@@ -223,7 +250,7 @@ module SloRulesEngine
       end
 
       def safe_numeric_field?(field, value)
-        return false unless value.is_a?(Numeric) && value.finite?
+        return false unless value.is_a?(Numeric) && value.finite? && value.to_f.finite?
 
         field == :objective ? value.positive? && value <= 1 : value >= 0
       end

@@ -4,6 +4,13 @@ This document describes how the engine should evolve from a public-safe DSL skel
 
 See [Telemetry-First Adoption Map](adoption-map.md) for the value-oriented onboarding path and near-term adoption backlog.
 
+Current execution order is owned by the
+[maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
+HK-01 test discovery is complete; HK-03 candidate safety is complete ahead of
+HK-02's larger documentation cleanup. Agent expansion and MCP/skill delivery
+remain paused through the HK-01–HK-06 reassessment. Live Datadog work remains
+deferred until isolated backend evidence is available.
+
 ## Product Intent
 
 The engine keeps service reliability intent independent from observability backends. A service definition should describe what reliability means for a service; providers then translate that intent into backend artifacts.
@@ -208,7 +215,7 @@ contract and with existing reliability/mutation gates intact.
 **Measures:**
 
 - Every current command has Human/Agent registry and catalog coverage. AICLI-F1
-  plus runtime introspection meet this for all 40 current commands; seven
+  plus runtime introspection meet this for all 40 current commands; thirteen
   commands now have executable equivalence and full parity remains an Agent CLI
   rollout gate.
 - Runtime schemas require no backend, network, or credentials.
@@ -239,6 +246,11 @@ contract and with existing reliability/mutation gates intact.
 
 ## Delivery Order
 
+The sequence below describes longer-term product dependencies. It does not
+override the current housekeeping queue or authorize deferred Datadog work.
+Executable Agent coverage is tracked in the
+[Agent roadmap](agent-interface-roadmap.md#feature-packets).
+
 1. Keep the provider-independent DSL and provider generation path stable.
 2. Strengthen provider-state management until Datadog is a credible `live_api` baseline.
 3. Make telemetry-derived draft generation and portfolio discovery a first-class onboarding path.
@@ -248,7 +260,7 @@ contract and with existing reliability/mutation gates intact.
 7. Add low-volume and reality-check examples with synthetic telemetry.
 8. Keep provider apply behavior explicit for each provider: Datadog as live API, Prometheus-compatible bundles as manifest bundles, and Sloth as external-generator handoff.
 9. Expand the implemented shared registry, Human-to-Agent JSON catalog,
-   offline introspection, and seven-command structured invocation only through
+   offline introspection, and structured invocation only through
    the typed application seam; complete output-path and mutation safety before
    exposing writes, add MCP later, and close executable parity before general
    availability.

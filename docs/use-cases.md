@@ -1335,6 +1335,29 @@ discovery/candidate packet. Its `validate_only` mode cannot prove candidate
 membership because it does not open the packet; normal execution retains the
 existing handoff schema and candidate-identity gates.
 
+The shared candidate handler preserves supported Human/Agent results. Agent
+presentation intentionally quarantines custom source text and malformed values;
+it does not change the Human generator's interpretation of reviewed input.
+Candidate objects expose only SLI identity, signal, metric, generated rationale,
+confidence, explanation, evidence, calculation-basis recommendation, and the
+proposed SLO. Nested objects also have explicit field allowlists.
+
+| Telemetry field | Agent candidate policy |
+| --- | --- |
+| `kind`, `metric`, `user_visible` | Require a bounded identifier/provider metric and a boolean; omit unsafe signals with `unsafe_candidate_signals_omitted`. |
+| `sli_uid`, `slo_uid`, `source` | Optional bounded identifiers; quarantine malformed values and use generator defaults or omit the field. |
+| `rationale`, `success_condition` | Fingerprint source text and use generated defaults. |
+| `calculation_basis` | Preserve exactly `observations` or `time_slice`; quarantine all other supplied values, then use the traffic recommendation or `observations` default. |
+| `objective` | Require a finite number greater than zero and at most one; otherwise quarantine and use the generator default. |
+| `observations_per_second`, `failed_observations_to_alert` | Require nonnegative finite numbers also representable as finite floats; otherwise quarantine and omit. |
+| Other source fields | Excluded from the candidate input/output allowlists. |
+
+Quarantined optional values produce `candidate_text_quarantined` with bounded
+fingerprints and counts. Unknown nested objects, arrays, controls, and oversized
+text cannot become a calculation basis. `agent describe candidates` declares
+`candidate_output_allowlist` and `calculation_basis_enum`; request syntax and
+versioned result field names remain unchanged.
+
 Planned write-capable invocation after the same gates reach later families:
 
 ```bash

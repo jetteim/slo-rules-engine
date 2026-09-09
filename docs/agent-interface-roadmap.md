@@ -181,7 +181,7 @@ interface syntax into domain handlers:
 | `providers list` | Yes | Implemented structured invocation with zero I/O | Yes |
 | `integrations list` | Yes | Implemented structured invocation with zero I/O | Yes |
 | `generate-routes` | Yes | Full parity | Yes |
-| `candidates` | Yes | Implemented bounded workspace read with unsafe evidence quarantine | Yes |
+| `candidates` | Yes | Implemented bounded workspace read with explicit output shape, enum calculation basis, and unsafe evidence quarantine | Yes |
 | `draft-definition` | Yes | Full parity | Yes |
 | `draft-from-handoff` | Yes | Full parity | Yes |
 | `onboarding-summary` | Yes | Full parity with bounded scopes | Yes |
@@ -331,7 +331,9 @@ text is not returned. Candidate review defaults to 100 signals with a 500
 maximum, reports truncation, fingerprints omitted unsafe metrics and optional
 text, and substitutes safe defaults. Handoff review returns decision counts,
 safe identifiers, artifact identity, and a packet fingerprint rather than the
-full evidence packet or review notes. General field masks, cursors, NDJSON, and
+full evidence packet or review notes. HK-03 adds explicit candidate/nested field
+allowlists, enum-only calculation basis with declared quarantine and inferred
+defaults, and finite numeric evidence checks. General field masks, cursors, NDJSON, and
 other command families remain open.
 
 **Value:** agents receive only the evidence needed for the current decision and do not ingest unsafe provider-controlled text by default.
@@ -366,16 +368,17 @@ other command families remain open.
 
 ## Delivery Order
 
-Execution override (2026-09-05): complete the first
+Execution override (2026-09-09): complete the first
 [housekeeping tranche](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue)
 and reassess with the maintainer before expanding command coverage or shipping
-MCP/skill work. HK-03 repairs a known candidate output-policy gap; the existing
-bounded/sanitized slices must not be read as comprehensive output safety.
+MCP/skill work. HK-01 discovery is complete and HK-03 candidate safety is
+complete ahead of HK-02 documentation cleanup. These bounded/sanitized
+slices must not be read as comprehensive output safety.
 The sequence below remains the feature dependency order after that checkpoint.
 
 1. AICLI-F1 delivered the architectural foundation and registered current commands without changing their behavior.
 2. Deliver AICLI-F2 first for read-only catalog, validation, reporting, and one state-planning vertical slice; expand only through registry-backed mappings.
-3. Complete AICLI-F3 before exposing any Agent CLI local write or provider mutation.
+3. Before enabling each Agent command, prove the applicable AICLI-F3 gates for its input, I/O, provider, and side-effect class. Local writes require confinement and zero-I/O `validate_only`; provider mutation also requires the existing review, ownership, exact-plan, journal, and verification gates. Complete AICLI-F3 across all supported commands before general availability.
 4. Deliver AICLI-F4 for high-volume discovery/status/reporting paths before claiming context-safe operation.
 5. Ship AICLI-F5 when the first Agent CLI slice is usable so guidance and behavior evolve together.
 6. Add AICLI-F6 only after schemas, safety metadata, and Agent CLI envelopes are stable.

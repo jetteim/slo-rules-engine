@@ -47,10 +47,11 @@ module SloRulesEngine
             io: CommandContract.io(local_reads: %w[telemetry_evidence]),
             gates: %w[
               strict_arguments workspace_confined_agent_reads bounded_input normalized_telemetry
-              conservative_classification bounded_response untrusted_text_quarantine read_only
+              conservative_classification bounded_response untrusted_text_quarantine
+              candidate_output_allowlist calculation_basis_enum read_only
             ],
             output: CommandContract.output(
-              field_masks: 'unsafe_telemetry_text_quarantined',
+              field_masks: 'explicit_candidate_shape_with_quarantine',
               streaming: 'not_applicable'
             ),
             agent_status: 'implemented',

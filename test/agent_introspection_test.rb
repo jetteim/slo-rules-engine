@@ -59,6 +59,16 @@ class AgentIntrospectionTest < Minitest::Test
     assert_equal 'sloth-mcp.compare', request.dig('properties', 'command_id', 'const')
   end
 
+  def test_candidate_description_declares_output_shape_and_basis_policy
+    description = invoke('agent', 'describe', 'candidates')
+    command = description.fetch('command')
+    assert_includes command.fetch('safety_gates'), 'candidate_output_allowlist'
+    assert_includes command.fetch('safety_gates'), 'calculation_basis_enum'
+    assert_equal 'explicit_candidate_shape_with_quarantine', command.dig('output', 'field_masks')
+    assert_equal true, command.fetch('structured_invocation')
+    assert_equal 'candidates', command.dig('request_schema', 'properties', 'command_id', 'const')
+  end
+
   def test_every_registered_agent_target_has_a_resolved_schema_matching_its_example
     registry = SloRulesEngine::CLI::CommandRegistry.default
 

@@ -10,8 +10,8 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 
 1. Housekeeping first: follow the HK-01–HK-08 queue in
    `docs/housekeeping/project-structure-refactoring-plan.md`. HK-01 test
-   discovery is implemented; the maintainer code map and candidate output
-   safety remain next. See the queue for current verification evidence.
+   discovery is complete and HK-03 candidate output safety is complete.
+   HK-02's maintainer code map is next; see the queue for verification evidence.
 2. Pause additional Agent command coverage and MCP/skill work during the first
    housekeeping tranche. Continue STR packets through their preservation and
    dependency-removal gates; reassess with the maintainer after HK-01–HK-06.
@@ -628,13 +628,24 @@ Implemented by the latest feature slices:
 
 ## Most Recent Checkpoints
 
+- 2026-09-09 HK-01: canonical verification recursively discovers every test
+  suite, including transitive and newly added nested suites exactly once.
+  Loaded paths and named test identities have regression coverage.
+- 2026-09-09 HK-03: Agent candidates expose explicit input/output field
+  allowlists, quarantine invalid calculation-basis values, preserve supported
+  enum values, and bound numeric evidence to finite float representation.
+  Human behavior and intentional Agent presentation differences are covered
+  through process-CLI regressions. The current queue and verification evidence
+  live in the structure plan; HK-02 is next. Full verification passed
+  558 tests / 7,550 assertions, architecture checks, and CLI smokes on 2026-09-09.
+
 - 2026-09-05 maintainer review: created eight scoped housekeeping tasks in the
   existing structure plan and made them the active queue. Rechecked baseline:
   100 production files, 24,649 lines, 64 root requires, 15 allowed forbidden
   references. Found three test suites omitted by the aggregate (17 tests / 158
   assertions pass separately), candidate `calculation_basis` output passthrough,
-  and overbroad descriptions of architecture-check coverage. These are open
-  tasks, not fixes; no runtime code changed. Historical checkpoints below do
+  and overbroad descriptions of architecture-check coverage. These were open
+  tasks at that audit; no runtime code changed in the audit checkpoint. Historical checkpoints below do
   not override the new housekeeping priority.
 
 - latest checkpoint: bounded/sanitized Agent candidate reads plus confined
@@ -754,8 +765,8 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. HK-01 suite discovery is implemented. Deliver the HK-02 maintainer map and
-   repair the HK-03 candidate output-policy defect before expanding command coverage.
+1. Deliver the HK-02 maintainer map. HK-01 test discovery is complete and
+   HK-03 candidate output safety is complete; command expansion stays paused.
 2. Remove duplicated artifact policy and remaining parallel command metadata,
    and align architecture checks with their stated scope (HK-04–HK-06).
 3. Run the Datadog sandbox probes and resume live provider-contract work only
@@ -778,16 +789,17 @@ Secondary gaps:
 
 ## Recommended Next Slice
 
-HK-01 suite discovery is implemented. Follow the next open task and its exact
-scope and verification in `docs/housekeeping/project-structure-refactoring-plan.md`.
+HK-02: give the maintainer one code map and one current queue. HK-01 discovery
+and HK-03 candidate safety are complete. Follow HK-02's exact scope and
+verification in `docs/housekeeping/project-structure-refactoring-plan.md`.
 The maintainer explicitly requested understandability and maintenance work;
 more Agent features are not the default next slice. All existing safety gates
 and postponed live-provider work remain unchanged.
 
 ## Next Session Handoff
 
-Updated on 2026-09-09: HK-01 suite discovery is implemented; `proceed` follows
-the next open housekeeping task, not another Agent feature.
+Updated on 2026-09-09: HK-01 discovery and HK-03 candidate safety are
+complete; `proceed` starts HK-02, not another Agent feature.
 The implementation evidence below describes the previous feature checkpoint;
 the current housekeeping audit and task status live in the structure plan.
 
@@ -950,7 +962,8 @@ If a new session needs to resume quickly:
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
 8. If the user says `proceed`, execute the first open housekeeping task.
-   HK-01 suite discovery is implemented. Do not resume Agent feature growth automatically. The tagged
+   HK-01 discovery and HK-03 candidate safety are complete. Do not resume
+   Agent feature growth automatically. The tagged
    Sloth-runtime comparison remains externally gated.
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic
