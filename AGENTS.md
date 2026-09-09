@@ -9,8 +9,9 @@ It models provider-independent reliability intent in a Ruby DSL, generates provi
 ## Current Priority Order
 
 1. Housekeeping first: follow the HK-01–HK-08 queue in
-   `docs/housekeeping/project-structure-refactoring-plan.md`. Start with test
-   suite discovery, then the maintainer code map and candidate output safety.
+   `docs/housekeeping/project-structure-refactoring-plan.md`. HK-01 test
+   discovery is implemented; the maintainer code map and candidate output
+   safety remain next. See the queue for current verification evidence.
 2. Pause additional Agent command coverage and MCP/skill work during the first
    housekeeping tranche. Continue STR packets through their preservation and
    dependency-removal gates; reassess with the maintainer after HK-01–HK-06.
@@ -753,8 +754,8 @@ Implemented by the latest feature slices:
 
 Highest-value remaining gaps:
 
-1. Close HK-01 suite-discovery gaps, deliver the HK-02 maintainer map, and repair
-   the HK-03 candidate output-policy defect before expanding command coverage.
+1. HK-01 suite discovery is implemented. Deliver the HK-02 maintainer map and
+   repair the HK-03 candidate output-policy defect before expanding command coverage.
 2. Remove duplicated artifact policy and remaining parallel command metadata,
    and align architecture checks with their stated scope (HK-04–HK-06).
 3. Run the Datadog sandbox probes and resume live provider-contract work only
@@ -777,16 +778,16 @@ Secondary gaps:
 
 ## Recommended Next Slice
 
-HK-01: make the aggregate suite include every eligible test and guard against
-future omission. Follow the task's exact scope and verification in
-`docs/housekeeping/project-structure-refactoring-plan.md`, then HK-02's code map.
+HK-01 suite discovery is implemented. Follow the next open task and its exact
+scope and verification in `docs/housekeeping/project-structure-refactoring-plan.md`.
 The maintainer explicitly requested understandability and maintenance work;
 more Agent features are not the default next slice. All existing safety gates
 and postponed live-provider work remain unchanged.
 
 ## Next Session Handoff
 
-Updated on 2026-09-05: `proceed` now starts HK-01, not another Agent feature.
+Updated on 2026-09-09: HK-01 suite discovery is implemented; `proceed` follows
+the next open housekeeping task, not another Agent feature.
 The implementation evidence below describes the previous feature checkpoint;
 the current housekeeping audit and task status live in the structure plan.
 
@@ -857,7 +858,7 @@ When the user types `proceed` in a fresh session:
 1. First read this file, `docs/implementation-plan.md`, `docs/adoption-map.md`, and the latest 5-10 commits.
 2. Confirm the worktree is clean with `git status --short --branch`.
 3. Read the current housekeeping queue at the top of
-   `docs/housekeeping/project-structure-refactoring-plan.md`; begin HK-01.
+   `docs/housekeeping/project-structure-refactoring-plan.md`; begin its first open task.
 4. Treat the supported Sloth engine boundary as complete; do not invent more
    provider work while the tagged MCP release and status-parity fields are absent.
 5. Keep Agent command expansion paused through the first housekeeping tranche;
@@ -948,8 +949,8 @@ If a new session needs to resume quickly:
 7. Inspect `lib/slo_rules_engine/live_status/sloth_reader.rb`,
    `lib/slo_rules_engine/sloth/downstream_evidence.rb`, and
    `docs/sloth-mcp-integration.md`
-8. If the user says `proceed`, execute the first open housekeeping task, starting
-   with HK-01. Do not resume Agent feature growth automatically. The tagged
+8. If the user says `proceed`, execute the first open housekeeping task.
+   HK-01 suite discovery is implemented. Do not resume Agent feature growth automatically. The tagged
    Sloth-runtime comparison remains externally gated.
 9. Update both CLI sub-interface mappings and usage for every CLI change; do not
    add independent adapter business logic

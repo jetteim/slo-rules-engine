@@ -93,7 +93,7 @@ Audit verification (canonical Homebrew Ruby, 2026-09-05):
   not invalidate the separately reproduced, not-yet-regression-tested output
   defect above.
 
-All tasks below are **open**. Sizes indicate review scope, not time estimates:
+HK-01 is complete; HK-02–HK-08 remain open. Sizes indicate review scope, not time estimates:
 S = one narrow checkpoint; M = several explicitly separated checkpoints.
 One task/checkpoint at a time. Each code checkpoint runs its focused tests,
 `scripts/structure-report --check`, `git diff --check`, and full verification.
@@ -102,7 +102,7 @@ contract change, or show that the old contract remains identical.
 
 | Order | Task | Size | Existing packet / prerequisite |
 | --- | --- | --- | --- |
-| 1 | HK-01: Make “all tests” actually include all tests | S | early test-discovery part of STR-7; no domain dependency |
+| 1 | HK-01: Make “all tests” actually include all tests (complete) | S | early test-discovery part of STR-7; no domain dependency |
 | 2 | HK-02: Give the maintainer one map and one current queue | M | documentation; after HK-01 baseline |
 | 3 | HK-03: Close candidate output-policy gaps | S | AICLI-F3/F4 safety repair; after HK-01 |
 | 4 | HK-04: Give artifact identity and credential policy one owner | M | STR-1; after HK-01 and HK-03 |
@@ -112,6 +112,21 @@ contract change, or show that the old contract remains identical.
 | 8 | HK-08: Separate journal storage from execution policy | M | STR-4; after HK-04 and HK-06 |
 
 ### HK-01: Make “All Tests” Actually Include All Tests
+
+**Status (2026-09-09):** implemented. The aggregate recursively discovers every
+`test/**/*_test.rb` suite; Ruby `require` preserves transitive loading exactly
+once. `test/test_discovery_test.rb` compares actual loaded suites and named test
+identities and proves discovery of a temporary nested, unregistered suite.
+There are no excluded suites; only the aggregate excludes itself from recursion.
+
+**Verification evidence (2026-09-09, local file-backed repository):**
+`./scripts/verify.sh` passed 551 tests / 7,448 assertions, structure checks and
+CLI smokes. Each previously omitted suite passed independently. The two new
+discovery tests passed, including the temporary-suite probe. Loaded suite paths
+and named test identities are captured in
+`/tmp/slo-hk01-20260909-discovery.json`; full output is in
+`/tmp/slo-hk01-20260909-verify.log`. No live provider was contacted. Rollback is
+limited to the runner and discovery test; production code is unchanged.
 
 **Work:** repair `test/all_test.rb` discovery and add a regression check that
 compares eligible test files with loaded suites, allowing only named exclusions
