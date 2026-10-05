@@ -50,7 +50,10 @@ The detailed commands, expected files, and safety boundaries are in [Engineering
 Phase 14 now has a validated 40-command catalog and registry. It pairs each
 Human CLI example with an Agent CLI JSON request, owns Human command dispatch,
 and exposes bounded offline `agent catalog` plus exact `agent describe`
-introspection with a strict resolved request schema for every command. Strict
+introspection with a strict resolved request schema for every command.
+`request_schema_source` identifies explicit declaration versus legacy inference;
+it does not indicate execution support. Inspect `structured_invocation` before
+invoking a command through Agent JSON. Strict
 `agent invoke` is implemented for thirteen commands: `providers.list`,
 `integrations.list`, `recommend-calculation-basis`, `validate`,
 `migration-report`, `model-report`, and file-backed `diff` for

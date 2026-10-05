@@ -283,6 +283,33 @@ revert migration independently from characterization.
 
 ### HK-05: Finish Command Declarations Without Enabling Commands
 
+**In progress:** Sloth evidence/MCP now owns three explicit declarations in
+`cli/command_contracts/sloth.rb`. Corresponding legacy usage/example/assembly
+entries are removed. The pre-migration registry, compact catalog, full Agent
+catalog, and all 40 descriptions are captured at `090a070`; persistent
+preservation hashes exclude only the authoring-source label. Reversing the
+three `inferred` → `explicit` labels reproduces every original wire field.
+Resolved schemas, including known optional-field limitations, are unchanged;
+thirteen application mappings remain enabled. The registry digest changes only
+for those source labels; the compact catalog digest is unchanged.
+
+**Family checkpoints (local repository, 2026-10-05 UTC):**
+
+| Family | Explicit declarations after checkpoint | Full verification | Evidence prefix in `/tmp/` |
+| --- | ---: | --- | --- |
+| Sloth evidence/MCP | 23 / 40 | 569 tests / 7,724 assertions | `slo-hk05-sloth-` |
+
+Sloth checkpoint verification at 21:56–21:58 UTC: focused registry,
+introspection, invocation, preservation and fitness suites passed 32 tests /
+3,337 assertions. Full `./scripts/verify.sh`, `scripts/structure-report --check`,
+and `git diff --check` passed. The proof JSON records the exact source-label
+delta and registry digest migration. Logs are `PREFIXfocused.log`,
+`PREFIXverify.log`, and `PREFIXproof.json`. No live provider calls, mutations,
+or metric/log/trace reads occurred. Rollback: revert the family checkpoint,
+its registry digest, and its named production-file count change together;
+retain baseline preservation goldens. HK-05 remains open for other families
+and the separate orchestration checkpoint.
+
 **Work:** finish the metadata half of STR-3 one remaining family at a time;
 remove each migrated family's legacy usage/examples/schema-inference source
 in the same checkpoint. Keep typed-handler extraction a separate checkpoint

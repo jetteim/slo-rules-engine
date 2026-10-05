@@ -1497,6 +1497,10 @@ arbitrary provider mutation payloads remain unsupported.
   unapproved dependency, a file loses ownership, a command contract changes,
   or a documented use case loses its mapped tests.
 
+The introspection field `request_schema_source` records explicit declaration
+versus legacy inference. It does not enable invocation; `structured_invocation`
+and the existing application mapping determine executable support.
+
 **What to expect after the remaining Agent slices:**
 
 - URL, host, resource-ID, query/fragment, exactly-once encoding, and

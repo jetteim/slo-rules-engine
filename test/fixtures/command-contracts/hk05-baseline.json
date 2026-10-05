@@ -1,0 +1,10 @@
+{
+  "baseline_commit": "090a070",
+  "allowed_difference": "request_schema_source inferred -> explicit only",
+  "sha256": {
+    "registry": "9e6d2d8b6dd476c0a9f7681d120e83306ef424bf26c474a654b2755bcac96dc6",
+    "catalog": "4f13f891ca05332cd6603babe12ba41fa186d4b7d77cd918707502b3e05401f7",
+    "agent_catalog": "cb72d74440b123912badff8ead59752096777788fee3c904ead446915361e595",
+    "descriptions": "adee5ffdf7409cd185278c6edea0347bae608955a07ecd7a4bd04ada60985720"
+  }
+}

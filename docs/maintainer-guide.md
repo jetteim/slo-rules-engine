@@ -125,6 +125,15 @@ validates the registered request, and resolves the application class declared in
 Both call `Application::GenerateProviderManifests`. The adapters format the
 result; the Agent adapter adds its envelope and workspace policy.
 
+When maintaining `generate`, the declaration above owns usage, the JSON example,
+and the request schema. Check [Agent input policy](../lib/slo_rules_engine/application/input_safety.rb)
+alongside the adapter and shared handler. The
+[Agent write tests](../test/agent_write_commands_test.rb) cover Human/Agent
+equivalence, confined outputs, and zero-I/O validation; the
+[contract preservation tests](../test/command_contract_preservation_test.rb)
+lock registry, catalog, and describe output. Inspect `agent describe generate`
+and update its task usage in [use cases](use-cases.md) when behavior changes.
+
 This shared seam is implemented for the executable Agent commands. Other
 commands still have Human handlers that directly coordinate domain objects:
 `apply`, `import`, and `prune` remain in `cli.rb`; bundle, plan, journal, and

@@ -8,6 +8,7 @@ require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
 require_relative 'command_contracts/onboarding'
+require_relative 'command_contracts/sloth'
 
 module SloRulesEngine
   module CLI
@@ -242,9 +243,6 @@ module SloRulesEngine
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
         'status' => 'bin/rules-ctl status --provider=sloth --manifest=./manifest.json --evidence=./sloth-evidence.json --base-url=http://localhost:9090',
-        'sloth-evidence.capture' => 'bin/rules-ctl sloth-evidence capture --manifest=./manifest.json --input=./sloth.yaml --generated-rules=./rules.yaml --reviewer=reviewer@example.com --reviewed-at=2026-08-04T12:00:00Z --output=./sloth-evidence.json',
-        'sloth-evidence.status' => 'bin/rules-ctl sloth-evidence status ./sloth-evidence.json',
-        'sloth-mcp.compare' => 'bin/rules-ctl sloth-mcp compare --manifest=./manifest.json --evidence=./sloth-evidence.json --endpoint=http://localhost:8080/mcp --allow-host=localhost --expected-version=dev --from=2026-08-01T00:00:00Z --to=2026-08-05T00:00:00Z --output=./sloth-mcp-comparison.json',
         'agent.catalog' => 'bin/rules-ctl agent catalog --format=json --limit=20',
         'agent.describe' => 'bin/rules-ctl agent describe bundle.verify --format=json',
         'bundle.create' => 'bin/rules-ctl bundle create --artifact-index=./index.json --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --sloth-evidence=checkout/sloth=./sloth-evidence.json --output=./bundle.json',
@@ -264,9 +262,6 @@ module SloRulesEngine
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
         'status' => { provider: 'sloth', manifest_file: './manifest.json', evidence_file: './sloth-evidence.json', base_url: 'http://localhost:9090' },
-        'sloth-evidence.capture' => { manifest_file: './manifest.json', input_files: ['./sloth.yaml'], generated_rules_file: './rules.yaml', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T12:00:00Z', output_file: './sloth-evidence.json' },
-        'sloth-evidence.status' => { evidence_file: './sloth-evidence.json' },
-        'sloth-mcp.compare' => { manifest_file: './manifest.json', evidence_file: './sloth-evidence.json', endpoint: 'http://localhost:8080/mcp', allowed_hosts: ['localhost'], expected_version: 'dev', from: '2026-08-01T00:00:00Z', to: '2026-08-05T00:00:00Z', output_file: './sloth-mcp-comparison.json' },
         'agent.catalog' => { limit: 20 },
         'agent.describe' => { command_id: 'bundle.verify' },
         'bundle.create' => { artifact_index_file: './index.json', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', sloth_evidence_files: { 'checkout/sloth' => './sloth-evidence.json' }, output_file: './bundle.json' },
@@ -316,19 +311,7 @@ module SloRulesEngine
                          local_writes: %w[live_status_report],
                          provider_reads: %w[prometheus_instant_queries]),
                   gates: %w[strict_arguments reviewed_manifest exact_manifest_evidence evidence_freshness complete_slo_coverage target_preflight read_only]),
-          command('sloth-evidence.capture', path: %w[sloth-evidence capture], side_effect: 'local_write',
-                  io: io(local_reads: %w[reviewed_sloth_manifest sloth_native_inputs sloth_generated_rules],
-                         local_writes: %w[sloth_downstream_evidence]),
-                  gates: %w[strict_arguments reviewed_manifest native_input_parity complete_slo_coverage unambiguous_recording_rules reviewer_attestation credential_scan no_provider_io]),
-          command('sloth-evidence.status', path: %w[sloth-evidence status], side_effect: 'local_read',
-                  io: io(local_reads: %w[sloth_downstream_evidence reviewed_sloth_manifest sloth_native_inputs sloth_generated_rules]),
-                  gates: %w[strict_arguments content_addressed_identity evidence_freshness credential_scan no_provider_io read_only]),
-          command('sloth-mcp.compare', path: %w[sloth-mcp compare], side_effect: 'provider_read',
-                  io: io(local_reads: %w[reviewed_sloth_manifest sloth_downstream_evidence sloth_evidence_sources],
-                         local_writes: %w[sloth_mcp_comparison],
-                         provider_reads: %w[sloth_mcp_read_only_tools]),
-                  gates: %w[strict_arguments reviewed_manifest exact_manifest_evidence evidence_freshness endpoint_allowlist tested_version pinned_tool_schemas read_only_tool_allowlist exact_sloth_identity bounded_pagination bounded_responses credential_scan no_status_promotion]),
-
+          *CommandContracts::Sloth.definitions,
           command('agent.catalog', path: %w[agent catalog], side_effect: 'none',
                   io: io,
                   gates: %w[strict_arguments offline_only bounded_pagination deterministic_output],
