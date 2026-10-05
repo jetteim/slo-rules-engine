@@ -34,9 +34,23 @@ class CommandContractPreservationTest < Minitest::Test
     families = contracts.constants(false).map { |name| contracts.const_get(name, false) }
     definitions = families.flat_map(&:definitions)
     assert_equal definitions.map(&:id).uniq, definitions.map(&:id)
+    assert_equal registry.definitions.map(&:id).sort, definitions.map(&:id).sort
+    assert_empty SloRulesEngine::CLI::CommandCatalog::HUMAN_USAGE
+    assert_empty SloRulesEngine::CLI::CommandCatalog::AGENT_ARGUMENT_EXAMPLES
     definitions.each do |definition|
       assert_same definition, registry.fetch(definition.id), definition.id
       assert_equal 'explicit', definition.request_schema_source, definition.id
     end
+  end
+
+  def test_contract_factory_requires_explicit_argument_declarations
+    error = assert_raises(ArgumentError) do
+      SloRulesEngine::CLI::CommandContract.build(
+        id: 'fixture', human_usage: 'bin/rules-ctl fixture', arguments: nil,
+        side_effect: 'none', io: SloRulesEngine::CLI::CommandContract.io,
+        gates: %w[offline_only]
+      )
+    end
+    assert_equal 'explicit argument declarations are required', error.message
   end
 end

@@ -283,15 +283,20 @@ revert migration independently from characterization.
 
 ### HK-05: Finish Command Declarations Without Enabling Commands
 
-**In progress:** Sloth evidence/MCP now owns three explicit declarations in
-`cli/command_contracts/sloth.rb`. Corresponding legacy usage/example/assembly
-entries are removed. The pre-migration registry, compact catalog, full Agent
+**Metadata complete; orchestration checkpoint next:** every command now has
+one explicit declaration owner in `cli/command_contracts/`. Legacy usage/example
+maps are empty compatibility views; example-based schema inference and catalog
+command factories are removed. The pre-migration registry, compact catalog, full Agent
 catalog, and all 40 descriptions are captured at `090a070`; persistent
 preservation hashes exclude only the authoring-source label. Reversing the
-three `inferred` → `explicit` labels reproduces every original wire field.
+twenty `inferred` → `explicit` labels reproduces every original wire field.
 Resolved schemas, including known optional-field limitations, are unchanged;
 thirteen application mappings remain enabled. The registry digest changes only
-for those source labels; the compact catalog digest is unchanged.
+for those source labels; the compact catalog digest is unchanged. The factory
+now requires explicit arguments, and preservation tests require exactly one
+family owner for every registered command. Production files increase from 101
+to 107 for the six named remaining-family declaration files; root requires
+remain 64. The command-module count is unchanged.
 
 **Family checkpoints (local repository, 2026-10-05 UTC):**
 
@@ -304,6 +309,7 @@ for those source labels; the compact catalog digest is unchanged.
 | Journal | 33 / 40 | 569 tests / 7,744 assertions | `slo-hk05-journal-` |
 | Approved plan | 37 / 40 | 569 tests / 7,752 assertions | `slo-hk05-approved_plan-` |
 | Remaining analysis | 39 / 40 | 569 tests / 7,762 assertions | `slo-hk05-analysis-` |
+| Handoff validation | 40 / 40 | 570 tests / 7,774 assertions | `slo-hk05-onboarding-` |
 
 Sloth checkpoint verification at 21:56–21:58 UTC: focused registry,
 introspection, invocation, preservation and fitness suites passed 32 tests /
@@ -327,6 +333,8 @@ Journal checkpoint verified 2026-10-05 22:05:18 UTC: 32 focused tests / 3,357 as
 Approved plan checkpoint verified 2026-10-05 22:06:25 UTC: 32 focused tests / 3,365 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
 
 Remaining analysis checkpoint verified 2026-10-05 22:08:04 UTC: 32 focused tests / 3,375 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
+
+Handoff validation checkpoint verified 2026-10-05 22:10:21 UTC: 33 focused tests / 3,387 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
 
 **Work:** finish the metadata half of STR-3 one remaining family at a time;
 remove each migrated family's legacy usage/examples/schema-inference source
@@ -777,19 +785,13 @@ equivalence, no-I/O spies, use-case documentation, and full verification.
 **Rollback:** migrate one command family per commit behind the unchanged
 registry and RulesCtl facade.
 
-**Current progress (2026-09-05):** the complete catalog, analysis, and
-provider-state families; telemetry and onboarding families; plus
-generation/review now own Human usage, Agent
-examples, and explicit argument schemas in bounded declaration modules. `providers.list`,
-`integrations.list`, `recommend-calculation-basis`, `validate`,
-`migration-report`, `model-report`, file-backed `diff`, `generate`, and
-`manifest-review`, telemetry lookup/discovery, bounded candidates, and confined
-handoff review normalize Human flags or Agent JSON into typed application
-commands that return values without printing or exiting. Generation/review
-and handoff review also enforce confined Agent destinations and zero-I/O
-`validate_only`.
-Remaining command families still use the compatibility assembly and keep STR-3
-open.
+**Current progress (2026-10-05):** the complete catalog, analysis, and
+provider-state families now have explicit declarations, as do all remaining
+families. HK-05 completes metadata ownership with preserved resolved schemas;
+runtime introspection owns the exhaustive inventory. Thirteen application
+mappings share Human/Agent behavior. Broader typed-command migration and Agent
+execution stay open and paused behind the housekeeping reassessment; completing
+metadata does not close STR-3 or enable additional commands.
 
 ### STR-4: Provider-State File Boundaries And Release Inversion
 

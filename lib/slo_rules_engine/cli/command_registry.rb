@@ -245,12 +245,9 @@ module SloRulesEngine
 
     module CommandCatalog
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
-      HUMAN_USAGE = {
-        'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-      }.freeze
-      AGENT_ARGUMENT_EXAMPLES = {
-        'validate-handoff' => { handoff_file: './handoff.json' },
-      }.freeze
+      # Empty compatibility views; family declarations own usage and examples.
+      HUMAN_USAGE = {}.freeze
+      AGENT_ARGUMENT_EXAMPLES = {}.freeze
 
       module_function
 
@@ -274,9 +271,7 @@ module SloRulesEngine
       def build
         [
           CommandContracts::Analysis.fetch('validate'),
-          command('validate-handoff', handler: :validate_handoff, side_effect: 'local_read',
-                  io: io(local_reads: %w[handoff_packet]),
-                  gates: %w[strict_arguments handoff_schema reviewed_provenance]),
+          CommandContracts::Onboarding.fetch('validate-handoff'),
           *CommandContracts::Generation.definitions,
           *CommandContracts::ProviderState.definitions,
           *CommandContracts::Status.definitions,
@@ -287,49 +282,13 @@ module SloRulesEngine
           *CommandContracts::ApprovedPlan.definitions,
           *CommandContracts::Telemetry.definitions,
           *CommandContracts::Catalog.definitions,
-          *CommandContracts::Onboarding.definitions,
+          *CommandContracts::Onboarding.definitions.reject { |definition| definition.id == 'validate-handoff' },
           CommandContracts::Analysis.fetch('recommend-calculation-basis'),
           CommandContracts::Analysis.fetch('reality-check'),
           *CommandContracts::Analysis.reports
         ]
       end
 
-      def command(id, side_effect:, io:, gates:, path: nil, adapter: nil, handler: nil, output: nil,
-                  agent_status: nil, application_command: nil)
-        CommandContract.build(
-          id: id,
-          human_usage: HUMAN_USAGE.fetch(id),
-          example: AGENT_ARGUMENT_EXAMPLES.fetch(id),
-          side_effect: side_effect,
-          io: io,
-          gates: gates,
-          path: path,
-          adapter: adapter,
-          handler: handler,
-          output: output,
-          agent_status: agent_status,
-          application_command: application_command
-        )
-      end
-
-      def io(local_reads: [], local_writes: [], provider_reads: [], provider_writes: [], credentials: [])
-        {
-          local_reads: local_reads,
-          local_writes: local_writes,
-          provider_reads: provider_reads,
-          provider_writes: provider_writes,
-          credentials: credentials
-        }
-      end
-
-      def output(stdout: 'json', persisted_artifacts: [], field_masks: 'planned', streaming: 'planned')
-        {
-          stdout: stdout,
-          persisted_artifacts: persisted_artifacts,
-          field_masks: field_masks,
-          streaming: streaming
-        }
-      end
     end
   end
 end

@@ -5,15 +5,14 @@ module SloRulesEngine
     module CommandContract
       module_function
 
-      def build(id:, human_usage:, side_effect:, io:, gates:, path: nil, adapter: nil, handler: nil,
-                output: nil, example: nil, arguments: nil, agent_status: nil, application_command: nil)
+      def build(id:, human_usage:, arguments:, side_effect:, io:, gates:, path: nil, adapter: nil, handler: nil,
+                output: nil, agent_status: nil, application_command: nil)
         human_path = path || id.split('.')
         handler ||= id.tr('.-', '_').to_sym
         adapter ||= human_path.length == 1 ? handler : human_path.first.tr('-', '_').to_sym
         contract_prefix = "slo-rules-engine/cli-command-contract/#{id}"
         request_ref = "#{contract_prefix}/request/v1"
-        explicit = !arguments.nil?
-        request_example, argument_properties, required_arguments = normalize_arguments(arguments, example)
+        request_example, argument_properties, required_arguments = normalize_arguments(arguments)
 
         CommandDefinition.new(
           id: id,
@@ -43,11 +42,10 @@ module SloRulesEngine
             id: id,
             version: 1,
             ref: request_ref,
-            example: request_example,
             argument_properties: argument_properties,
-            explicit_required_arguments: required_arguments
+            required_arguments: required_arguments
           ),
-          request_schema_source: explicit ? 'explicit' : 'inferred',
+          request_schema_source: 'explicit',
           side_effect: side_effect,
           io: io,
           safety_gates: gates,
@@ -101,8 +99,8 @@ module SloRulesEngine
         }
       end
 
-      def normalize_arguments(arguments, example)
-        return [example, nil, nil] unless arguments
+      def normalize_arguments(arguments)
+        raise ArgumentError, 'explicit argument declarations are required' unless arguments.is_a?(Hash)
 
         request_example = arguments.each_with_object({}) do |(name, definition), result|
           next unless definition.fetch(:include_in_example)

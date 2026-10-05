@@ -300,7 +300,7 @@ class CliCommandRegistryTest < Minitest::Test
   def test_onboarding_family_owns_explicit_contracts_and_safe_executable_slices
     definitions = SloRulesEngine::CLI::CommandContracts::Onboarding.definitions
 
-    assert_equal %w[candidates draft-definition draft-from-handoff onboarding-summary onboarding-artifact-index review-handoff],
+    assert_equal %w[candidates draft-definition draft-from-handoff onboarding-summary onboarding-artifact-index review-handoff validate-handoff],
                  definitions.map(&:id)
     definitions.each do |definition|
       assert_equal 'explicit', definition.request_schema_source

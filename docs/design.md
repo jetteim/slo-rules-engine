@@ -47,6 +47,12 @@ versioned Agent JSON request. `AgentIntrospection` resolves strict request
 schemas from that metadata and serves bounded offline catalog/describe output
 through the focused `AgentCommands` adapter.
 
+Every command is authored once in its owning `cli/command_contracts/` family,
+including explicit argument schemas. The registry composes those declarations;
+the compact catalog projects their Human usage and Agent examples. Example-based
+schema inference and legacy authoring maps have been removed. Authoring-source
+labels do not grant execution support: application mappings remain the gate.
+
 The Human CLI adapter preserves existing positional/convenience syntax. The
 Agent adapter validates complete JSON requests and returns stable result/error
 envelopes for thirteen registry-mapped application commands. Analysis commands

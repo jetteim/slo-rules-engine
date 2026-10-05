@@ -31,7 +31,7 @@ through the aggregate suite.
 Observed: 100 production/executable files, 24,677 production lines, 64 root
 requires, 40 registered commands, and 15 allowlisted forbidden-reference
 occurrences. Thirteen commands have shared executable application mappings;
-20 request schemas are explicit and 20 are inferred. These are current counts,
+20 request schemas are explicit and 20 are inferred. These describe the baseline,
 not targets or measures of comprehension. HK-04 adds one shared-policy file and
 reduces the configured forbidden-reference occurrences from 15 to 6.
 
@@ -124,6 +124,11 @@ catalog view. Complete HK-05 family ownership and derive the compact catalog
 from those declarations. Characterize optional/conditional forms separately
 when correcting schemas; do not silently refresh snapshots during a structural
 move. Do not replace this with handler discovery or a generic command framework.
+
+**Resolution:** HK-05 moves all remaining declarations into owning families and
+removes example-based inference. All 40 resolved schemas, examples, handlers,
+and safety metadata retain their baseline values; only authoring-source labels
+change. The optional/conditional schema limitations remain separately gated.
 
 ### A-04: Useful domains depend on each other in the wrong direction
 

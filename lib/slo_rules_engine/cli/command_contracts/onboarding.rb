@@ -24,7 +24,8 @@ module SloRulesEngine
             draft_from_handoff,
             onboarding_summary,
             onboarding_artifact_index,
-            review_handoff
+            review_handoff,
+            validate_handoff
           ].freeze
         end
 
@@ -202,6 +203,26 @@ module SloRulesEngine
           )
         end
         private_class_method :review_handoff
+        def fetch(id)
+          definitions.find { |definition| definition.id == id } || raise(KeyError, id)
+        end
+
+        def validate_handoff
+          CommandContract.build(
+            id: "validate-handoff",
+            human_usage: "bin/rules-ctl validate-handoff ./handoff.json",
+            arguments: {
+              handoff_file: CommandContract.argument(
+                example: "./handoff.json",
+                schema: CommandContract.path_schema
+              )
+            },
+            side_effect: "local_read",
+            io: CommandContract.io(local_reads: ["handoff_packet"]),
+            gates: %w[strict_arguments handoff_schema reviewed_provenance]
+          )
+        end
+        private_class_method :validate_handoff
       end
     end
   end

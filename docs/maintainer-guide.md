@@ -162,10 +162,11 @@ operation ordering during a structural move.
 
 A change to a CLI command also involves its Human handler, Agent mapping,
 contract declaration, introspection, equivalence evidence, and task usage.
-Some contract families remain assembled in `cli/command_registry.rb`; the
-[HK-05 task](housekeeping/project-structure-refactoring-plan.md#hk-05-finish-command-declarations-without-enabling-commands)
-removes that duplication. Avoid adding a second policy implementation in an
-adapter.
+Each command is authored in its owning `cli/command_contracts/` family.
+`cli/command_registry.rb` composes those declarations and projects the compact
+catalog. The [HK-05 evidence](housekeeping/project-structure-refactoring-plan.md#hk-05-finish-command-declarations-without-enabling-commands)
+records the preservation checks. Avoid adding a second policy implementation
+in an adapter.
 
 Run the owning tests, then the repository gates:
 
