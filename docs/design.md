@@ -1,5 +1,8 @@
 # Design
 
+For a first pass through the project, use the [maintainer guide](maintainer-guide.md).
+This page is the architecture reference for boundaries and detailed flows.
+
 ## Architecture
 
 The engine is a local Ruby application with explicit boundaries around neutral
@@ -9,22 +12,19 @@ introspection, and typed structured invocation for thirteen commands; later Agen
 commands and MCP must reuse the same application behavior.
 
 ```text
-Operator / CI            AI agent                 MCP client (planned)
-  |                         |                         |
-Human CLI adapter      Agent CLI adapter        MCP stdio adapter
-  |                         |                         |
-  +------------- versioned command registry --------+
-                            |
-             typed application commands
-                            |
-RulesCtl library orchestration + command-family modules
-  |
-  +--> DSL / neutral model / validation
-  +--> telemetry lookup and onboarding
-  +--> provider generation and integrations
-  +--> manifest review and release bundles
-  +--> provider-state planning and execution
-  +--> live SLO status readers
+Operator / CI                         AI agent
+  |                                      |
+Human CLI adapter                    Agent CLI adapter
+  |                                      |
+registered Human handler             strict request + registry mapping
+  |                                      |
+  +-- migrated commands --> typed application commands <-- enabled commands
+  |                                      |
+  +-- legacy orchestration --------------+
+                                         |
+                 DSL / telemetry / providers / review / state / live status
+
+MCP stdio adapter: planned projection of the shared command contract.
 ```
 
 `bin/rules-ctl` only loads `lib/slo_rules_engine/cli.rb` and dispatches `ARGV`.
@@ -73,8 +73,10 @@ exact-plan, confirmation, journal, or verification requirements.
 The measured dependency debt, target direction, eight reversible refactoring
 packets, freeze zones, and all-use-case preservation matrix are in the
 [Project Structure Refactoring Plan](housekeeping/project-structure-refactoring-plan.md).
-STR-0 must make current boundary exceptions visible and reject new edges before
-the larger decomposition packets start.
+STR-0 implements the current inventory, configured regex dependency checks,
+and contract snapshots. It does not derive a complete Ruby dependency graph.
+HK-06 aligns the boundary declarations with that enforcement scope before the
+larger dependency moves.
 
 ## Component Boundaries
 
@@ -134,8 +136,9 @@ source fingerprints without executing Sloth or contacting Prometheus.
 
 The artifact retains generated record selectors and the reviewed native total
 query as provider evidence. It does not add PromQL to the neutral model. The
-direct Sloth reader now explicitly accepts it; release-bundle verification and
-aggregate status do not yet package it.
+direct Sloth reader explicitly accepts it. Release bundles can package optional
+evidence per Sloth target, and portfolio targets can reference it. Aggregate
+status and opt-in bundle verification consume it after exact-source preflight.
 
 `sloth/mcp.rb`, `sloth/mcp/client.rb`, and `sloth/mcp/comparison.rb` own the
 implemented provider-runtime comparison adapter for Sloth's official HTTP MCP

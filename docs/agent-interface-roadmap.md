@@ -368,13 +368,11 @@ other command families remain open.
 
 ## Delivery Order
 
-Execution override (2026-09-09): complete the first
-[housekeeping tranche](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue)
-and reassess with the maintainer before expanding command coverage or shipping
-MCP/skill work. HK-01 discovery is complete and HK-03 candidate safety is
-complete ahead of HK-02 documentation cleanup. These bounded/sanitized
-slices must not be read as comprehensive output safety.
-The sequence below remains the feature dependency order after that checkpoint.
+The [housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue)
+owns the execution override: finish the first tranche and reassess with the
+maintainer before expanding command coverage or shipping MCP/skill work.
+The sequence below is the feature dependency order after that checkpoint.
+Implemented bounded/sanitized slices do not imply comprehensive output safety.
 
 1. AICLI-F1 delivered the architectural foundation and registered current commands without changing their behavior.
 2. Deliver AICLI-F2 first for read-only catalog, validation, reporting, and one state-planning vertical slice; expand only through registry-backed mappings.

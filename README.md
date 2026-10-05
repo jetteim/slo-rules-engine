@@ -4,6 +4,12 @@ Public-safe SLI/SLO engineering toolkit with a Ruby DSL, telemetry-first onboard
 
 The engine keeps reliability intent independent from observability products. Provider adapters translate reviewed intent into complete backend bundles; they do not choose objectives, success conditions, or response policy.
 
+**Maintaining this repository?** Start with the
+[maintainer guide](docs/maintainer-guide.md) for the workflow, code map, and one
+Human/Agent command trace. Pick work from the
+[current housekeeping queue](docs/housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
+The guide is the entry point; the task examples below are operational reference.
+
 ## Engineering Tasks
 
 Use the toolkit to:
@@ -647,6 +653,7 @@ The initial delivery integration is `notification_router`, which generates conte
 
 ## Documentation
 
+- [Maintainer Guide: Workflow, Code Map, And Making A Change](docs/maintainer-guide.md)
 - [Maintainer Housekeeping: Findings And Next Tasks](docs/housekeeping/project-structure-refactoring-plan.md#start-here-make-the-project-understandable-again)
 - [Architecture](docs/design.md)
 - [Engineering Use Cases](docs/use-cases.md)

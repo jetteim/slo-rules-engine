@@ -2,12 +2,10 @@
 
 This is the running plan for the long refactor.
 
-Current execution priority (2026-09-09): the
-[maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
-HK-01 test discovery is complete; HK-03's safety repair is complete ahead
-of HK-02's code map, which is the next open task.
-Additional Agent coverage and MCP/skill work are paused for the first tranche;
-the phases below describe scope and history, not permission to skip that queue.
+For current execution priorities and checkpoint evidence, use the
+[housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
+For source navigation, start with the [maintainer guide](maintainer-guide.md).
+This page records implementation scope and history; it is not an active task queue.
 
 ## Phase 1: Public Skeleton
 
@@ -245,47 +243,20 @@ and article revalidation live in
   gates, provider I/O, and output metadata, route Human dispatch through the
   registry, and publish a separate Human-command to Agent-JSON catalog without
   changing command behavior.
-- [ ] **AICLI-F2:** add offline catalog/describe plus a strict Agent CLI raw
-  JSON/file/stdin invocation path and versioned result/error envelopes.
-  Offline bounded `agent catalog`, exact `agent describe`, JSON-only
-  introspection errors, and strict resolved request schemas for all 40 current
-  registry commands are complete. Strict inline JSON, workspace-file, and stdin
-  invocation plus deterministic result/error envelopes are complete for thirteen
-  commands: `providers.list`, `integrations.list`,
-  `recommend-calculation-basis`, `validate`, `migration-report`,
-  `model-report`, file-backed `diff`, `generate`, `manifest-review`,
-  `lookup-telemetry`, single/batch `discover-telemetry`, bounded `candidates`,
-  and confined `review-handoff`.
-  Datadog reads and other write-capable commands remain gated.
-- [ ] **AICLI-F3:** add shared field-specific input hardening, generated/fuzz
-  coverage, and zero-I/O `validate_only` for every write-capable command.
-  Workspace read confinement, traversal/control/pre-encoding rejection,
-  symlink containment, extension/count/byte bounds, parsed-error request IDs,
-  and application-output quarantine are complete for the thirteen executable
-  commands. Confined generation/review outputs, derived child paths, and their
-  zero-I/O `validate_only` are complete. Telemetry now adds HTTP(S) exact-host
-  allowlists, resource-ID/selector/window validation, confined batch output,
-  and pre-client zero-I/O validation. Candidate review adds bounded input and
-  unsafe-text quarantine; handoff review adds confined in-place output,
-  credential-text rejection, and zero-I/O validation. Other-family URL/ID,
-  broader fuzz, and validation-only gates for remaining writes stay open.
-- [ ] **AICLI-F4:** add schema-checked field masks, declared limits/cursors,
-  NDJSON streaming, explicit truncation, and response sanitization/quarantine.
-  Telemetry discovery now has required Agent limits, explicit truncation,
-  provider-metric fingerprint quarantine, byte-bounded Prometheus bodies, and
-  sanitized batch/provider errors. Candidates now add default/maximum limits,
-  truncation, and fingerprint quarantine; handoff review returns a bounded
-  summary. Candidate output now has an explicit field allowlist, enum-only
-  calculation basis with declared quarantine/defaults, and finite numeric
-  evidence checks. Projection, cursors, streaming, and other families remain open.
-- [ ] **AICLI-F5:** ship a versioned `SKILL.md` and compact agent context whose
-  invariants are checked against the registry.
-- [ ] **AICLI-F6:** expose eligible commands through an allowlisted MCP stdio
-  adapter generated from the registry with headless credential references and
-  no shell construction.
-- [ ] **AICLI-F7:** close Human CLI, Agent CLI, schema, skill, and MCP parity;
-  preserve existing Human CLI syntax/output/exit contracts; and pass every
-  security, context-budget, compatibility, and no-I/O gate.
+- [ ] **AICLI-F2:** complete strict Agent invocation and Human/Agent equivalence
+  across the command inventory.
+- [ ] **AICLI-F3:** complete field-specific input safety, generated/fuzz coverage,
+  and zero-I/O validation for every enabled side-effect class.
+- [ ] **AICLI-F4:** complete bounded output, field selection, pagination,
+  streaming, and sanitization across eligible workflows.
+- [ ] **AICLI-F5:** ship versioned skill/context guidance checked against the registry.
+- [ ] **AICLI-F6:** project eligible commands into an allowlisted MCP stdio adapter.
+- [ ] **AICLI-F7:** verify full parity, compatibility, and rollout gates.
+
+Partial delivery and remaining acceptance criteria are owned by the
+[feature packets](agent-interface-roadmap.md#feature-packets). Use runtime
+`agent catalog` / `agent describe` for executable support and exact schemas;
+this history does not repeat per-command progress inventories.
 
 Phase 14 must not create a provider-payload bypass. Neutral intent, reviewed
 provenance, freshness, ownership, exact-plan, confirmation, journal, and final
@@ -310,33 +281,10 @@ verification requirements apply identically through every interface.
 
 ## Project Backlog: Structure Stabilization And Refactoring
 
-The evidence, dependency model, preservation matrix, packet acceptance gates,
-and revalidation are in
-[`docs/housekeeping/project-structure-refactoring-plan.md`](housekeeping/project-structure-refactoring-plan.md).
-
-- [x] **STR-0:** establish architecture fitness tests, a current dependency-debt
-  allowlist, deterministic structure reporting, complete command-module
-  ownership, and requirement/contract snapshots.
-- [ ] **STR-1:** consolidate identical artifact fingerprint and credential-key
-  policy behind compatibility delegates.
-- [ ] **STR-2:** make Sloth downstream evidence own shared preflight and split
-  its existing collaborators without changing public constants.
-- [ ] **STR-3:** replace parallel command metadata with bounded-context contract
-  declarations and introduce typed application commands before Agent invocation
-  expands. Catalog, analysis, generation/review, provider-state, telemetry, and
-  onboarding families now have explicit declarations; thirteen Human/Agent
-  commands share typed application commands. HK-05 finishes declarations
-  without enabling additional commands; remaining families are open.
-- [ ] **STR-4:** split provider-state journal/approved-plan classes by existing
-  boundaries and invert the provider-state to release default dependency.
-- [ ] **STR-5:** split release verification/application by workflow phase and
-  move bundle/portfolio status input resolution out of core live readers.
-- [ ] **STR-6:** split Sloth MCP comparison and manifest-bundle apply internals
-  behind their stable provider facades.
-- [ ] **STR-7:** split process CLI coverage by command family, add bounded
-  composition roots, remove resolved dependency exceptions, and record final
-  structural evidence.
-
-Each STR packet is a behavior-preserving, independently revertible checkpoint.
-No packet is complete until its named dependency or responsibility debt is
-removed and focused plus full verification is green.
+The [structure plan](housekeeping/project-structure-refactoring-plan.md#delivery-packets)
+owns STR packet dependencies, preservation boundaries, and removal evidence.
+STR-0 establishes the inventory and configured fitness checks; remaining
+structural debt and current execution order are tracked there. The
+[current abstraction review](housekeeping/abstraction-layer-review.md) explains
+which abstractions to retain, consolidate, relocate, or remove. A packet is
+complete only after its named debt is removed and focused/full verification passes.

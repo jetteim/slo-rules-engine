@@ -2,7 +2,8 @@
 
 Original audit: 2026-08-15. Maintainer review: 2026-09-05.
 
-Status: housekeeping first; HK-01 and HK-03 complete; HK-02 next.
+Status: housekeeping first; HK-01 and HK-03 complete; HK-02 implemented,
+maintainer navigation feedback pending. HK-04 is the next code task.
 STR-0 completed, STR-3 partially implemented.
 
 Baseline commit: `6dc0ffb`
@@ -23,80 +24,20 @@ too little evidence that cleanup is reducing that burden.
 
 ### Current Audit Evidence
 
-Inspected revision: `df5303e` (clean `main` before the original audit documentation).
-Findings below describe that baseline; current task status and correction
-evidence are recorded in the queue and task sections.
-
-| Measure | Original audit | Rechecked 2026-09-05 |
-| --- | ---: | ---: |
-| Production Ruby/executable files | 82 | 100 |
-| Production lines | 21,467 | 24,649 (+14.8%) |
-| Test Ruby files, including support/aggregate files | 71 | 78 |
-| Test lines | 16,092 | 17,732 |
-| Root requires | 63 | 64 |
-| Registered commands | 40 | 40 |
-| Allowed forbidden-reference occurrences | not recorded here | 15 |
-
-The command surface has not grown, but its interface machinery has. That is
-not automatically waste: Agent confinement and parity need real code. However,
-the dependency-removal packets remain open and the largest existing workflow
-files remain large: downstream evidence 1,167 lines, journal execution 884,
-release verification 828, and the CLI facade 774. STR-3 progress alone is not
-evidence that the codebase is easier to understand.
-
-Verified findings, ordered by practical impact:
-
-1. **The aggregate test baseline is incomplete.** Loading `test/all_test.rb`
-   and comparing `$LOADED_FEATURES` with `test/**/*_test.rb` identifies three
-   omitted suites: `agent_telemetry_commands_test.rb`,
-   `sloth_live_status_test.rb`, and `telemetry_batch_discovery_test.rb`.
-   The aggregate passes 532 tests / 7,282 assertions; those suites separately
-   pass another 17 tests / 158 assertions. Passing `scripts/verify.sh` therefore
-   does not currently mean every test file ran. This is test discovery evidence,
-   not a line-coverage measurement.
-2. **There is no short, reliable maintainer entry point.** `AGENTS.md` was 974
-   lines, this plan 581, and current priorities are repeated in implementation,
-   Agent, adoption, and handoff documents. The implementation plan's STR-3
-   summary still said seven shared commands while Phase 14 said thirteen.
-   The latest two-command checkpoint touched 21 files, including nine Markdown
-   files. Reading more historical status is not a substitute for a code map.
-3. **Output safety is still field-by-field and incomplete.** In
-   `application/onboarding_commands.rb`, `sanitize_signals` removes some
-   untrusted text but passes `calculation_basis` through. `CandidateGenerator`
-   copies it into `proposed_slo`. An in-memory application probe with confined
-   Agent policy returned `{ "unexpected_text": "audit_canary" }` unchanged
-   when supplied as that field. No source file or provider was accessed by the
-   probe. This proves the application-boundary defect, not an end-to-end CLI
-   exploit. Treat correction as a safety fix, not behavior-preserving cleanup.
-4. **The architecture checks prove less than their prose suggests.**
-   `StructureInventory#dependency_evaluation` evaluates configured regex rules;
-   boundary `allowed_dependencies` are reported but not used to derive all
-   forbidden edges. Use-case mapping checks file existence, not suite loading.
-   Some removal ownership also disagrees: shared fingerprint edges are marked
-   STR-2 in configuration but assigned to STR-1 here. The check is useful, but
-   it is not a complete Ruby dependency graph or coverage proof.
-5. **Repeated policy and parallel command declarations remain.** The new
-   onboarding support adds another canonical JSON fingerprint implementation
-   while STR-1 remains open. Command-family declarations coexist with legacy
-   usage/example/schema assembly. This creates multiple maintenance paths even
-   though the final runtime registry is validated.
+The [2026-10-05 abstraction audit](abstraction-layer-review.md) separates useful
+boundaries from duplication, leftover helpers, reversed dependencies, and
+checker limitations. The [September audit](archive/housekeeping-audit-2026-09-05.md)
+is historical; corrected defects and verification are recorded in the tasks.
 
 ### Ordered Housekeeping Queue
 
-Audit verification (canonical Homebrew Ruby, 2026-09-05):
+This table owns current execution order. HK tasks are implementation slices;
+STR packets below own structural preservation and dependency-removal gates.
+Feature scope lives in the Agent roadmap and implementation history, rather
+than a second active queue.
 
-- `./scripts/verify.sh`: passed, including 532 tests / 7,282 assertions and
-  architecture checks; its deliberately refused live apply printed expected
-  usage text. No live provider verification was attempted.
-- `ruby -Ilib -e 'Dir.glob("test/**/*_test.rb").sort.each { |path| require_relative path }'`:
-  passed 549 tests / 7,440 assertions, zero failures/errors/skips. This audit
-  command covers the omitted suites but does not repair the canonical runner.
-- Focused housekeeping/Agent-roadmap/use-case/public-safety tests: 13 tests /
-  653 assertions passed. `git diff --check` passed. Current suite success does
-  not invalidate the separately reproduced, not-yet-regression-tested output
-  defect above.
-
-HK-01 and HK-03 are complete; HK-02 and HK-04–HK-08 remain open.
+HK-01 and HK-03 are complete. HK-02 has implemented documentation with the
+maintainer navigation check pending; HK-04–HK-08 remain open.
 Sizes indicate review scope, not time estimates:
 S = one narrow checkpoint; M = several explicitly separated checkpoints.
 One task/checkpoint at a time. Each code checkpoint runs its focused tests,
@@ -108,7 +49,7 @@ contract change, or show that the old contract remains identical.
 | --- | --- | --- | --- |
 | 1 | HK-01: Make “all tests” actually include all tests (complete) | S | early test-discovery part of STR-7; no domain dependency |
 | 2 | HK-03: Close candidate output-policy gaps (complete) | S | AICLI-F3/F4 safety repair; after HK-01 |
-| 3 | HK-02: Give the maintainer one map and one current queue | M | documentation; after HK-01 and HK-03 |
+| 3 | HK-02: Give the maintainer one map and one current queue (navigation check pending) | M | documentation; after HK-01 and HK-03 |
 | 4 | HK-04: Give artifact identity and credential policy one owner | M | STR-1; after HK-01 and HK-03 |
 | 5 | HK-05: Finish command declarations without enabling commands | M | bounded STR-3 work; after HK-02 |
 | 6 | HK-06: Make fitness checks match their advertised scope | S | STR-0 follow-up; before dependency moves in HK-07/08 |
@@ -148,6 +89,39 @@ use a temporary unregistered test to prove the discovery check catches it.
 **Rollback:** revert test-runner/check changes only; no runtime behavior changes.
 
 ### HK-02: Give The Maintainer One Map And One Current Queue
+
+**Implementation (2026-10-05):** [the maintainer guide](../maintainer-guide.md)
+now explains the workflow, saved objects, source/test ownership, a shared
+Human/Agent generation path, legacy handlers, and where to investigate refused
+apply. README routes maintainers to it before operational reference. AGENTS.md
+now contains operating rules, evidence gates, and links; its prior 974-line
+handoff is preserved [verbatim](archive/agents-2026-10-05.md). September audit
+findings are archived above. The architecture reference now distinguishes
+migrated and legacy command paths and reflects implemented Sloth evidence support.
+The [current abstraction audit](abstraction-layer-review.md) records independently
+checked redundancy and dependency inconsistencies.
+
+**Verification evidence (2026-10-05 UTC, local repository at `611d450`):**
+`./scripts/verify.sh` passed 558 tests / 7,550 assertions, zero failures,
+errors, or skips, architecture checks, and CLI smokes. Focused documentation
+tests passed 13 tests / 653 assertions; the offline Prometheus walkthrough
+passed one test / 47 assertions. At 14:57 UTC, a local check resolved all 160
+links in the 13 changed/new Markdown files and proved the AGENTS archive
+byte-identical to its original. The guide's Human/Agent examples both exited
+zero and produced identical manifest/review artifacts in temporary confined
+output roots. `git diff --check` passed. No backend queries, metric/log/trace
+reads, or provider mutation were performed. Production code and contracts are
+unchanged. Outputs: `/tmp/slo-hk02-20261005-verify.log`,
+`/tmp/slo-hk02-20261005-docs.log`, `/tmp/slo-hk02-20261005-walkthrough.log`,
+`/tmp/slo-hk02-20261005-links.json`, and
+`/tmp/slo-hk02-20261005-guide-examples.json`. Rollback: revert this documentation
+checkpoint independently of HK-01/03, retaining historical evidence.
+
+**Human evidence:** comprehension remains unverified. Ask the maintainer to use
+the guide to (1) trace a generated Prometheus YAML file to its definition,
+(2) find the shared generation handler and its tests, and (3) locate the gates
+behind an apply refusal. Record their result before closing this acceptance
+item or resuming feature expansion. HK-04 is the next code task in the queue.
 
 **Work:** first add a short maintainer explanation, linked prominently from
 README: intent → reviewed artifacts → plan → journaled execution → verification;
@@ -229,7 +203,7 @@ if reverted, mark the defect open and keep command expansion paused.
 
 **Work:** execute STR-1 in two checkpoints: golden-vector characterization,
 then shared owner plus compatibility delegates and caller migration. Include
-the newly added `OnboardingCommandSupport#fingerprint` in the inventory.
+`OnboardingCommandSupport#fingerprint` and manifest-review hashing in the inventory.
 Compare implementations before consolidation: text hashing, JSON hashing,
 symbol values, duplicate string/symbol keys, error fallback, and finding paths
 are not assumed interchangeable.
@@ -250,7 +224,11 @@ revert migration independently from characterization.
 remove each migrated family's legacy usage/examples/schema-inference source
 in the same checkpoint. Keep typed-handler extraction a separate checkpoint
 only where there is demonstrated duplicated orchestration. Record one worked
-example showing all files needed to maintain a command.
+example showing all files needed to maintain a command. The current abstraction
+audit identifies three repository-unused RulesCtl helpers and three matching
+provider-validation loops; remove or consolidate them in isolated preservation
+checkpoints after checking public-library compatibility. Characterize corrections
+to inferred optional/conditional schemas separately from structural moves.
 
 **Acceptance:** all 40 commands have one explicit declaration owner; existing
 registry/catalog output and resolved schemas compare equal; command coverage
@@ -265,7 +243,8 @@ outputs; run Human/Agent parity and unsupported-command refusal tests.
 ### HK-06: Make Fitness Checks Match Their Advertised Scope
 
 **Work:** reconcile boundary declarations with the actual regex checks and
-label their limitations. Add negative fixtures for missing rule coverage and
+label their limitations. Reconcile Datadog state-file ownership with the declared
+provider-translation restrictions. Add negative fixtures for missing rule coverage and
 representative forbidden edges; do not build a general Ruby static analyzer.
 Align removal ownership for shared policy with STR-1, evidence preflight with
 STR-2, actual runtime status coordination with STR-5, and approved plans with

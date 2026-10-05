@@ -4,12 +4,10 @@ This document describes how the engine should evolve from a public-safe DSL skel
 
 See [Telemetry-First Adoption Map](adoption-map.md) for the value-oriented onboarding path and near-term adoption backlog.
 
-Current execution order is owned by the
-[maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue).
-HK-01 test discovery is complete; HK-03 candidate safety is complete ahead of
-HK-02's larger documentation cleanup. Agent expansion and MCP/skill delivery
-remain paused through the HK-01–HK-06 reassessment. Live Datadog work remains
-deferred until isolated backend evidence is available.
+Use the [maintainer guide](maintainer-guide.md) to understand the implementation
+and the [housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue)
+for current work. This page defines product outcomes and capability direction;
+feature delivery and acceptance live in the Agent roadmap and implementation history.
 
 ## Product Intent
 
@@ -214,10 +212,10 @@ contract and with existing reliability/mutation gates intact.
 
 **Measures:**
 
-- Every current command has Human/Agent registry and catalog coverage. AICLI-F1
-  plus runtime introspection meet this for all 40 current commands; thirteen
-  commands now have executable equivalence and full parity remains an Agent CLI
-  rollout gate.
+- Every supported command has Human/Agent registry and catalog coverage.
+  Executable equivalence is evidenced in the
+  [Agent feature packets](agent-interface-roadmap.md#feature-packets); full parity
+  remains a general-availability gate.
 - Runtime schemas require no backend, network, or credentials.
 - Every write-capable command passes zero-I/O validation-only tests.
 - Collections declare field masks, limits, truncation, and NDJSON behavior.

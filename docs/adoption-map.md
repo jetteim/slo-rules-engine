@@ -129,50 +129,18 @@ gates; MCP later projects the same registry.
 
 ## Current Best Next Value
 
-1. follow the [maintainer housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue):
-   trustworthy test discovery, a short code map, and candidate output safety
-2. remove repeated artifact policy and command metadata before enabling more
-   Agent commands; reassess feature growth after the first housekeeping tranche
-3. keep Datadog live status, contract testing, exact apply/resume, and Datadog
-   live bundle verification postponed until isolated credentials are available
-4. revalidate the Sloth MCP comparison against a tagged binary only after an
-   official release includes MCP; retain direct Prometheus evidence as the
-   contract-complete path
+The [housekeeping queue](housekeeping/project-structure-refactoring-plan.md#ordered-housekeeping-queue)
+owns near-term work and the maintainer reassessment before feature growth.
+Use the [maintainer guide](maintainer-guide.md) to locate the implementation for
+an adoption workflow. Product outcomes and flow measures remain in this map;
+implementation history is in [the implementation plan](implementation-plan.md).
 
 ## Housekeeping Backlog
 
-Active repository-wide plan:
-
-1. Project structure refactoring plan:
-   `docs/housekeeping/project-structure-refactoring-plan.md`
-
-Completed recommendation reviews:
-
-1. Test suite dependency and compaction review: `docs/housekeeping/test-suite-compaction-review.md`
-2. Abstraction layer placement and compaction review: `docs/housekeeping/abstraction-layer-review.md`
-
-Historical completed guardrails:
-
-1. CLI helper pilot: `test/support/cli_helpers.rb`
-2. Public-safe onboarding handoff and discovery fixtures: `test/support/onboarding_fixtures.rb`
-3. Datadog fake client/response helpers: `test/support/datadog_fakes.rb`
-4. Datadog apply coverage split by behavior: `test/datadog_applier_state_test.rb`, `test/datadog_payload_translation_test.rb`, `test/datadog_client_state_test.rb`, and `test/datadog_client_http_test.rb`
-5. First guarded CLI command extraction: `lib/slo_rules_engine/cli/onboarding_commands.rb`
-6. Catalog CLI command extraction: `lib/slo_rules_engine/cli/catalog_commands.rb`
-7. Datadog risk policy extraction: `lib/slo_rules_engine/datadog/risk_policy.rb`
-8. Datadog payload translation extraction: `lib/slo_rules_engine/datadog/payload_translator.rb`
-9. Telemetry CLI command extraction: `lib/slo_rules_engine/cli/telemetry_commands.rb`
-10. Datadog state planning extraction: `lib/slo_rules_engine/datadog/state_planner.rb`
-11. Datadog state reader split: `lib/slo_rules_engine/datadog/state_reader.rb`
-12. Report CLI command extraction: `lib/slo_rules_engine/cli/report_commands.rb`
-13. Datadog request transport extraction: `lib/slo_rules_engine/datadog/request_transport.rb`
-14. Atomic coherence-preserving simplification: thin executable, library CLI
-    boundary, consolidated architecture coverage, shared public-safe manifest
-    fixture, current architecture map, and repository-wide traceability
-    evidence in `docs/housekeeping/atomic-coherence-simplification.md`
-
-Recommended remaining housekeeping sequence:
-
-Follow the current HK queue linked above. The earlier feature-triggered-only
-housekeeping pause is superseded by the 2026-09-05 maintainer review. Preserve
-the completed atomic checkpoint's thin executable and safety boundaries.
+Use the [structure plan](housekeeping/project-structure-refactoring-plan.md) for
+preservation/dependency gates and the
+[current abstraction audit](housekeeping/abstraction-layer-review.md) for
+consolidation and ownership findings. Previous checkpoint inventories are in the
+[archived handoff](housekeeping/archive/agents-2026-10-05.md); they do not set
+current priorities. The [test topology review](housekeeping/test-suite-compaction-review.md)
+remains historical supporting context.
