@@ -298,6 +298,7 @@ for those source labels; the compact catalog digest is unchanged.
 | Family | Explicit declarations after checkpoint | Full verification | Evidence prefix in `/tmp/` |
 | --- | ---: | --- | --- |
 | Sloth evidence/MCP | 23 / 40 | 569 tests / 7,724 assertions | `slo-hk05-sloth-` |
+| Live status | 24 / 40 | 569 tests / 7,726 assertions | `slo-hk05-status-` |
 
 Sloth checkpoint verification at 21:56–21:58 UTC: focused registry,
 introspection, invocation, preservation and fitness suites passed 32 tests /
@@ -309,6 +310,8 @@ or metric/log/trace reads occurred. Rollback: revert the family checkpoint,
 its registry digest, and its named production-file count change together;
 retain baseline preservation goldens. HK-05 remains open for other families
 and the separate orchestration checkpoint.
+
+Live status checkpoint verified 2026-10-05 22:00:45 UTC: 32 focused tests / 3,339 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
 
 **Work:** finish the metadata half of STR-3 one remaining family at a time;
 remove each migrated family's legacy usage/examples/schema-inference source

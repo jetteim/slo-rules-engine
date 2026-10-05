@@ -8,6 +8,7 @@ require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
 require_relative 'command_contracts/onboarding'
+require_relative 'command_contracts/status'
 require_relative 'command_contracts/sloth'
 
 module SloRulesEngine
@@ -242,7 +243,6 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'status' => 'bin/rules-ctl status --provider=sloth --manifest=./manifest.json --evidence=./sloth-evidence.json --base-url=http://localhost:9090',
         'agent.catalog' => 'bin/rules-ctl agent catalog --format=json --limit=20',
         'agent.describe' => 'bin/rules-ctl agent describe bundle.verify --format=json',
         'bundle.create' => 'bin/rules-ctl bundle create --artifact-index=./index.json --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --sloth-evidence=checkout/sloth=./sloth-evidence.json --output=./bundle.json',
@@ -261,7 +261,6 @@ module SloRulesEngine
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'status' => { provider: 'sloth', manifest_file: './manifest.json', evidence_file: './sloth-evidence.json', base_url: 'http://localhost:9090' },
         'agent.catalog' => { limit: 20 },
         'agent.describe' => { command_id: 'bundle.verify' },
         'bundle.create' => { artifact_index_file: './index.json', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', sloth_evidence_files: { 'checkout/sloth' => './sloth-evidence.json' }, output_file: './bundle.json' },
@@ -306,11 +305,7 @@ module SloRulesEngine
                   gates: %w[strict_arguments handoff_schema reviewed_provenance]),
           *CommandContracts::Generation.definitions,
           *CommandContracts::ProviderState.definitions,
-          command('status', side_effect: 'provider_read',
-                  io: io(local_reads: %w[provider_manifest release_bundle live_status_portfolio sloth_downstream_evidence sloth_evidence_sources],
-                         local_writes: %w[live_status_report],
-                         provider_reads: %w[prometheus_instant_queries]),
-                  gates: %w[strict_arguments reviewed_manifest exact_manifest_evidence evidence_freshness complete_slo_coverage target_preflight read_only]),
+          *CommandContracts::Status.definitions,
           *CommandContracts::Sloth.definitions,
           command('agent.catalog', path: %w[agent catalog], side_effect: 'none',
                   io: io,
