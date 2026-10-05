@@ -8,6 +8,7 @@ require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
 require_relative 'command_contracts/onboarding'
+require_relative 'command_contracts/introspection'
 require_relative 'command_contracts/status'
 require_relative 'command_contracts/sloth'
 
@@ -243,8 +244,6 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'agent.catalog' => 'bin/rules-ctl agent catalog --format=json --limit=20',
-        'agent.describe' => 'bin/rules-ctl agent describe bundle.verify --format=json',
         'bundle.create' => 'bin/rules-ctl bundle create --artifact-index=./index.json --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --sloth-evidence=checkout/sloth=./sloth-evidence.json --output=./bundle.json',
         'bundle.plan' => 'bin/rules-ctl bundle plan ./bundle.json --target-output=checkout/prometheus_stack=./managed --output=./apply-ready.json',
         'bundle.apply' => 'bin/rules-ctl bundle apply ./apply-ready.json --confirm --approved-plan=./approved-plan.json --journal-dir=./journals --output=./applied.json',
@@ -261,8 +260,6 @@ module SloRulesEngine
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'agent.catalog' => { limit: 20 },
-        'agent.describe' => { command_id: 'bundle.verify' },
         'bundle.create' => { artifact_index_file: './index.json', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', sloth_evidence_files: { 'checkout/sloth' => './sloth-evidence.json' }, output_file: './bundle.json' },
         'bundle.plan' => { bundle_file: './bundle.json', target_outputs: { 'checkout/prometheus_stack' => './managed' }, output_file: './apply-ready.json' },
         'bundle.apply' => { bundle_file: './apply-ready.json', confirm: true, approved_plan_files: ['./approved-plan.json'], journal_dir: './journals', output_file: './applied.json' },
@@ -307,15 +304,7 @@ module SloRulesEngine
           *CommandContracts::ProviderState.definitions,
           *CommandContracts::Status.definitions,
           *CommandContracts::Sloth.definitions,
-          command('agent.catalog', path: %w[agent catalog], side_effect: 'none',
-                  io: io,
-                  gates: %w[strict_arguments offline_only bounded_pagination deterministic_output],
-                  output: output(streaming: 'not_applicable')),
-          command('agent.describe', path: %w[agent describe], side_effect: 'none',
-                  io: io,
-                  gates: %w[strict_arguments offline_only exact_command_id deterministic_output],
-                  output: output(streaming: 'not_applicable')),
-
+          *CommandContracts::Introspection.definitions,
           command('bundle.create', path: %w[bundle create], side_effect: 'local_write',
                   io: io(local_reads: %w[artifact_index provider_plans source_evidence],
                          local_writes: %w[review_ready_bundle]),
