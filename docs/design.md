@@ -80,6 +80,16 @@ larger dependency moves.
 
 ## Component Boundaries
 
+### Shared Artifact Integrity
+
+`artifact_integrity.rb` owns canonical JSON hashing, text hashing, and recursive
+credential-key scanning. It loads without domain composition. Provider state,
+release, manifest review, and onboarding retain their existing helper entry
+points as delegates; Sloth and live-status code consume the neutral owner.
+Workflow-specific identity assembly, finding construction, and serialization
+error handling stay with their workflows. Onboarding retains its prefixed text
+fallback and `fetch` semantics; state/release helpers retain bracket reads.
+
 ### Neutral Intent
 
 `model.rb`, `dsl/`, `reliability_model.rb`, `validation.rb`, and

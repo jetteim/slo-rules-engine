@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../artifact_integrity'
+
 module SloRulesEngine
   module Sloth
     module Mcp
@@ -72,7 +74,7 @@ module SloRulesEngine
         end
 
         def fingerprint(value)
-          SloRulesEngine::ReleaseBundle::Fingerprint.content(value)
+          SloRulesEngine::ArtifactIntegrity::Fingerprint.content(value)
         end
 
         def comparison_id(report)

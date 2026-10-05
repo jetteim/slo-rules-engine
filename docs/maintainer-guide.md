@@ -68,6 +68,7 @@ Start with the facade for the workflow you are changing, then follow its calls.
 
 | Responsibility | Code to start with | Focused evidence |
 | --- | --- | --- |
+| Preserve artifact hashes and credential finding paths | [shared integrity](../lib/slo_rules_engine/artifact_integrity.rb); identity assembly stays with each workflow | [compatibility goldens](../test/artifact_integrity_compatibility_test.rb), [boundary checks](../test/architecture_fitness_test.rb) |
 | Read intent and validate it | [DSL](../lib/slo_rules_engine/dsl/service_definition.rb), [model](../lib/slo_rules_engine/model.rb), [validation](../lib/slo_rules_engine/validation.rb) | [DSL](../test/dsl_test.rb), [validation](../test/validation_test.rb) |
 | Translate intent into artifacts | [provider contract](../lib/slo_rules_engine/provider.rb), [Prometheus Stack provider](../lib/slo_rules_engine/providers/prometheus_stack.rb), [native renderer](../lib/slo_rules_engine/prometheus_stack/resource_renderer.rb) | [provider output](../test/prometheus_stack_provider_test.rb), [manifest schema](../test/manifest_schema_test.rb) |
 | Review generated artifacts | [schema](../lib/slo_rules_engine/manifest_schema.rb), [review queue](../lib/slo_rules_engine/manifest_review_queue.rb), [review evidence](../lib/slo_rules_engine/manifest_review_evidence.rb) | [review queue](../test/manifest_review_queue_test.rb) |

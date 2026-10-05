@@ -2,6 +2,8 @@
 
 require 'minitest/autorun'
 require 'digest'
+require 'open3'
+require 'rbconfig'
 require_relative '../lib/slo_rules_engine'
 require_relative 'support/release_bundle_fixtures'
 
@@ -57,6 +59,8 @@ class ArtifactIntegrityCompatibilityTest < Minitest::Test
     assert_equal({ 'a' => 'bracket-read' }, SloRulesEngine::ReleaseBundle::Fingerprint.canonicalize(lookup_hash))
     assert_equal({ 'a' => 'bracket-read' }, review_support.send(:canonicalize, lookup_hash))
     assert_equal({ 'a' => 'stored-value' }, onboarding_support.send(:canonicalize, lookup_hash))
+    assert_equal "sha256:#{Digest::SHA256.hexdigest('{"a":"stored-value"}')}",
+                 onboarding_support.send(:fingerprint, lookup_hash)
   end
 
   def test_text_hashing_is_distinct_from_json_string_hashing
@@ -98,6 +102,24 @@ class ArtifactIntegrityCompatibilityTest < Minitest::Test
 
   def test_identity_assembly_and_generated_artifact_goldens
     assert_equal JSON.parse(File.read(GOLDEN_PATH)), golden_results
+  end
+
+  def test_shared_integrity_loads_without_domain_composition
+    script = <<~RUBY
+      require 'slo_rules_engine/artifact_integrity'
+      puts JSON.generate(
+        constants: SloRulesEngine.constants.map(&:to_s).sort,
+        fingerprint: SloRulesEngine::ArtifactIntegrity::Fingerprint.content({}),
+        paths: SloRulesEngine::ArtifactIntegrity::CredentialScanner.paths({ token: nil }, 'artifact')
+      )
+    RUBY
+    stdout, stderr, status = Open3.capture3(
+      RbConfig.ruby, '-I', File.expand_path('../lib', __dir__), '-e', script
+    )
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_equal({ 'constants' => ['ArtifactIntegrity'], 'fingerprint' => Digest::SHA256.hexdigest('{}'),
+                   'paths' => ['artifact.token'] }, JSON.parse(stdout))
   end
 
   # Used once to capture the pre-extraction baseline. Expected hashes are saved,

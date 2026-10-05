@@ -106,7 +106,8 @@ tagged Sloth comparison externally gated as described above.
 
 Follow the first open acceptance item in the queue. HK-02's guide and navigation
 cleanup are implemented; maintainer comprehension remains unverified until the
-three navigation tasks are tried. HK-04 is the next code task. Do not automatically
+three navigation tasks are tried. HK-04's shared integrity policy is complete;
+HK-05 is the next code task. Do not automatically
 resume feature expansion after a documentation change.
 
 ## Next Session Handoff

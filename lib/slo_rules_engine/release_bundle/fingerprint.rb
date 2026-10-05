@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'digest'
-require 'json'
+require_relative '../artifact_integrity'
 
 module SloRulesEngine
   module ReleaseBundle
@@ -9,11 +8,11 @@ module SloRulesEngine
       module_function
 
       def content(value)
-        Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))
+        ArtifactIntegrity::Fingerprint.content(value)
       end
 
       def text(value)
-        Digest::SHA256.hexdigest(value.to_s)
+        ArtifactIntegrity::Fingerprint.text(value)
       end
 
       def artifact_content(artifact)
@@ -57,16 +56,7 @@ module SloRulesEngine
       end
 
       def canonicalize(value)
-        case value
-        when Hash
-          value.keys.sort_by(&:to_s).each_with_object({}) do |key, canonical|
-            canonical[key.to_s] = canonicalize(value[key])
-          end
-        when Array
-          value.map { |entry| canonicalize(entry) }
-        else
-          value
-        end
+        ArtifactIntegrity::Fingerprint.canonicalize(value)
       end
 
       def fetch_value(container, key)

@@ -2,9 +2,9 @@
 
 Original audit: 2026-08-15. Maintainer review: 2026-09-05.
 
-Status: housekeeping first; HK-01 and HK-03 complete; HK-02 implemented,
-maintainer navigation feedback pending. HK-04 is the next code task.
-STR-0 completed, STR-3 partially implemented.
+Status: housekeeping first; HK-01, HK-03, and HK-04 complete; HK-02 implemented,
+maintainer navigation feedback pending. HK-05 is the next code task.
+STR-0 completed; STR-1 completed; STR-3 partially implemented.
 
 Baseline commit: `6dc0ffb`
 
@@ -36,8 +36,8 @@ STR packets below own structural preservation and dependency-removal gates.
 Feature scope lives in the Agent roadmap and implementation history, rather
 than a second active queue.
 
-HK-01 and HK-03 are complete. HK-02 has implemented documentation with the
-maintainer navigation check pending; HK-04–HK-08 remain open.
+HK-01, HK-03, and HK-04 are complete. HK-02 has implemented documentation with
+the maintainer navigation check pending; HK-05–HK-08 remain open.
 Sizes indicate review scope, not time estimates:
 S = one narrow checkpoint; M = several explicitly separated checkpoints.
 One task/checkpoint at a time. Each code checkpoint runs its focused tests,
@@ -50,7 +50,7 @@ contract change, or show that the old contract remains identical.
 | 1 | HK-01: Make “all tests” actually include all tests (complete) | S | early test-discovery part of STR-7; no domain dependency |
 | 2 | HK-03: Close candidate output-policy gaps (complete) | S | AICLI-F3/F4 safety repair; after HK-01 |
 | 3 | HK-02: Give the maintainer one map and one current queue (navigation check pending) | M | documentation; after HK-01 and HK-03 |
-| 4 | HK-04: Give artifact identity and credential policy one owner | M | STR-1; after HK-01 and HK-03 |
+| 4 | HK-04: Give artifact identity and credential policy one owner (complete) | M | STR-1; after HK-01 and HK-03 |
 | 5 | HK-05: Finish command declarations without enabling commands | M | bounded STR-3 work; after HK-02 |
 | 6 | HK-06: Make fitness checks match their advertised scope | S | STR-0 follow-up; before dependency moves in HK-07/08 |
 | 7 | HK-07: Let Sloth evidence own evidence preflight | M | STR-2; after HK-04 and HK-06 |
@@ -121,7 +121,8 @@ checkpoint independently of HK-01/03, retaining historical evidence.
 the guide to (1) trace a generated Prometheus YAML file to its definition,
 (2) find the shared generation handler and its tests, and (3) locate the gates
 behind an apply refusal. Record their result before closing this acceptance
-item or resuming feature expansion. HK-04 is the next code task in the queue.
+item or resuming feature expansion. HK-04's policy extraction is complete;
+HK-05 is the next code task.
 
 **Work:** first add a short maintainer explanation, linked prominently from
 README: intent → reviewed artifacts → plan → journaled execution → verification;
@@ -200,6 +201,46 @@ registry/introspection and full verify. **Rollback:** isolated safety-fix commit
 if reverted, mark the defect open and keep command expansion paused.
 
 ### HK-04: Give Artifact Identity And Credential Policy One Owner
+
+**Status:** complete in two independently revertible checkpoints.
+
+**Migration implementation (2026-10-05):** `ArtifactIntegrity::Fingerprint` and
+`ArtifactIntegrity::CredentialScanner` own the characterized policies in one
+independently loadable file. Existing state/release constants, manifest-review
+helpers, and onboarding helpers delegate. Onboarding keeps its `sha256:` prefix,
+serialization-error text fallback, and `fetch` semantics. Bundle identity assembly
+and exact findings remain in their owners. No command is enabled or changed.
+
+Sloth evidence/MCP and live aggregation now use the neutral owner directly.
+The exact six migrated allowlist entries (nine occurrences) are removed; current
+configured debt falls from 15 to 6 occurrences. Remaining release/status/preflight
+edges retain their later packets. The new neutral boundary has a zero-debt rule
+and an isolated negative fixture. There are 101 production files and still 64
+root requires. Contract snapshots and all pre-extraction goldens are unchanged;
+the production-file count assertion changes only for the named new owner.
+
+**Migration verification (2026-10-05, 21:42–21:44 UTC, local repository):**
+focused integrity, boundary, Agent onboarding, Sloth evidence/MCP, and aggregate
+status suites passed 51 tests / 543 assertions. `./scripts/verify.sh` passed
+567 tests / 7,672 assertions, zero failures/errors/skips, architecture checks,
+and CLI smokes. The aggregate includes both complete offline usability
+walkthroughs. All pre-extraction golden fingerprints/IDs remain equal.
+The structure report shows 101 owned production files, 64 root requires,
+40 commands, 21 artifact schema IDs, 120 command schema references, and 19 use
+cases. The exact architecture contract snapshot and current contract inventory
+compare unchanged; no digest was refreshed. Debt decreases from 15 to 6
+configured forbidden-reference occurrences by removing only the nine migrated
+release-utility references. No backend queries, metric/log/trace reads, or
+provider mutations occurred. Outputs:
+`/tmp/slo-hk04-20261005-migration-focused.log`,
+`/tmp/slo-hk04-20261005-migration-verify.log`,
+`/tmp/slo-hk04-20261005-after-structure.json`, and
+`/tmp/slo-hk04-20261005-parity.json`. Rollback: revert the migration checkpoint
+with its boundary/count changes; retain the characterization checkpoint and
+its original golden fixture. Later dependency packets remain open.
+Final documentation/public-safety checks passed 13 tests / 653 assertions after
+updating task status; `git diff --check` passed. Output:
+`/tmp/slo-hk04-20261005-documentation.log`.
 
 **Characterization checkpoint (2026-10-05, baseline `18d0879`):**
 `test/artifact_integrity_compatibility_test.rb` locks canonical JSON bytes,
@@ -622,6 +663,8 @@ was corrected from 22 to 20 after filename-qualified duplicate occurrences
 were deduplicated.
 
 ### STR-1: Shared Artifact Identity And Safety Kernel
+
+**Status:** complete in HK-04; see its verification and preservation evidence.
 
 **Intent:** remove demonstrated duplication and eliminate lower layers reaching
 into `ReleaseBundle` for generic artifact policy.

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'time'
+require_relative '../artifact_integrity'
 
 module SloRulesEngine
   module ReleaseBundle
@@ -42,23 +43,12 @@ module SloRulesEngine
     end
 
     module CredentialScanner
-      FORBIDDEN_KEY = /\A(?:api[_-]?key|app[_-]?key|access[_-]?key|secret|password|token|authorization|credential|credentials)\z/i
+      FORBIDDEN_KEY = ArtifactIntegrity::CredentialScanner::FORBIDDEN_KEY
 
       module_function
 
       def paths(value, path)
-        case value
-        when Hash
-          value.flat_map do |key, entry|
-            key_path = "#{path}.#{key}"
-            matches = key.to_s.match?(FORBIDDEN_KEY) ? [key_path] : []
-            matches + paths(entry, key_path)
-          end
-        when Array
-          value.each_with_index.flat_map { |entry, index| paths(entry, "#{path}[#{index}]") }
-        else
-          []
-        end
+        ArtifactIntegrity::CredentialScanner.paths(value, path)
       end
     end
 

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../artifact_integrity'
+
 require 'json'
 require 'pathname'
 require 'uri'
@@ -118,7 +120,7 @@ module SloRulesEngine
             path: expanded_path,
             bundle_id: fetch_value(bundle, :bundle_id),
             lifecycle: status.fetch(:effective_lifecycle),
-            fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(bundle)
+            fingerprint: SloRulesEngine::ArtifactIntegrity::Fingerprint.content(bundle)
           },
           targets: targets.sort_by { |target| target.fetch(:uid) }
         )
@@ -160,7 +162,7 @@ module SloRulesEngine
           manifest_sources << {
             uid: uid,
             path: manifest_path,
-            fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(manifest)
+            fingerprint: SloRulesEngine::ArtifactIntegrity::Fingerprint.content(manifest)
           }
           evidence_reference = fetch_value(entry, :evidence).to_s
           evidence_path = nil
@@ -170,7 +172,7 @@ module SloRulesEngine
             evidence_sources << {
               uid: uid,
               path: evidence_path,
-              fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(evidence)
+              fingerprint: SloRulesEngine::ArtifactIntegrity::Fingerprint.content(evidence)
             }
           end
           resolved_target(uid, manifest, evidence_path: evidence_path)
@@ -179,7 +181,7 @@ module SloRulesEngine
 
         source = {
           path: expanded_path,
-          fingerprint: SloRulesEngine::ReleaseBundle::Fingerprint.content(portfolio),
+          fingerprint: SloRulesEngine::ArtifactIntegrity::Fingerprint.content(portfolio),
           manifests: manifest_sources.sort_by { |entry| entry.fetch(:uid) }
         }
         source[:evidence] = evidence_sources.sort_by { |entry| entry.fetch(:uid) } unless evidence_sources.empty?
@@ -209,7 +211,7 @@ module SloRulesEngine
             "live-status portfolio must be #{PORTFOLIO_SCHEMA_VERSION} #{PORTFOLIO_KIND}"
           )
         end
-        credential_paths = SloRulesEngine::ReleaseBundle::CredentialScanner.paths(portfolio, 'portfolio')
+        credential_paths = SloRulesEngine::ArtifactIntegrity::CredentialScanner.paths(portfolio, 'portfolio')
         return if credential_paths.empty?
 
         raise AggregateError.new(

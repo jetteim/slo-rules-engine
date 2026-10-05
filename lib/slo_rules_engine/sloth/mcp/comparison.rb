@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../../artifact_integrity'
+
 require 'json'
 require 'time'
 
@@ -80,7 +82,7 @@ module SloRulesEngine
             results,
             findings
           )
-          credential_paths = SloRulesEngine::ReleaseBundle::CredentialScanner.paths(report, 'report')
+          credential_paths = SloRulesEngine::ArtifactIntegrity::CredentialScanner.paths(report, 'report')
           unless credential_paths.empty?
             raise ContractError.new(
               'credential_like_sloth_mcp_output',

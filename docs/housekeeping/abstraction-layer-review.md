@@ -6,6 +6,13 @@ the [housekeeping queue](project-structure-refactoring-plan.md#ordered-housekeep
 owns execution order. The [maintainer guide](../maintainer-guide.md) explains
 how to navigate the current implementation.
 
+HK-04 resolution update, 2026-10-05: A-01's shared policies now live in
+`artifact_integrity.rb`; compatibility delegates preserve existing entry points.
+The generic release-utility edges in A-04 are removed. The findings below describe
+the inspected baseline; remaining responsibilities and dependencies stay open.
+Verification and the exact before/after debt inventory live in
+[HK-04](project-structure-refactoring-plan.md#hk-04-give-artifact-identity-and-credential-policy-one-owner).
+
 **Conclusion:** the main domain boundaries are useful, but their implementation
 is not fully consistent. The strongest simplifications are removing leftover
 migration helpers, giving repeated policies one owner, and correcting
@@ -25,7 +32,8 @@ Observed: 100 production/executable files, 24,677 production lines, 64 root
 requires, 40 registered commands, and 15 allowlisted forbidden-reference
 occurrences. Thirteen commands have shared executable application mappings;
 20 request schemas are explicit and 20 are inferred. These are current counts,
-not targets or measures of comprehension.
+not targets or measures of comprehension. HK-04 adds one shared-policy file and
+reduces the configured forbidden-reference occurrences from 15 to 6.
 
 The structure check enforces configured regex rules, file ownership, and
 contract snapshots. It is not a complete Ruby dependency analyzer. The runtime
@@ -73,6 +81,11 @@ hashing and bundle-specific identity assembly distinct: a telemetry identifier's
 text hash is not the hash of its JSON string representation. Local hash accessors
 also have different defaults and accepted containers; do not merge them merely
 because their names match.
+
+**Resolution:** implemented in HK-04. Pre-extraction goldens remain unchanged.
+A Hash subclass characterization additionally proves onboarding's `fetch`
+differs from bracket reads; the shared canonicalizer preserves both explicitly.
+The onboarding serialization-error fallback remains at its application boundary.
 
 ### A-02: Three CLI helpers are leftovers from migration
 
@@ -197,8 +210,8 @@ Datadog live testing and tagged Sloth MCP comparison remain externally gated.
 
 ## Recommendations
 
-Complete HK-02's guide and navigation cleanup, then follow the existing queue:
-HK-04 for common policy; HK-05 for single command ownership, leftover helpers,
+Keep HK-02's human navigation check open, then follow the existing queue:
+HK-04's common policy extraction is implemented; HK-05 covers single command ownership, leftover helpers,
 and proven duplicated orchestration; HK-06 for enforcement scope; then reassess
 with the maintainer. HK-07/08 address the demonstrated dependency problems.
 Later STR packets retain their dependencies and preservation gates.

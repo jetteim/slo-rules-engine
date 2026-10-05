@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'digest'
 require 'json'
+require_relative '../artifact_integrity'
 
 module SloRulesEngine
   module Application
@@ -68,22 +68,13 @@ module SloRulesEngine
       end
 
       def fingerprint(value)
-        "sha256:#{Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))}"
+        "sha256:#{ArtifactIntegrity::Fingerprint.content(value, fetch_values: true)}"
       rescue JSON::GeneratorError
-        "sha256:#{Digest::SHA256.hexdigest(value.to_s)}"
+        "sha256:#{ArtifactIntegrity::Fingerprint.text(value)}"
       end
 
       def canonicalize(value)
-        case value
-        when Hash
-          value.keys.sort_by(&:to_s).each_with_object({}) do |key, result|
-            result[key.to_s] = canonicalize(value.fetch(key))
-          end
-        when Array
-          value.map { |item| canonicalize(item) }
-        else
-          value
-        end
+        ArtifactIntegrity::Fingerprint.canonicalize(value, fetch_values: true)
       end
     end
 

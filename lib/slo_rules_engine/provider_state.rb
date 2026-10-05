@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'digest'
-require 'json'
+require_relative 'artifact_integrity'
 
 module SloRulesEngine
   module ProviderState
@@ -94,41 +93,21 @@ module SloRulesEngine
       module_function
 
       def content(value)
-        Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))
+        ArtifactIntegrity::Fingerprint.content(value)
       end
 
       def canonicalize(value)
-        case value
-        when Hash
-          value.keys.sort_by(&:to_s).each_with_object({}) do |key, canonical|
-            canonical[key.to_s] = canonicalize(value[key])
-          end
-        when Array
-          value.map { |entry| canonicalize(entry) }
-        else
-          value
-        end
+        ArtifactIntegrity::Fingerprint.canonicalize(value)
       end
     end
 
     module CredentialScanner
-      FORBIDDEN_KEY = /\A(?:api[_-]?key|app[_-]?key|access[_-]?key|secret|password|token|authorization|credential|credentials)\z/i
+      FORBIDDEN_KEY = ArtifactIntegrity::CredentialScanner::FORBIDDEN_KEY
 
       module_function
 
       def paths(value, path)
-        case value
-        when Hash
-          value.flat_map do |key, entry|
-            key_path = "#{path}.#{key}"
-            matches = key.to_s.match?(FORBIDDEN_KEY) ? [key_path] : []
-            matches + paths(entry, key_path)
-          end
-        when Array
-          value.each_with_index.flat_map { |entry, index| paths(entry, "#{path}[#{index}]") }
-        else
-          []
-        end
+        ArtifactIntegrity::CredentialScanner.paths(value, path)
       end
     end
 

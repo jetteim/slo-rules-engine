@@ -88,12 +88,30 @@ class ArchitectureFitnessTest < Minitest::Test
 
     assert_equal JSON.generate(first), JSON.generate(second)
     assert_equal 'structure-report/v1', first.fetch(:schema_version)
-    assert_equal 100, first.dig(:production, :file_count)
+    assert_equal 101, first.dig(:production, :file_count)
     assert_equal 64, first.dig(:composition, :root_require_count)
     assert_equal 11, first.dig(:commands, :module_count)
     assert_equal 120, first.dig(:schema_contracts, :command_ref_count)
     assert first.dig(:boundaries, :valid)
     assert first.dig(:dependency_debt, :valid)
     assert first.dig(:contracts, :valid)
+  end
+
+  def test_shared_integrity_policy_cannot_depend_on_orchestration
+    policy = JSON.parse(File.read(POLICY_PATH))
+    rule = policy.fetch('rules').find { |entry| entry.fetch('id') == 'artifact_integrity_must_not_depend_on_domains' }
+    Dir.mktmpdir('integrity-boundary') do |dir|
+      path = File.join(dir, 'lib/slo_rules_engine/artifact_integrity.rb')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, "SloRulesEngine::ReleaseBundle::Fingerprint.content(value)\n")
+      policy_path = File.join(dir, 'policy.json')
+      File.write(policy_path, JSON.generate(boundaries: [], rules: [rule]))
+      inventory = StructureInventory.new(root: dir, policy_path: policy_path, contracts_path: CONTRACTS_PATH)
+      evaluation = inventory.dependency_evaluation
+      refute evaluation.fetch(:valid)
+      assert_equal 1, evaluation.fetch(:reference_count)
+      assert_equal 'lib/slo_rules_engine/artifact_integrity.rb',
+                   evaluation.dig(:rules, 0, :unexpected_references, 0, :path)
+    end
   end
 end

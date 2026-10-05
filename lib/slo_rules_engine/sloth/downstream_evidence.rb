@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../artifact_integrity'
+
 require 'json'
 require 'time'
 require 'yaml'
@@ -65,7 +67,7 @@ module SloRulesEngine
         end
 
         def fingerprint(value)
-          SloRulesEngine::ReleaseBundle::Fingerprint.content(value)
+          SloRulesEngine::ArtifactIntegrity::Fingerprint.content(value)
         end
 
         def json_file(
@@ -109,7 +111,7 @@ module SloRulesEngine
         end
 
         def credential_findings(value, path)
-          SloRulesEngine::ReleaseBundle::CredentialScanner.paths(value, path).map do |credential_path|
+          SloRulesEngine::ArtifactIntegrity::CredentialScanner.paths(value, path).map do |credential_path|
             finding(
               'credential_like_key',
               'Sloth downstream evidence sources must not contain credential-like keys.',
