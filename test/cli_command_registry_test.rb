@@ -252,7 +252,7 @@ class CliCommandRegistryTest < Minitest::Test
     analysis = SloRulesEngine::CLI::CommandContracts::Analysis.definitions
     state = SloRulesEngine::CLI::CommandContracts::ProviderState.definitions
 
-    assert_equal %w[validate migration-report model-report], analysis.map(&:id)
+    assert_equal %w[validate migration-report model-report recommend-calculation-basis reality-check], analysis.map(&:id)
     assert_equal %w[apply diff import prune], state.map(&:id)
     (analysis + state).each { |definition| assert_equal 'explicit', definition.request_schema_source }
     (analysis + state).each do |definition|

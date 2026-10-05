@@ -247,13 +247,9 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'recommend-calculation-basis' => 'bin/rules-ctl recommend-calculation-basis --observations-per-second=1 --failed-observations-to-alert=5',
-        'reality-check' => 'bin/rules-ctl reality-check --provider=prometheus_stack --telemetry=./telemetry.json ./service.rb',
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'recommend-calculation-basis' => { observations_per_second: 1.0, failed_observations_to_alert: 5.0 },
-        'reality-check' => { provider: 'prometheus_stack', telemetry_file: './telemetry.json', definition_files: ['./service.rb'] },
       }.freeze
 
       module_function
@@ -292,15 +288,8 @@ module SloRulesEngine
           *CommandContracts::Telemetry.definitions,
           *CommandContracts::Catalog.definitions,
           *CommandContracts::Onboarding.definitions,
-          command('recommend-calculation-basis', handler: :recommend_calculation_basis, side_effect: 'none',
-                  io: io, gates: %w[strict_arguments numeric_bounds], output: output(streaming: 'not_applicable'),
-                  agent_status: 'implemented',
-                  application_command: 'SloRulesEngine::Application::RecommendCalculationBasis'),
-          command('reality-check', handler: :reality_check, side_effect: 'provider_read',
-                  io: io(local_reads: %w[definitions telemetry_evidence lookup_results],
-                         provider_reads: %w[telemetry_backend],
-                         credentials: %w[provider_environment_when_online]),
-                  gates: %w[strict_arguments reviewed_provider_binding read_only_backend]),
+          CommandContracts::Analysis.fetch('recommend-calculation-basis'),
+          CommandContracts::Analysis.fetch('reality-check'),
           *CommandContracts::Analysis.reports
         ]
       end
