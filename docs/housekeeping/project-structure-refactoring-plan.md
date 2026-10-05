@@ -302,6 +302,7 @@ for those source labels; the compact catalog digest is unchanged.
 | Agent introspection | 26 / 40 | 569 tests / 7,730 assertions | `slo-hk05-introspection-` |
 | Release bundle | 31 / 40 | 569 tests / 7,740 assertions | `slo-hk05-release_bundle-` |
 | Journal | 33 / 40 | 569 tests / 7,744 assertions | `slo-hk05-journal-` |
+| Approved plan | 37 / 40 | 569 tests / 7,752 assertions | `slo-hk05-approved_plan-` |
 
 Sloth checkpoint verification at 21:56–21:58 UTC: focused registry,
 introspection, invocation, preservation and fitness suites passed 32 tests /
@@ -321,6 +322,8 @@ Agent introspection checkpoint verified 2026-10-05 22:02:39 UTC: 32 focused test
 Release bundle checkpoint verified 2026-10-05 22:04:13 UTC: 32 focused tests / 3,353 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
 
 Journal checkpoint verified 2026-10-05 22:05:18 UTC: 32 focused tests / 3,357 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
+
+Approved plan checkpoint verified 2026-10-05 22:06:25 UTC: 32 focused tests / 3,365 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
 
 **Work:** finish the metadata half of STR-3 one remaining family at a time;
 remove each migrated family's legacy usage/examples/schema-inference source

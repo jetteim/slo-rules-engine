@@ -8,6 +8,7 @@ require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
 require_relative 'command_contracts/onboarding'
+require_relative 'command_contracts/approved_plan'
 require_relative 'command_contracts/journal'
 require_relative 'command_contracts/release_bundle'
 require_relative 'command_contracts/introspection'
@@ -246,19 +247,11 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'plan.approve' => 'bin/rules-ctl plan approve ./apply-ready.json --target=checkout/prometheus_stack --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --output=./approved-plan.json',
-        'plan.status' => 'bin/rules-ctl plan status ./approved-plan.json',
-        'plan.apply' => 'bin/rules-ctl plan apply ./approved-plan.json --confirm --journal-dir=./journals',
-        'plan.resume' => 'bin/rules-ctl plan resume ./approved-plan.json --confirm --journal-dir=./journals',
         'recommend-calculation-basis' => 'bin/rules-ctl recommend-calculation-basis --observations-per-second=1 --failed-observations-to-alert=5',
         'reality-check' => 'bin/rules-ctl reality-check --provider=prometheus_stack --telemetry=./telemetry.json ./service.rb',
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'plan.approve' => { bundle_file: './apply-ready.json', target: 'checkout/prometheus_stack', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', output_file: './approved-plan.json' },
-        'plan.status' => { approved_plan_file: './approved-plan.json' },
-        'plan.apply' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
-        'plan.resume' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
         'recommend-calculation-basis' => { observations_per_second: 1.0, failed_observations_to_alert: 5.0 },
         'reality-check' => { provider: 'prometheus_stack', telemetry_file: './telemetry.json', definition_files: ['./service.rb'] },
       }.freeze
@@ -295,24 +288,7 @@ module SloRulesEngine
           *CommandContracts::Introspection.definitions,
           *CommandContracts::ReleaseBundle.definitions,
           *CommandContracts::Journal.definitions,
-          command('plan.approve', path: %w[plan approve], side_effect: 'local_write',
-                  io: io(local_reads: %w[apply_ready_bundle source_evidence provider_plan],
-                         local_writes: %w[approved_plan]),
-                  gates: %w[strict_arguments reviewed_provenance evidence_freshness reviewer_attestation credential_scan]),
-          command('plan.status', path: %w[plan status], side_effect: 'local_read',
-                  io: io(local_reads: %w[approved_plan source_evidence managed_files]),
-                  gates: %w[strict_arguments approved_plan_schema evidence_freshness managed_path_containment read_only]),
-          command('plan.apply', path: %w[plan apply], side_effect: 'local_write',
-                  io: io(local_reads: %w[approved_plan source_evidence managed_files operation_journal],
-                         local_writes: %w[managed_files operation_journal provider_state_result],
-                         provider_reads: %w[managed_files], provider_writes: %w[managed_files]),
-                  gates: %w[strict_arguments reviewed_provenance evidence_freshness approved_exact_plan explicit_confirmation scope_lock durable_journal post_apply_verification]),
-          command('plan.resume', path: %w[plan resume], side_effect: 'local_write',
-                  io: io(local_reads: %w[approved_plan source_evidence managed_files operation_journal],
-                         local_writes: %w[managed_files operation_journal provider_state_result],
-                         provider_reads: %w[managed_files], provider_writes: %w[managed_files]),
-                  gates: %w[strict_arguments approved_exact_plan resumable_journal state_recheck explicit_confirmation scope_lock post_apply_verification]),
-
+          *CommandContracts::ApprovedPlan.definitions,
           *CommandContracts::Telemetry.definitions,
           *CommandContracts::Catalog.definitions,
           *CommandContracts::Onboarding.definitions,
