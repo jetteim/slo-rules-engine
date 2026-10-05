@@ -8,6 +8,7 @@ require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
 require_relative 'command_contracts/onboarding'
+require_relative 'command_contracts/release_bundle'
 require_relative 'command_contracts/introspection'
 require_relative 'command_contracts/status'
 require_relative 'command_contracts/sloth'
@@ -244,11 +245,6 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'bundle.create' => 'bin/rules-ctl bundle create --artifact-index=./index.json --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --sloth-evidence=checkout/sloth=./sloth-evidence.json --output=./bundle.json',
-        'bundle.plan' => 'bin/rules-ctl bundle plan ./bundle.json --target-output=checkout/prometheus_stack=./managed --output=./apply-ready.json',
-        'bundle.apply' => 'bin/rules-ctl bundle apply ./apply-ready.json --confirm --approved-plan=./approved-plan.json --journal-dir=./journals --output=./applied.json',
-        'bundle.verify' => 'bin/rules-ctl bundle verify ./applied.json --sloth-evidence=checkout/sloth=./sloth-evidence.json --target-base-url=checkout/sloth=http://localhost:9090 --max-age-seconds=300 --output=./verified.json',
-        'bundle.status' => 'bin/rules-ctl bundle status ./bundle.json',
         'journal.create' => 'bin/rules-ctl journal create ./provider-plan.json --output=./journal.json',
         'journal.status' => 'bin/rules-ctl journal status ./journal.json',
         'plan.approve' => 'bin/rules-ctl plan approve ./apply-ready.json --target=checkout/prometheus_stack --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --output=./approved-plan.json',
@@ -260,11 +256,6 @@ module SloRulesEngine
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'bundle.create' => { artifact_index_file: './index.json', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', sloth_evidence_files: { 'checkout/sloth' => './sloth-evidence.json' }, output_file: './bundle.json' },
-        'bundle.plan' => { bundle_file: './bundle.json', target_outputs: { 'checkout/prometheus_stack' => './managed' }, output_file: './apply-ready.json' },
-        'bundle.apply' => { bundle_file: './apply-ready.json', confirm: true, approved_plan_files: ['./approved-plan.json'], journal_dir: './journals', output_file: './applied.json' },
-        'bundle.verify' => { bundle_file: './applied.json', sloth_evidence_files: { 'checkout/sloth' => './sloth-evidence.json' }, target_base_urls: { 'checkout/sloth' => 'http://localhost:9090' }, max_age_seconds: 300, output_file: './verified.json' },
-        'bundle.status' => { bundle_file: './bundle.json' },
         'journal.create' => { provider_plan_file: './provider-plan.json', output_file: './journal.json' },
         'journal.status' => { journal_file: './journal.json' },
         'plan.approve' => { bundle_file: './apply-ready.json', target: 'checkout/prometheus_stack', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', output_file: './approved-plan.json' },
@@ -305,31 +296,7 @@ module SloRulesEngine
           *CommandContracts::Status.definitions,
           *CommandContracts::Sloth.definitions,
           *CommandContracts::Introspection.definitions,
-          command('bundle.create', path: %w[bundle create], side_effect: 'local_write',
-                  io: io(local_reads: %w[artifact_index provider_plans source_evidence],
-                         local_writes: %w[review_ready_bundle]),
-                  gates: %w[strict_arguments reviewed_provenance evidence_freshness credential_scan immutable_predecessor]),
-          command('bundle.plan', path: %w[bundle plan], side_effect: 'provider_read',
-                  io: io(local_reads: %w[review_ready_bundle source_evidence managed_files],
-                         local_writes: %w[apply_ready_bundle],
-                         provider_reads: %w[provider_state managed_files],
-                         credentials: %w[provider_environment_when_live]),
-                  gates: %w[strict_arguments evidence_freshness target_runtime_preflight immutable_predecessor no_provider_mutation]),
-          command('bundle.apply', path: %w[bundle apply], side_effect: 'local_write',
-                  io: io(local_reads: %w[apply_ready_bundle approved_plans source_evidence operation_journals],
-                         local_writes: %w[managed_files operation_journals provider_state_results applied_bundle],
-                         provider_reads: %w[managed_files],
-                         provider_writes: %w[managed_files]),
-                  gates: %w[strict_arguments reviewed_provenance evidence_freshness approved_exact_plan explicit_confirmation scope_lock durable_journal post_apply_verification]),
-          command('bundle.verify', path: %w[bundle verify], side_effect: 'local_write',
-                  io: io(local_reads: %w[applied_bundle approved_plans operation_journals managed_files sloth_downstream_evidence sloth_evidence_sources],
-                         local_writes: %w[verified_bundle],
-                         provider_reads: %w[managed_files prometheus_instant_queries]),
-                  gates: %w[strict_arguments evidence_freshness execution_evidence exact_manifest_evidence complete_slo_coverage target_runtime_preflight read_only_provider_state immutable_predecessor]),
-          command('bundle.status', path: %w[bundle status], side_effect: 'local_read',
-                  io: io(local_reads: %w[release_bundle source_evidence]),
-                  gates: %w[strict_arguments bundle_schema evidence_freshness read_only]),
-
+          *CommandContracts::ReleaseBundle.definitions,
           command('journal.create', path: %w[journal create], side_effect: 'local_write',
                   io: io(local_reads: %w[provider_plan], local_writes: %w[operation_journal]),
                   gates: %w[strict_arguments provider_plan_schema credential_scan no_execution]),
