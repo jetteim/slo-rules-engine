@@ -8,6 +8,7 @@ require_relative 'command_contracts/generation'
 require_relative 'command_contracts/provider_state'
 require_relative 'command_contracts/telemetry'
 require_relative 'command_contracts/onboarding'
+require_relative 'command_contracts/journal'
 require_relative 'command_contracts/release_bundle'
 require_relative 'command_contracts/introspection'
 require_relative 'command_contracts/status'
@@ -245,8 +246,6 @@ module SloRulesEngine
       SCHEMA_VERSION = 'slo-rules-engine/cli-command-catalog/v1'
       HUMAN_USAGE = {
         'validate-handoff' => 'bin/rules-ctl validate-handoff ./handoff.json',
-        'journal.create' => 'bin/rules-ctl journal create ./provider-plan.json --output=./journal.json',
-        'journal.status' => 'bin/rules-ctl journal status ./journal.json',
         'plan.approve' => 'bin/rules-ctl plan approve ./apply-ready.json --target=checkout/prometheus_stack --reviewer=reviewer@example.com --reviewed-at=2026-08-04T09:00:00Z --output=./approved-plan.json',
         'plan.status' => 'bin/rules-ctl plan status ./approved-plan.json',
         'plan.apply' => 'bin/rules-ctl plan apply ./approved-plan.json --confirm --journal-dir=./journals',
@@ -256,8 +255,6 @@ module SloRulesEngine
       }.freeze
       AGENT_ARGUMENT_EXAMPLES = {
         'validate-handoff' => { handoff_file: './handoff.json' },
-        'journal.create' => { provider_plan_file: './provider-plan.json', output_file: './journal.json' },
-        'journal.status' => { journal_file: './journal.json' },
         'plan.approve' => { bundle_file: './apply-ready.json', target: 'checkout/prometheus_stack', reviewer: 'reviewer@example.com', reviewed_at: '2026-08-04T09:00:00Z', output_file: './approved-plan.json' },
         'plan.status' => { approved_plan_file: './approved-plan.json' },
         'plan.apply' => { approved_plan_file: './approved-plan.json', confirm: true, journal_dir: './journals' },
@@ -297,13 +294,7 @@ module SloRulesEngine
           *CommandContracts::Sloth.definitions,
           *CommandContracts::Introspection.definitions,
           *CommandContracts::ReleaseBundle.definitions,
-          command('journal.create', path: %w[journal create], side_effect: 'local_write',
-                  io: io(local_reads: %w[provider_plan], local_writes: %w[operation_journal]),
-                  gates: %w[strict_arguments provider_plan_schema credential_scan no_execution]),
-          command('journal.status', path: %w[journal status], side_effect: 'local_read',
-                  io: io(local_reads: %w[operation_journal]),
-                  gates: %w[strict_arguments operation_journal_schema read_only]),
-
+          *CommandContracts::Journal.definitions,
           command('plan.approve', path: %w[plan approve], side_effect: 'local_write',
                   io: io(local_reads: %w[apply_ready_bundle source_evidence provider_plan],
                          local_writes: %w[approved_plan]),
