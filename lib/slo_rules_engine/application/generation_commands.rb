@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require 'json'
+require_relative 'provider_validation'
 
 module SloRulesEngine
   module Application
@@ -24,15 +25,21 @@ module SloRulesEngine
           { kind: 'provider_manifest', path: destination.fetch(:display_path) }
         end
 
-        report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
-          manifests,
-          provider: provider.key,
-          handoff_dir: handoff_dir
+        display_path = File.join(report_path_root, *report_segments)
+        write_manifest_review_report(
+          report_path, manifests, provider: provider, handoff_dir: handoff_dir,
+          display_path: display_path
         )
-        report[:report] = { path: File.join(report_path_root, *report_segments) }
-        write_json(report_path, report)
-        artifacts << { kind: 'manifest_review_report', path: report.dig(:report, :path) }
+        artifacts << { kind: 'manifest_review_report', path: display_path }
         artifacts
+      end
+
+      def write_manifest_review_report(path, manifests, provider:, handoff_dir:, display_path: path)
+        report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
+          manifests, provider: provider.key, handoff_dir: handoff_dir
+        )
+        report[:report] = { path: display_path }
+        write_json(path, report)
       end
 
       def write_json(path, payload)
@@ -45,18 +52,7 @@ module SloRulesEngine
       private
 
       def validate_for_provider(definitions, provider)
-        core_validator = SloRulesEngine::CoreValidator.new
-        errors = []
-        warnings = []
-        definitions.each do |definition|
-          core_result = core_validator.validate(definition)
-          provider_result = provider.validate(definition)
-          errors.concat(core_result.errors.map(&:to_h))
-          errors.concat(provider_result.errors.map(&:to_h))
-          warnings.concat(core_result.warnings.map(&:to_h))
-          warnings.concat(provider_result.warnings.map(&:to_h))
-        end
-        { valid: errors.empty?, errors: errors, warnings: warnings }
+        ProviderValidation.validate(definitions, provider)
       end
 
       def generate_manifests(definitions, provider)

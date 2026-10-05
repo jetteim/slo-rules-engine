@@ -535,43 +535,23 @@ module RulesCtl
   end
 
   def validate_for_provider(definitions, provider)
-    core_validator = SloRulesEngine::CoreValidator.new
-    errors = []
-    warnings = []
-    definitions.each do |definition|
-      core_result = core_validator.validate(definition)
-      provider_result = provider.validate(definition)
-      errors.concat(core_result.errors.map(&:to_h))
-      errors.concat(provider_result.errors.map(&:to_h))
-      warnings.concat(core_result.warnings.map(&:to_h))
-      warnings.concat(provider_result.warnings.map(&:to_h))
-    end
-    {
-      valid: errors.empty?,
-      errors: errors,
-      warnings: warnings
-    }
+    SloRulesEngine::Application::ProviderValidation.validate(definitions, provider)
   end
 
   def write_provider_manifests(output_dir, manifests, provider: nil, handoff_dir: nil)
+    writer = SloRulesEngine::Application::LocalArtifactWriter.new
     manifests.each do |manifest|
       path = File.join(output_dir, manifest.fetch(:service), manifest.fetch(:provider), 'manifest.json')
-      FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, JSON.pretty_generate(manifest))
+      writer.write_json(path, manifest)
     end
     write_manifest_review_report(output_dir, manifests, provider: provider, handoff_dir: handoff_dir) if provider
   end
 
   def write_manifest_review_report(output_dir, manifests, provider:, handoff_dir: nil)
-    report = SloRulesEngine::ManifestReviewQueue::ReportBuilder.new.build(
-      manifests,
-      provider: provider.key,
-      handoff_dir: handoff_dir
-    )
     path = File.join(output_dir, 'manifest-review', "#{provider.key}.json")
-    report[:report] = { path: path }
-    FileUtils.mkdir_p(File.dirname(path))
-    File.write(path, JSON.pretty_generate(report))
+    SloRulesEngine::Application::LocalArtifactWriter.new.write_manifest_review_report(
+      path, manifests, provider: provider, handoff_dir: handoff_dir
+    )
   end
 
   def write_json_file(path, payload)

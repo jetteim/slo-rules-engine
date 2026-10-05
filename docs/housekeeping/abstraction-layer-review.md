@@ -104,6 +104,13 @@ absence of repository callers does not prove absence of external callers.
 Keep `load_definitions`, `validate_for_provider`, and `write_json_file` until
 their current legacy callers are migrated. They are still used.
 
+**Compatibility decision in HK-05:** retain these Ruby module-method entry
+points rather than assuming external callers do not exist. The legacy writers
+now delegate JSON/report writes to the existing application writer; their bytes
+and nil/integer return values are characterized. The short legacy resolver
+remains a compatibility shim. This removes duplicated implementation while
+deferring deletion of callable names.
+
 ### A-03: The command registry has one runtime inventory but two authoring paths
 
 [CommandRegistry.default](../../lib/slo_rules_engine/cli/command_registry.rb)
@@ -163,6 +170,11 @@ its callers in HK-05. Preserve finding paths, ordering, warning behavior, and
 Human/Agent exits. Keep core validation separate from provider validation;
 those two policies answer different questions.
 
+**Resolution:** HK-05 gives aggregation one owner in
+`Application::ProviderValidation`. The three existing paths delegate with the
+same finding order, warning behavior, exception propagation, and result shape.
+The core validator and provider validators retain their separate policies.
+
 ### A-06: The boundary declarations and their enforcement disagree
 
 [StructureInventory](../../scripts/support/structure_inventory.rb) reports
@@ -216,8 +228,9 @@ Datadog live testing and tagged Sloth MCP comparison remain externally gated.
 ## Recommendations
 
 Keep HK-02's human navigation check open, then follow the existing queue:
-HK-04's common policy extraction is implemented; HK-05 covers single command ownership, leftover helpers,
-and proven duplicated orchestration; HK-06 for enforcement scope; then reassess
+HK-04's common policy and HK-05's single command ownership and shared
+orchestration are complete, with callable legacy names retained for compatibility.
+HK-06 addresses enforcement scope; then reassess
 with the maintainer. HK-07/08 address the demonstrated dependency problems.
 Later STR packets retain their dependencies and preservation gates.
 

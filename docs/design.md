@@ -31,9 +31,11 @@ MCP stdio adapter: planned projection of the shared command contract.
 The library composes focused command-family modules for catalogs, onboarding,
 telemetry, reports, release bundles, journals, approved plans, Sloth downstream
 evidence, and live status.
-Shared manifest/state orchestration remains in the library facade because those
-commands intentionally share definition loading, provider validation, review
-freshness, error rendering, and usage behavior.
+Legacy manifest/state orchestration remains in the library facade, including
+definition loading, review freshness, error rendering, and usage behavior.
+`application/provider_validation.rb` owns shared core/provider finding
+aggregation. Generation and legacy writer entry points share
+`Application::LocalArtifactWriter` for report and JSON writes.
 
 ### Command Contract And Agent Interfaces
 

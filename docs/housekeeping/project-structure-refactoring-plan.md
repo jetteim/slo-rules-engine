@@ -2,8 +2,8 @@
 
 Original audit: 2026-08-15. Maintainer review: 2026-09-05.
 
-Status: housekeeping first; HK-01, HK-03, and HK-04 complete; HK-02 implemented,
-maintainer navigation feedback pending. HK-05 is the next code task.
+Status: housekeeping first; HK-01, HK-03, HK-04, and HK-05 complete;
+HK-02 implemented, maintainer navigation feedback pending. HK-06 is the next code task.
 STR-0 completed; STR-1 completed; STR-3 partially implemented.
 
 Baseline commit: `6dc0ffb`
@@ -36,8 +36,8 @@ STR packets below own structural preservation and dependency-removal gates.
 Feature scope lives in the Agent roadmap and implementation history, rather
 than a second active queue.
 
-HK-01, HK-03, and HK-04 are complete. HK-02 has implemented documentation with
-the maintainer navigation check pending; HK-05–HK-08 remain open.
+HK-01, HK-03, HK-04, and HK-05 are complete. HK-02 has implemented documentation
+with the maintainer navigation check pending; HK-06–HK-08 remain open.
 Sizes indicate review scope, not time estimates:
 S = one narrow checkpoint; M = several explicitly separated checkpoints.
 One task/checkpoint at a time. Each code checkpoint runs its focused tests,
@@ -51,7 +51,7 @@ contract change, or show that the old contract remains identical.
 | 2 | HK-03: Close candidate output-policy gaps (complete) | S | AICLI-F3/F4 safety repair; after HK-01 |
 | 3 | HK-02: Give the maintainer one map and one current queue (navigation check pending) | M | documentation; after HK-01 and HK-03 |
 | 4 | HK-04: Give artifact identity and credential policy one owner (complete) | M | STR-1; after HK-01 and HK-03 |
-| 5 | HK-05: Finish command declarations without enabling commands | M | bounded STR-3 work; after HK-02 |
+| 5 | HK-05: Finish command declarations without enabling commands (complete) | M | bounded STR-3 work; after HK-02 |
 | 6 | HK-06: Make fitness checks match their advertised scope | S | STR-0 follow-up; before dependency moves in HK-07/08 |
 | 7 | HK-07: Let Sloth evidence own evidence preflight | M | STR-2; after HK-04 and HK-06 |
 | 8 | HK-08: Separate journal storage from execution policy | M | STR-4; after HK-04 and HK-06 |
@@ -122,7 +122,7 @@ the guide to (1) trace a generated Prometheus YAML file to its definition,
 (2) find the shared generation handler and its tests, and (3) locate the gates
 behind an apply refusal. Record their result before closing this acceptance
 item or resuming feature expansion. HK-04's policy extraction is complete;
-HK-05 is the next code task.
+HK-05's declaration/validation cleanup is complete; HK-06 is next.
 
 **Work:** first add a short maintainer explanation, linked prominently from
 README: intent → reviewed artifacts → plan → journaled execution → verification;
@@ -283,7 +283,8 @@ revert migration independently from characterization.
 
 ### HK-05: Finish Command Declarations Without Enabling Commands
 
-**Metadata complete; orchestration checkpoint next:** every command now has
+**Status: complete, with compatibility entry-point deletion explicitly deferred.**
+Every command now has
 one explicit declaration owner in `cli/command_contracts/`. Legacy usage/example
 maps are empty compatibility views; example-based schema inference and catalog
 command factories are removed. The pre-migration registry, compact catalog, full Agent
@@ -297,6 +298,39 @@ now requires explicit arguments, and preservation tests require exactly one
 family owner for every registered command. Production files increase from 101
 to 107 for the six named remaining-family declaration files; root requires
 remain 64. The command-module count is unchanged.
+
+`Application::ProviderValidation` now owns finding aggregation used by the three
+existing CLI/generation/diff paths. Core and provider policy remain distinct.
+The existing application writer owns JSON/report serialization for generation
+and legacy writer methods. Characterization before moving this code passed
+4 tests / 39 assertions, including ordering, warning-only and empty-input
+success, exception propagation, file bytes, and nil/integer return values.
+Ruby-callable legacy helpers are retained as compatibility entry points;
+deleting their names is deferred because repository non-use cannot prove
+external non-use. This is a compatibility decision, not a second policy owner.
+The named application validation file brings production ownership to 108 files;
+root requires, schema IDs, command count, and six dependency-debt occurrences
+remain unchanged. No broader Agent command is enabled.
+
+**Final orchestration verification (2026-10-05, 22:13–22:18 UTC, local repository):**
+focused workflow, artifact/command goldens, Human/Agent read/write parity, and
+the two offline walkthroughs passed 33 tests / 510 assertions. Final
+`./scripts/verify.sh` passed 575 tests / 7,816 assertions with zero failures,
+errors, or skips, architecture checks, and CLI smokes. The extra constant-lookup
+test preserves the original neutral validator lookup even if an application
+extension defines a same-named class. The command baseline comparison still
+permits only the twenty authoring-source labels; this orchestration move changes
+no registry digest. Artifact/identity goldens are unchanged. A link check resolved
+all 120 local file links in changed Markdown. No live provider calls, mutations,
+or metric/log/trace reads occurred. Outputs:
+`/tmp/slo-hk05-workflow-characterization.log`,
+`/tmp/slo-hk05-workflow-focused.log`, `/tmp/slo-hk05-workflow-verify.log`,
+`/tmp/slo-hk05-workflow-proof.json`, `/tmp/slo-hk05-workflow-links.json`, and
+`/tmp/slo-hk05-after-structure.json`. Rollback: revert the orchestration checkpoint
+with its named validation-file/count change, preserving the independently
+verified family commits and their original goldens. HK-06 is next; STR-3 remains
+open for later typed workflow coverage, and HK-02 human navigation remains
+unverified. Feature expansion stays paused.
 
 **Family checkpoints (local repository, 2026-10-05 UTC):**
 
@@ -319,8 +353,8 @@ delta and registry digest migration. Logs are `PREFIXfocused.log`,
 `PREFIXverify.log`, and `PREFIXproof.json`. No live provider calls, mutations,
 or metric/log/trace reads occurred. Rollback: revert the family checkpoint,
 its registry digest, and its named production-file count change together;
-retain baseline preservation goldens. HK-05 remains open for other families
-and the separate orchestration checkpoint.
+retain baseline preservation goldens. The following rows record each subsequent
+family before the separate orchestration checkpoint.
 
 Live status checkpoint verified 2026-10-05 22:00:45 UTC: 32 focused tests / 3,339 assertions; full verification, wire comparison, and structure checks passed. Its table prefix identifies the focused/full/proof outputs. Registry changes remain limited to authoring provenance; application mappings stay at thirteen. No live provider or telemetry reads/writes occurred.
 
