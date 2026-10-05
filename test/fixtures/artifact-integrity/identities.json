@@ -1,0 +1,17 @@
+{
+  "desired_state": "e616ba26ba079506e5651075d2346bbe83a38d95ccecaf4d9fbd751ce8be5c8d",
+  "observed_state": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "plan": "cb40c16c90676a019138add7d7bc79a60912b4620e032939b27fb5d6a052612c",
+  "journal": "operation-journal-c260e7efd320060e7ec5d6ea82d6babb67543d99f6edbf907b1968ba9f943b05",
+  "approved_plan": "approved-provider-plan-50c8ef4d9e886f83ba31256287c66fb27f7ddf661b76ed35a1b4cb2409983fba",
+  "bundle": "slo-bundle-1b8310b9ff39896b7a9a8033f61ba0d738e79123d170133782314598b6eaaf5b",
+  "bundle_recomputed": "slo-bundle-b1518264233c33dc64981e49d9507f0cef76c89cf5f1a4a588c87e93cd7e8b48",
+  "sloth_evidence": "sloth-evidence-50c8ef4d9e886f83ba31256287c66fb27f7ddf661b76ed35a1b4cb2409983fba",
+  "sloth_mcp": "sloth-mcp-comparison-50c8ef4d9e886f83ba31256287c66fb27f7ddf661b76ed35a1b4cb2409983fba",
+  "datadog_manifest": "e1345dc4e4b5985bf660acc4d4317fba2e011d000d6011ebeedfc5e538045073",
+  "datadog_review": "5f38c4e14efd6a002d06b5f365a631602b330c3a6b0a776485772c434bb9f93f",
+  "prometheus_stack_manifest": "bb80044e80332e43532c4330c6c1f1ce8e1534676bb896e6e89ce8fa46facaf6",
+  "prometheus_stack_review": "1f0b550640d46052c9252c31ad833cbbbf52e21e231a3a6d700ffa7a583faad1",
+  "sloth_manifest": "0952e7011023bd5720b263529449af4bab5a6112ec080efb4e6844cc0c071bee",
+  "sloth_review": "5932b5b439f15b2603bf62d76f19bc54fe95a6a09c309af524b6611074964593"
+}

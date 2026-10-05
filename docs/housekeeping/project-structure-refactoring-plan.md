@@ -201,6 +201,28 @@ if reverted, mark the defect open and keep command expansion paused.
 
 ### HK-04: Give Artifact Identity And Credential Policy One Owner
 
+**Characterization checkpoint (2026-10-05, baseline `18d0879`):**
+`test/artifact_integrity_compatibility_test.rb` locks canonical JSON bytes,
+symbol/string collisions, array order, input immutability, exact credential-key
+paths, text-vs-JSON hashing, and onboarding's prefix/error fallback. A Hash
+subclass probe demonstrates onboarding's `fetch` semantics versus the other
+helpers' bracket reads; preserve that distinction. Saved pre-extraction goldens
+cover state/plan/journal/approval/bundle/evidence/comparison identities and all
+three providers' generated manifest/review content. Identity-only synthetic
+inputs do not claim full artifact schema validity.
+
+**Characterization evidence (2026-10-05, 21:38 UTC, local repository):**
+focused tests passed 7 tests / 114 assertions. `./scripts/verify.sh` passed
+565 tests / 7,664 assertions, architecture checks, and CLI smokes. Offline
+onboarding and Prometheus managed-file walkthroughs passed 2 tests / 69
+assertions, proving those complete documented flows remain usable. No backend,
+metric/log/trace reads or provider mutations occurred. Outputs:
+`/tmp/slo-hk04-20261005-characterization.log`,
+`/tmp/slo-hk04-20261005-characterization-verify.log`,
+`/tmp/slo-hk04-20261005-usability.log`, and
+`/tmp/slo-hk04-20261005-before-structure.json`. Production code is unchanged.
+Rollback: revert this test/fixture checkpoint independently of the migration.
+
 **Work:** execute STR-1 in two checkpoints: golden-vector characterization,
 then shared owner plus compatibility delegates and caller migration. Include
 `OnboardingCommandSupport#fingerprint` and manifest-review hashing in the inventory.
